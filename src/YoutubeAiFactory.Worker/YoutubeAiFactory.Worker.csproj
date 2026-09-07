@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-YoutubeAiFactory.Worker-817fae35-d986-4c3e-9607-9beb22168393</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\YoutubeAiFactory.Application\YoutubeAiFactory.Application.csproj" />
+    <ProjectReference Include="..\YoutubeAiFactory.Infrastructure\YoutubeAiFactory.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

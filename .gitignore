@@ -1,0 +1,31 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+**/appsettings.Development.json
+
+# Frontend
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# Local configuration and tooling
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+TestResults/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+build/
+coverage/
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,40 @@
+# YouTube AI Factory
+
+YouTube AI Factory turns YouTube market information into structured content intelligence. The current Phase 2 vertical slice creates projects, collects a competitor channel and recent videos through the official YouTube Data API, stores the result in PostgreSQL, and displays it in React. AI analysis and later production workflows remain deferred.
+
+## Repository layout
+
+- `src/YoutubeAiFactory.Domain` — entities, value objects, invariants, and state transitions.
+- `src/YoutubeAiFactory.Application` — use cases and provider-neutral contracts.
+- `src/YoutubeAiFactory.Infrastructure` — EF Core, PostgreSQL, migrations, and the YouTube adapter.
+- `src/YoutubeAiFactory.Api` — HTTP endpoints, problem responses, and health checks.
+- `src/YoutubeAiFactory.Worker` — reserved host for later background work.
+- `src/YoutubeAiFactory.Web` — React and TypeScript project/competitor interface.
+- `tests` — domain, application, adapter, API, and PostgreSQL tests.
+- `docs` — product, architecture, domain, API, workflow, and setup notes.
+
+## Quick start
+
+Prerequisites: .NET SDK 10.0.400 or a compatible feature band, Node.js 22.12+, npm, Docker, and a Google API key with YouTube Data API v3 access.
+
+```powershell
+docker compose up -d postgres
+dotnet tool restore
+dotnet ef database update --project src/YoutubeAiFactory.Infrastructure --startup-project src/YoutubeAiFactory.Infrastructure
+$env:YouTube__ApiKey = "your-google-api-key"
+dotnet run --project src/YoutubeAiFactory.Api --urls http://localhost:5050
+```
+
+In another terminal:
+
+```powershell
+cd src/YoutubeAiFactory.Web
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. See [Local Development](docs/LOCAL_DEVELOPMENT.md) for tests, configuration, and database commands.
+
+## Phase boundary
+
+Phase 2 supports project creation and read operations plus competitor collection and refresh. It accepts `youtube.com/@handle` and `youtube.com/channel/{id}` URLs and collects up to `CompetitorCollection:VideoLimit` recent uploads. Competitor analysis, LLM calls, ideas, research, scripts, authentication, and background collection are outside this phase.

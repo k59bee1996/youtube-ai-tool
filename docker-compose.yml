@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${YAF_DB_NAME:-youtube_ai_factory}
+      POSTGRES_USER: ${YAF_DB_USER:-yaf}
+      POSTGRES_PASSWORD: ${YAF_DB_PASSWORD:-yaf_dev_password}
+    ports:
+      - "127.0.0.1:${YAF_DB_PORT:-5432}:5432"
+    volumes:
+      - yaf-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${YAF_DB_USER:-yaf} -d ${YAF_DB_NAME:-youtube_ai_factory}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-tests:
+    image: postgres:17-alpine
+    profiles: ["tests"]
+    environment:
+      POSTGRES_DB: youtube_ai_factory_tests
+      POSTGRES_USER: yaf
+      POSTGRES_PASSWORD: yaf_test_password
+    ports:
+      - "127.0.0.1:${YAF_TEST_DB_PORT:-5433}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaf -d youtube_ai_factory_tests"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  yaf-postgres:
