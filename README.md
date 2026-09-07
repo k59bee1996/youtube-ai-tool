@@ -35,6 +35,12 @@ npm run dev
 
 Open `http://localhost:5173`. See [Local Development](docs/LOCAL_DEVELOPMENT.md) for tests, configuration, and database commands.
 
+## CI
+
+GitHub Actions runs for pull requests targeting `main` and pushes to `main`. It verifies .NET formatting, build, unit and PostgreSQL integration tests, then installs the web client with `npm ci` and runs its lint, test, and build checks. No GitHub repository secrets are required: CI uses an isolated ephemeral PostgreSQL service and provider fakes rather than the YouTube API.
+
+Run the same checks locally using the commands in [Local Development](docs/LOCAL_DEVELOPMENT.md#validate), including the optional PostgreSQL test-service steps.
+
 ## Phase boundary
 
 Phase 2 supports project creation and read operations plus competitor collection and refresh. It accepts `youtube.com/@handle` and `youtube.com/channel/{id}` URLs and collects up to `CompetitorCollection:VideoLimit` recent uploads. Competitor analysis, LLM calls, ideas, research, scripts, authentication, and background collection are outside this phase.

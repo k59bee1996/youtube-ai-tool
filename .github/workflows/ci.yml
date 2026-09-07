@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: youtube_ai_factory_tests
+          POSTGRES_USER: yaf
+          POSTGRES_PASSWORD: yaf_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U yaf -d youtube_ai_factory_tests"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+
+    env:
+      YAF_TEST_POSTGRES: Host=localhost;Port=5432;Database=youtube_ai_factory_tests;Username=yaf;Password=yaf_test_password
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'global.json', 'dotnet-tools.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore YoutubeAiFactory.sln
+
+      - name: Verify formatting
+        run: dotnet format YoutubeAiFactory.sln --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build YoutubeAiFactory.sln --configuration Release --no-restore
+
+      - name: Test
+        run: >-
+          dotnet test YoutubeAiFactory.sln
+          --configuration Release
+          --no-build
+          --logger trx
+          --results-directory TestResults
+          --collect:"XPlat Code Coverage"
+
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 7
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: src/YoutubeAiFactory.Web
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: src/YoutubeAiFactory.Web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
