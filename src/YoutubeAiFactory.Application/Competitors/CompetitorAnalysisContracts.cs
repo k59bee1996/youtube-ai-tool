@@ -6,6 +6,8 @@ public sealed record CompetitorAnalysisResult(
     AudienceAnalysis Audience,
     IReadOnlyList<TopicCluster> TopicClusters,
     IReadOnlyList<TitlePattern> TitlePatterns,
+    IReadOnlyList<ThumbnailPattern> ThumbnailPatterns,
+    IReadOnlyList<HookPattern> HookPatterns,
     IReadOnlyList<ContentFormatInsight> ContentFormats,
     IReadOnlyList<PerformanceInsight> PerformanceInsights,
     IReadOnlyList<WeaknessInsight> PotentialWeaknesses,
@@ -23,6 +25,8 @@ public sealed record AudienceAnalysis(
 
 public sealed record TopicCluster(string Name, string Description, IReadOnlyList<Guid> ExampleVideoIds, int Frequency, string PerformanceSignal, int Confidence);
 public sealed record TitlePattern(string PatternName, string Description, string Template, IReadOnlyList<string> ExampleTitles, int ObservedFrequency, string PerformanceSignal, int Confidence);
+public sealed record ThumbnailPattern(string PatternName, string Observation, IReadOnlyList<Guid> EvidenceVideoIds, int Confidence, IReadOnlyList<string> Limitations);
+public sealed record HookPattern(string PatternName, string Observation, IReadOnlyList<Guid> EvidenceVideoIds, int Confidence, IReadOnlyList<string> Limitations);
 public sealed record ContentFormatInsight(string Format, IReadOnlyList<Guid> EvidenceVideoIds, string PerformanceSignal, int Confidence);
 public sealed record PerformanceInsight(string Insight, IReadOnlyList<Guid> SupportingVideoIds, int Confidence);
 public sealed record WeaknessInsight(string Observation, IReadOnlyList<Guid> SupportingVideoIds, int Confidence);

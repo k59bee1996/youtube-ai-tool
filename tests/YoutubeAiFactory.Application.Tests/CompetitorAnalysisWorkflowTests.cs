@@ -59,6 +59,48 @@ public sealed class CompetitorAnalysisWorkflowTests
     }
 
     [Fact]
+    public void Validator_turns_missing_structured_members_into_retryable_output_errors()
+    {
+        var competitor = CreateCompetitor(10, 100, 300);
+        var context = new CompetitorAnalysisContextBuilder(new CompetitorAnalysisOptions()).Build(competitor);
+        var missingAudience = ValidResult(competitor.Videos.First().Id) with { Audience = null! };
+
+        Assert.Throws<StructuredOutputException>(() => CompetitorAnalysisValidator.Validate(missingAudience, context));
+    }
+
+    [Fact]
+    public async Task Run_handler_reuses_the_atomic_active_job_result()
+    {
+        var competitor = CreateCompetitor(10);
+        var store = new AnalysisStore(competitor);
+        var handler = new RunCompetitorAnalysisHandler(store, new CompetitorAnalysisOptions(), TimeProvider.System);
+
+        var first = await handler.HandleAsync(competitor.ProjectId, competitor.Id, CancellationToken.None);
+        var second = await handler.HandleAsync(competitor.ProjectId, competitor.Id, CancellationToken.None);
+
+        Assert.False(first.Existing);
+        Assert.True(second.Existing);
+        Assert.Equal(first.JobId, second.JobId);
+    }
+
+    [Fact]
+    public async Task Job_processor_schedules_bounded_retry_for_transient_provider_failure()
+    {
+        var competitor = CreateCompetitor(50, 100, 300);
+        var store = new AnalysisStore(competitor);
+        store.Job = new Job("competitor-analysis", System.Text.Json.JsonSerializer.Serialize(
+            new CompetitorAnalysisJobPayload(competitor.ProjectId, competitor.Id), WebJson), DateTimeOffset.UtcNow, maxRetries: 1, competitor.Id);
+        var processor = new CompetitorAnalysisJobProcessor(store, new FailingProvider(),
+            new CompetitorAnalysisContextBuilder(new CompetitorAnalysisOptions()), new CompetitorAnalysisOptions(),
+            TimeProvider.System, NullLogger<CompetitorAnalysisJobProcessor>.Instance);
+
+        Assert.True(await processor.ProcessNextAsync(CancellationToken.None));
+        Assert.Equal(JobStatus.Retrying, store.Job.Status);
+        Assert.Equal(1, store.Job.RetryCount);
+        Assert.Equal(AiRunStatus.Failed, Assert.Single(store.Runs).Status);
+    }
+
+    [Fact]
     public void Golden_fixture_retains_a_bounded_mix_of_outlier_typical_and_weak_video_evidence()
     {
         var competitor = CreateCompetitor([450, 390, 310, 120, 110, 105, 100, 95, 92, 90, 88, 85, 82, 80, 78, 76, 35, 30, 25, 20]);
@@ -75,6 +117,8 @@ public sealed class CompetitorAnalysisWorkflowTests
         new AudienceAnalysis(null, ["Creators"], ["Learn"], [], 60, ["Channel description"]),
         [new TopicCluster("Research", "Research videos", [videoId], 1, "Above baseline", 70)],
         [new TitlePattern("How to", "Instructional framing", "How to {task}", ["How to research"], 1, "Typical", 65)],
+        [new ThumbnailPattern("Insufficient visual evidence", "Thumbnail URLs were collected but pixels were not analyzed.", [videoId], 0, ["No thumbnail-image analysis is available."])],
+        [new HookPattern("Insufficient spoken evidence", "Titles and descriptions do not establish opening hook wording.", [videoId], 0, ["No transcript is available."])],
         [new ContentFormatInsight("Explainer", [videoId], "Typical", 70)],
         [new PerformanceInsight("Research content performed above baseline.", [videoId], 65)],
         [],
@@ -102,6 +146,12 @@ public sealed class CompetitorAnalysisWorkflowTests
             Task.FromResult(new LlmResult<T>((T)(object)_results.Dequeue(), "Fake", "fake-model", 12, 34, null));
     }
 
+    private sealed class FailingProvider : ILlmProvider
+    {
+        public Task<LlmResult<T>> GenerateStructuredAsync<T>(LlmRequest request, CancellationToken cancellationToken) =>
+            throw new ExternalServiceException("Provider is temporarily unavailable.", ExternalServiceFailure.Transient);
+    }
+
     private sealed class AnalysisStore(CompetitorChannel competitor) : IYoutubeAiFactoryStore
     {
         public Job? Job { get; set; }
@@ -115,12 +165,30 @@ public sealed class CompetitorAnalysisWorkflowTests
         public Task<CompetitorChannel?> GetCompetitorAsync(Guid projectId, Guid competitorId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<CompetitorChannel?>(projectId == competitor.ProjectId && competitorId == competitor.Id ? competitor : null);
         public Task<CompetitorChannel?> FindCompetitorByYoutubeChannelIdAsync(Guid projectId, string youtubeChannelId, CancellationToken cancellationToken) => Task.FromResult<CompetitorChannel?>(null);
         public void AddCompetitor(CompetitorChannel channel) { }
-        public Task<Job?> TryClaimNextCompetitorAnalysisJobAsync(DateTimeOffset now, CancellationToken cancellationToken)
+        public Task<Job> EnqueueCompetitorAnalysisJobAsync(Job job, CancellationToken cancellationToken)
+        {
+            if (Job is { Status: JobStatus.Queued or JobStatus.Running or JobStatus.Retrying }) return Task.FromResult(Job);
+            Job = job;
+            return Task.FromResult(job);
+        }
+        public Task<Job?> TryClaimNextCompetitorAnalysisJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken)
         {
             if (Job?.Status != JobStatus.Queued) return Task.FromResult<Job?>(null);
             Job.Start(now); return Task.FromResult<Job?>(Job);
         }
         public Task<int> GetNextCompetitorAnalysisVersionAsync(Guid competitorId, CancellationToken cancellationToken) => Task.FromResult(Analyses.Count + 1);
+        public Task RequeueCompetitorAnalysisJobAsync(Guid jobId, CancellationToken cancellationToken)
+        {
+            if (Job?.Status == JobStatus.Running) Job.Requeue(DateTimeOffset.UtcNow);
+            return Task.CompletedTask;
+        }
+        public Task FailCompetitorAnalysisJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken)
+        {
+            var run = Runs.SingleOrDefault(candidate => candidate.Id == aiRunId);
+            if (run?.Status == AiRunStatus.Running) run.Fail(reason, failedAt);
+            if (Job?.Status == JobStatus.Running) Job.Fail(reason, retryable, failedAt, retryAt);
+            return Task.CompletedTask;
+        }
         public void AddCompetitorAnalysis(CompetitorAnalysis analysis) => Analyses.Add(analysis);
         public void AddAiRun(AiRun run) => Runs.Add(run);
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;

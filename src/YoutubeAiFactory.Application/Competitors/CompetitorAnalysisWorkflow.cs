@@ -13,6 +13,7 @@ public sealed record CompetitorAnalysisJobPayload(Guid ProjectId, Guid Competito
 
 public sealed class RunCompetitorAnalysisHandler(
     IYoutubeAiFactoryStore store,
+    CompetitorAnalysisOptions options,
     TimeProvider timeProvider)
 {
     private static readonly JsonSerializerOptions PayloadSerializerOptions = new(JsonSerializerDefaults.Web);
@@ -21,13 +22,12 @@ public sealed class RunCompetitorAnalysisHandler(
         var competitor = await store.GetCompetitorAsync(projectId, competitorId, false, cancellationToken)
             ?? throw new ResourceNotFoundException($"Competitor '{competitorId}' was not found in project '{projectId}'.");
         if (competitor.Videos.Count == 0) throw new ApplicationValidationException("Collect at least one competitor video before running AI analysis.");
-        var active = await store.GetActiveCompetitorAnalysisJobAsync(projectId, competitorId, cancellationToken);
-        if (active is not null) return new RunCompetitorAnalysisResult(active.Id, active.Status.ToString(), true);
+        if (options.MaxJobRetries is < 0 or > 10)
+            throw new ApplicationValidationException("CompetitorAnalysis:MaxJobRetries must be between 0 and 10.");
         var payload = JsonSerializer.Serialize(new CompetitorAnalysisJobPayload(projectId, competitorId), PayloadSerializerOptions);
-        var job = new Job("competitor-analysis", payload, timeProvider.GetUtcNow(), maxRetries: 0);
-        store.AddJob(job);
-        await store.SaveChangesAsync(cancellationToken);
-        return new RunCompetitorAnalysisResult(job.Id, job.Status.ToString(), false);
+        var job = new Job("competitor-analysis", payload, timeProvider.GetUtcNow(), options.MaxJobRetries, competitorId);
+        var persisted = await store.EnqueueCompetitorAnalysisJobAsync(job, cancellationToken);
+        return new RunCompetitorAnalysisResult(persisted.Id, persisted.Status.ToString(), persisted.Id != job.Id);
     }
 }
 
@@ -65,7 +65,13 @@ public sealed class CompetitorAnalysisJobProcessor(
         LoggerMessage.Define<Guid>(LogLevel.Warning, new EventId(2, nameof(LogFailed)), "Competitor analysis job {JobId} failed.");
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
-        var job = await store.TryClaimNextCompetitorAnalysisJobAsync(timeProvider.GetUtcNow(), cancellationToken);
+        if (options.RunningJobLeaseSeconds is < 30 or > 3_600)
+            throw new ApplicationValidationException("CompetitorAnalysis:RunningJobLeaseSeconds must be between 30 and 3600.");
+        var now = timeProvider.GetUtcNow();
+        var job = await store.TryClaimNextCompetitorAnalysisJobAsync(
+            now,
+            now.AddSeconds(-options.RunningJobLeaseSeconds),
+            cancellationToken);
         if (job is null) return false;
         var payload = JsonSerializer.Deserialize<CompetitorAnalysisJobPayload>(job.Payload, CompetitorAnalysisPrompt.SerializerOptions)
             ?? throw new InvalidOperationException("Competitor analysis job payload is invalid.");
@@ -113,12 +119,27 @@ public sealed class CompetitorAnalysisJobProcessor(
             await store.SaveChangesAsync(cancellationToken);
             LogCompleted(logger, competitor.Id, version, context.AnalyzedVideoCount, run.RetryCount, null);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            var now = timeProvider.GetUtcNow();
-            run?.Fail(SafeFailure(exception), now);
-            job.Fail(SafeFailure(exception), retryable: false, now);
-            await store.SaveChangesAsync(CancellationToken.None);
+            await store.RequeueCompetitorAnalysisJobAsync(job.Id, CancellationToken.None);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var failedAt = timeProvider.GetUtcNow();
+            var retryable = exception is ExternalServiceException
+            {
+                Failure: ExternalServiceFailure.QuotaExceeded or ExternalServiceFailure.Transient,
+            };
+            DateTimeOffset? retryAt = retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null;
+            await store.FailCompetitorAnalysisJobAsync(
+                job.Id,
+                run?.Id,
+                SafeFailure(exception),
+                retryable,
+                failedAt,
+                retryAt,
+                CancellationToken.None);
             LogFailed(logger, job.Id, exception);
         }
         return true;

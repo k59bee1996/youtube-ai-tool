@@ -13,7 +13,8 @@ public sealed class Job
         string type,
         string payload,
         DateTimeOffset queuedAt,
-        int maxRetries = 3)
+        int maxRetries = 3,
+        Guid? competitorChannelId = null)
     {
         if (maxRetries < 0)
         {
@@ -23,6 +24,7 @@ public sealed class Job
         ValidateJson(payload);
         Id = Guid.NewGuid();
         Type = Guard.Required(type, nameof(type), 100);
+        CompetitorChannelId = competitorChannelId;
         Payload = payload;
         Status = JobStatus.Queued;
         MaxRetries = maxRetries;
@@ -33,6 +35,8 @@ public sealed class Job
     public Guid Id { get; private set; }
 
     public string Type { get; private set; } = string.Empty;
+
+    public Guid? CompetitorChannelId { get; private set; }
 
     public string Payload { get; private set; } = string.Empty;
 
@@ -74,6 +78,15 @@ public sealed class Job
         EnsureRunning();
         Status = JobStatus.Completed;
         CompletedAt = completedAt;
+    }
+
+    public void Requeue(DateTimeOffset availableAt)
+    {
+        EnsureRunning();
+        Status = JobStatus.Queued;
+        AvailableAt = availableAt;
+        StartedAt = null;
+        FailureReason = "Recovered after worker interruption.";
     }
 
     public void Fail(

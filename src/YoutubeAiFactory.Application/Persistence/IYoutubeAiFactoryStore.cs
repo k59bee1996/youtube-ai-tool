@@ -48,7 +48,23 @@ public interface IYoutubeAiFactoryStore
         Task.FromResult<Job?>(null);
 
     Task<Job?> TryClaimNextCompetitorAnalysisJobAsync(
-        DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+        DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+
+    Task<Job> EnqueueCompetitorAnalysisJobAsync(Job job, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Competitor analysis job persistence is not configured.");
+
+    Task RequeueCompetitorAnalysisJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Competitor analysis job persistence is not configured.");
+
+    Task FailCompetitorAnalysisJobAsync(
+        Guid jobId,
+        Guid? aiRunId,
+        string reason,
+        bool retryable,
+        DateTimeOffset failedAt,
+        DateTimeOffset? retryAt,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Competitor analysis job persistence is not configured.");
 
     void AddCompetitorAnalysis(CompetitorAnalysis analysis) =>
         throw new NotSupportedException("Competitor analysis persistence is not configured.");
