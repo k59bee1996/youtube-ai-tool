@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Persistence;
+using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
+using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Projects;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
@@ -63,6 +65,48 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public void AddCompetitor(CompetitorChannel competitor) =>
         dbContext.CompetitorChannels.Add(competitor);
 
+    public Task<CompetitorAnalysis?> GetLatestCompetitorAnalysisAsync(
+        Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
+        dbContext.CompetitorAnalyses.AsNoTracking()
+            .Where(analysis => analysis.CompetitorChannelId == competitorId &&
+                dbContext.CompetitorChannels.Any(channel => channel.Id == competitorId && channel.ProjectId == projectId))
+            .OrderByDescending(analysis => analysis.Version)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<int> GetNextCompetitorAnalysisVersionAsync(Guid competitorId, CancellationToken cancellationToken) =>
+        (await dbContext.CompetitorAnalyses.Where(analysis => analysis.CompetitorChannelId == competitorId)
+            .Select(analysis => (int?)analysis.Version).MaxAsync(cancellationToken) ?? 0) + 1;
+
+    public Task<Job?> GetActiveCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
+        FindAnalysisJobAsync(projectId, competitorId, activeOnly: true, cancellationToken);
+
+    public Task<Job?> GetLatestCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
+        FindAnalysisJobAsync(projectId, competitorId, activeOnly: false, cancellationToken);
+
+    public async Task<Job?> TryClaimNextCompetitorAnalysisJobAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var job = await dbContext.Jobs.FromSqlRaw("""
+            SELECT * FROM yaf.jobs
+            WHERE type = 'competitor-analysis'
+              AND status IN ('Queued', 'Retrying')
+              AND available_at <= {0}
+            ORDER BY available_at, created_at
+            LIMIT 1 FOR UPDATE SKIP LOCKED
+            """, now).FirstOrDefaultAsync(cancellationToken);
+        if (job is null) return null;
+        job.Start(now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return job;
+    }
+
+    public void AddCompetitorAnalysis(CompetitorAnalysis analysis) => dbContext.CompetitorAnalyses.Add(analysis);
+
+    public void AddAiRun(AiRun aiRun) => dbContext.AiRuns.Add(aiRun);
+
+    public void AddJob(Job job) => dbContext.Jobs.Add(job);
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         try
@@ -78,5 +122,14 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
             throw new ResourceConflictException(
                 "The project already contains this YouTube channel or video.");
         }
+    }
+
+    private Task<Job?> FindAnalysisJobAsync(Guid projectId, Guid competitorId, bool activeOnly, CancellationToken cancellationToken)
+    {
+        var payload = $"{{\"projectId\":\"{projectId}\",\"competitorId\":\"{competitorId}\"}}";
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "competitor-analysis" &&
+            EF.Functions.JsonContains(job.Payload, payload));
+        if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
+        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
 }

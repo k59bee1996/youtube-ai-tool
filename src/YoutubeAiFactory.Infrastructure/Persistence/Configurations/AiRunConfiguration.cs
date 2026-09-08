@@ -14,6 +14,7 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
         builder.Property(run => run.Id).HasColumnName("id");
         builder.Property(run => run.Workflow).HasColumnName("workflow").HasMaxLength(100).IsRequired();
         builder.Property(run => run.ProjectId).HasColumnName("project_id");
+        builder.Property(run => run.CompetitorId).HasColumnName("competitor_channel_id");
         builder.Property(run => run.Provider).HasColumnName("provider").HasMaxLength(100).IsRequired();
         builder.Property(run => run.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(run => run.PromptKey).HasColumnName("prompt_key").HasMaxLength(100).IsRequired();
@@ -34,5 +35,6 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(run => new { run.ProjectId, run.StartedAt });
+        builder.HasIndex(run => new { run.CompetitorId, run.StartedAt });
     }
 }

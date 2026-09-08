@@ -16,7 +16,7 @@ Web -> API -> Application -> Domain
 
 `Domain` has no framework or integration dependencies. `Application` defines use cases and external contracts. `Infrastructure` owns EF Core, PostgreSQL, provider adapters, and migrations. `Api` maps HTTP contracts to application use cases. `Worker` is reserved for long-running work.
 
-## Phase 2 request flow
+## Phase 2 collection flow
 
 ```text
 React -> project/competitor endpoint -> application handler
@@ -37,3 +37,15 @@ Only fully resolved competitors may be persisted: channel identity, title, and c
 `/health/live` checks the process. `/health/ready` checks PostgreSQL and YouTube configuration. Structured collection logs include project, outcome, competitor/channel when resolved, video count, and elapsed time; API keys and response bodies are excluded. Job claiming and dispatch remain deferred.
 
 See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), and [ADR-003](adr/ADR-003-synchronous-competitor-collection.md).
+
+## Phase 3 competitor-analysis flow
+
+```text
+React -> API (202 Accepted) -> Job table -> Worker -> application workflow
+                                                    -> context builder -> ILlmProvider
+                                                    -> validator -> analysis/AiRun tables
+```
+
+The controller only queues or reads work. The application context builder selects a bounded mix of recent, high-, low-, and representative videos and calculates quantitative signals before the provider is called. `competitor-analysis:v1` is the first immutable prompt contract. The worker claims jobs with PostgreSQL row locking (`FOR UPDATE SKIP LOCKED`), so separate workers do not process the same job.
+
+Completed `CompetitorAnalysis` records are immutable versions. Their nested typed result is stored as one `jsonb` aggregate because it is rendered and consumed as an analysis report; provenance, versions, source timestamp, provider and model remain relational columns. A refresh after `SourceDataAsOf` marks the latest report stale without automatically spending another AI call.

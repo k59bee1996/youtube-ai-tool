@@ -16,6 +16,19 @@ public sealed class AiRun
         string promptKey,
         int promptVersion,
         DateTimeOffset startedAt)
+        : this(workflow, projectId, null, provider, model, promptKey, promptVersion, startedAt)
+    {
+    }
+
+    public AiRun(
+        string workflow,
+        Guid? projectId,
+        Guid? competitorId,
+        string provider,
+        string model,
+        string promptKey,
+        int promptVersion,
+        DateTimeOffset startedAt)
     {
         if (promptVersion < 1)
         {
@@ -25,6 +38,7 @@ public sealed class AiRun
         Id = Guid.NewGuid();
         Workflow = Guard.Required(workflow, nameof(workflow), 100);
         ProjectId = projectId;
+        CompetitorId = competitorId;
         Provider = Guard.Required(provider, nameof(provider), 100);
         Model = Guard.Required(model, nameof(model), 100);
         PromptKey = Guard.Required(promptKey, nameof(promptKey), 100);
@@ -38,6 +52,8 @@ public sealed class AiRun
     public string Workflow { get; private set; } = string.Empty;
 
     public Guid? ProjectId { get; private set; }
+
+    public Guid? CompetitorId { get; private set; }
 
     public string Provider { get; private set; } = string.Empty;
 
@@ -69,6 +85,13 @@ public sealed class AiRun
     {
         EnsureRunning();
         RetryCount++;
+    }
+
+    public void RecordProvider(string provider, string model)
+    {
+        EnsureRunning();
+        Provider = Guard.Required(provider, nameof(provider), 100);
+        Model = Guard.Required(model, nameof(model), 100);
     }
 
     public void Complete(

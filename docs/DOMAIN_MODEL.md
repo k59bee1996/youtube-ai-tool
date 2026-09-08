@@ -10,10 +10,14 @@
 
 Submitting the same resolved channel for a project refreshes its metadata and upserts videos by YouTube video ID. Existing videos outside the configured recent-video window are retained. Hidden or unavailable statistics are nullable rather than represented as zero. Database uniqueness constraints provide final protection against duplicate provider identities.
 
+## Competitor intelligence
+
+`CompetitorAnalysis` is an immutable completed report owned by a competitor channel. It stores a monotonically increasing version, structured-result JSON, `AiRun` link, prompt/provider/model provenance, analysis-video count, and source-data timestamp. It never overwrites an earlier report. `AiRun` additionally records the competitor ID for Phase 3 traceability.
+
 ## Operations
 
-`Job` models future database-backed background work with explicit state transitions and bounded retries. `AiRun` records future AI workflow metadata such as provider, model, prompt version, token usage, cost, and latency. Neither participates in Phase 2 collection.
+`Job` models database-backed background work with explicit state transitions and bounded retries. Phase 3 uses it for competitor analysis. `AiRun` records provider, model, prompt version, token usage, cost, latency and failure details.
 
 ## Deferred concepts
 
-Competitor analyses, winning patterns, content gaps, ideas, pilots, video projects, research reports, outlines, scripts, and production packages are intentionally absent. The Phase 2 collection path does not invoke `ILlmProvider`.
+Content gaps, ideas, pilots, video projects, research reports, outlines, scripts, and production packages remain intentionally absent.

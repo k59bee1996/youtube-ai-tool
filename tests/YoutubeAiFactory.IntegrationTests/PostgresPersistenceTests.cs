@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using YoutubeAiFactory.Application.Common;
+using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Infrastructure.Persistence;
@@ -9,6 +10,35 @@ namespace YoutubeAiFactory.IntegrationTests;
 
 public sealed class PostgresPersistenceTests
 {
+    [PostgresFact]
+    public async Task Migrations_persist_versioned_competitor_analysis_and_ai_run_provenance()
+    {
+        var options = CreateOptions();
+        await using var context = new YoutubeAiFactoryDbContext(options);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var project = new Project("Analysis", new Market("Education", "English", "Global"), new AudienceProfile("Developers"), now);
+        var competitor = CreateCompetitor(project.Id, "https://youtube.com/@analysis");
+        var run = new AiRun("CompetitorAnalysis", project.Id, competitor.Id, "Fake", "fake-model", "competitor-analysis", 1, now);
+        run.Complete(10, 20, null, now.AddSeconds(1));
+        var analysis = new CompetitorAnalysis(competitor.Id, 1, run.Id, "competitor-analysis", 1, "Fake", "fake-model", now, 1,
+            "{\"audience\":{},\"confidence\":{}}", now.AddSeconds(1));
+        context.Projects.Add(project);
+        context.CompetitorChannels.Add(competitor);
+        context.AiRuns.Add(run);
+        context.CompetitorAnalyses.Add(analysis);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var stored = await context.CompetitorAnalyses.SingleAsync();
+        var storedRun = await context.AiRuns.SingleAsync();
+        Assert.Equal(1, stored.Version);
+        Assert.Equal(competitor.Id, stored.CompetitorChannelId);
+        Assert.Equal(run.Id, stored.AiRunId);
+        Assert.Equal(competitor.Id, storedRun.CompetitorId);
+    }
+
     [PostgresFact]
     public async Task Migrations_persist_and_read_project_competitor_and_videos()
     {

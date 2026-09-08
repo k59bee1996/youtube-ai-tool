@@ -52,6 +52,22 @@ textarea { min-height: 92px; resize: vertical; }
 .channel-stats dd { margin: 5px 0 0; color: #f8fafc; font-weight: 750; }
 
 .videos-section { margin-top: 34px; }
+.analysis-section { margin-top: 34px; }
+.analysis-section h2 { margin-top: 5px; }
+.analysis-state { display: grid; gap: 12px; padding: 20px 0 2px; color: #c9d4e4; }
+.error-copy { color: #fecaca; }
+.analysis-report { display: grid; gap: 20px; margin-top: 22px; }
+.confidence-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.confidence-grid div { display: grid; gap: 5px; padding: 14px; border: 1px solid #2c3a51; border-radius: 10px; background: #0b1424; }
+.confidence-grid span, .analysis-block small { color: #91a0b6; font-size: .78rem; }
+.analysis-block { border-top: 1px solid #26334a; padding-top: 18px; }
+.analysis-block h3 { margin: 0 0 12px; color: #f8fafc; font-size: 1rem; }
+.analysis-block article { margin: 10px 0; padding: 13px; border-left: 2px solid #ff6846; background: #0b1424; }
+.analysis-block article p { margin: 7px 0; color: #c9d4e4; line-height: 1.45; }
+.analysis-block code { color: #ffd0c6; }
+.analysis-block ul { margin: 0; padding-left: 20px; color: #c9d4e4; line-height: 1.7; }
+.evidence { display: block; margin-top: 8px; }
+.stale-note { margin: 0; padding: 10px; border: 1px solid #8b5b1e; color: #fde68a; background: rgba(146, 64, 14, .2); border-radius: 8px; }
 .video-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .video-card { display: grid; grid-template-columns: 150px 1fr; overflow: hidden; min-height: 96px; border: 1px solid #26334a; border-radius: 12px; background: #0b1424; }
 .video-card img, .thumbnail-placeholder { width: 150px; height: 100%; min-height: 96px; object-fit: cover; background: #1c2940; }
@@ -64,6 +80,7 @@ textarea { min-height: 92px; resize: vertical; }
   .home-grid, .video-list { grid-template-columns: 1fr; }
   .channel-card { grid-template-columns: auto 1fr; }
   .channel-stats { grid-column: 1 / -1; }
+  .confidence-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {

@@ -21,6 +21,9 @@ Create a Google API key with YouTube Data API v3 access and provide it through c
 ```powershell
 $env:YouTube__ApiKey = "your-google-api-key"
 $env:CompetitorCollection__VideoLimit = "30" # Allowed range: 1-50
+$env:AI__ApiKey = "your-ai-provider-key"
+$env:AI__Model = "gpt-4.1-mini"
+$env:CompetitorAnalysis__MaxVideos = "30" # Allowed range: 1-50
 ```
 
 Readiness reports `Degraded` when the key is absent. Project endpoints still work, while collection returns a `503` problem response. The adapter sends the key in the `X-Goog-Api-Key` header and logs no credentials.
@@ -33,6 +36,8 @@ dotnet run --project src/YoutubeAiFactory.Worker
 ```
 
 Run the client from `src/YoutubeAiFactory.Web` with `npm install` and `npm run dev`. Vite serves port 5173 and proxies `/api` and `/health` to port 5050. Create a project in the UI, then submit a supported channel URL; submit it again to refresh metadata.
+
+For Phase 3 analysis, run the Worker in a separate terminal after setting `AI__ApiKey`. The UI queues work and polls job status; it never sends provider keys to the browser. The default OpenAI-compatible provider posts to the Chat Completions endpoint with JSON-mode output. No provider key is needed for routine tests.
 
 ## Validate
 

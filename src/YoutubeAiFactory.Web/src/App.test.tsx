@@ -294,6 +294,30 @@ test('renders an explicit empty state and unavailable channel metrics', async ()
   expect(screen.getAllByText('Unavailable')).toHaveLength(3)
 })
 
+test('queues AI analysis from the competitor detail without auto-generating it', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    const method = init?.method ?? 'GET'
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([summary])
+    if (url.endsWith('/competitors/competitor-1')) return json(competitor)
+    if (url.endsWith('/analysis') && method === 'GET') return json({ latestAnalysis: null, activeJob: null, latestJob: null })
+    if (url.endsWith('/analysis:run') && method === 'POST') return json({ jobId: 'job-1', status: 'Queued', existing: false }, 202)
+    throw new Error(`Unexpected request: ${method} ${url}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  render(<App />)
+
+  expect(await screen.findByText('No analysis has been generated yet.')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Run AI Analysis' }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    `/api/projects/${project.id}/competitors/${summary.id}/analysis:run`,
+    expect.objectContaining({ method: 'POST' }),
+  ))
+})
+
 function json(body: unknown, status = 200) {
   return Promise.resolve(response(body, status))
 }
