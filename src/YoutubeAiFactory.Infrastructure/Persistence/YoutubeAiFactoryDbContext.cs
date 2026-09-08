@@ -15,6 +15,8 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
 
     public DbSet<CompetitorVideo> CompetitorVideos => Set<CompetitorVideo>();
 
+    public DbSet<CompetitorAnalysis> CompetitorAnalyses => Set<CompetitorAnalysis>();
+
     public DbSet<Job> Jobs => Set<Job>();
 
     public DbSet<AiRun> AiRuns => Set<AiRun>();

@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. The current Phase 2 vertical slice creates projects, collects a competitor channel and recent videos through the official YouTube Data API, stores the result in PostgreSQL, and displays it in React. AI analysis and later production workflows remain deferred.
+YouTube AI Factory turns YouTube market information into structured content intelligence. The current Phase 3 vertical slice creates projects, collects competitor channels and videos through the official YouTube Data API, then runs a persisted, versioned competitor-intelligence analysis in the worker.
 
 ## Repository layout
 
@@ -22,6 +22,7 @@ docker compose up -d postgres
 dotnet tool restore
 dotnet ef database update --project src/YoutubeAiFactory.Infrastructure --startup-project src/YoutubeAiFactory.Infrastructure
 $env:YouTube__ApiKey = "your-google-api-key"
+$env:AI__ApiKey = "your-ai-provider-key"
 dotnet run --project src/YoutubeAiFactory.Api --urls http://localhost:5050
 ```
 
@@ -43,4 +44,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Phase 2 supports project creation and read operations plus competitor collection and refresh. It accepts `youtube.com/@handle` and `youtube.com/channel/{id}` URLs and collects up to `CompetitorCollection:VideoLimit` recent uploads. Competitor analysis, LLM calls, ideas, research, scripts, authentication, and background collection are outside this phase.
+Phase 3 adds a database-backed competitor-analysis job. Start the Worker as well as the API to process jobs. The analysis uses bounded metadata evidence only; no transcripts, comments, or thumbnail pixels are analyzed. Opportunities, ideas, pilots, research, scripts, and production packages remain outside this phase.

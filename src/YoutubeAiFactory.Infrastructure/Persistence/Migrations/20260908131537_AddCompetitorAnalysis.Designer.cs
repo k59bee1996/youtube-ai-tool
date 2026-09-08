@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using YoutubeAiFactory.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    partial class YoutubeAiFactoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908131537_AddCompetitorAnalysis")]
+    partial class AddCompetitorAnalysis
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -339,10 +342,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("available_at");
 
-                    b.Property<Guid?>("CompetitorChannelId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competitor_channel_id");
-
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
@@ -386,11 +385,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnName("type");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CompetitorChannelId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_jobs_active_competitor_analysis")
-                        .HasFilter("type = 'competitor-analysis' AND status IN ('Queued', 'Running', 'Retrying')");
 
                     b.HasIndex("Status", "AvailableAt");
 

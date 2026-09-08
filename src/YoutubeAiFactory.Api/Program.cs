@@ -9,18 +9,26 @@ using YoutubeAiFactory.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(
     builder.Configuration.GetSection("CompetitorCollection").Get<CompetitorCollectionOptions>() ?? new());
+builder.Services.AddSingleton(
+    builder.Configuration.GetSection("CompetitorAnalysis").Get<CompetitorAnalysisOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
 builder.Services.AddScoped<AddCompetitorHandler>();
 builder.Services.AddScoped<GetCompetitorHandler>();
 builder.Services.AddScoped<ListCompetitorsHandler>();
+builder.Services.AddScoped<RunCompetitorAnalysisHandler>();
+builder.Services.AddScoped<GetCompetitorAnalysisStatusHandler>();
+builder.Services.AddScoped<CompetitorAnalysisContextBuilder>();
+builder.Services.AddScoped<CompetitorAnalysisJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"])
@@ -33,7 +41,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-2",
+    phase = "phase-3",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

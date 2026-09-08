@@ -14,6 +14,9 @@ public sealed class ResourceNotFoundException(string message) : YoutubeAiFactory
 
 public sealed class ResourceConflictException(string message) : YoutubeAiFactoryException(message);
 
+public sealed class StructuredOutputException(string message, Exception? innerException = null)
+    : YoutubeAiFactoryException(message, innerException);
+
 public enum ExternalServiceFailure
 {
     Configuration,
