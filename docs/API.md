@@ -31,3 +31,10 @@ Phase 2 is intentionally single-user and has no authentication or workspace auth
 ## AI analysis behavior
 
 Competitor IDs are always scoped to their route project. A competitor without collected videos returns a validation problem instead of consuming an AI call. Repeated run commands while a matching job is queued/running return the existing job. A failed job preserves a safe failure message and may be retried by submitting a new run command. Start `YoutubeAiFactory.Worker` to execute queued jobs.
+
+## Opportunities
+
+- `POST /api/projects/{projectId}/opportunities:generate` queues one project-scoped opportunity analysis and returns `202` with a job ID, status, and active-job reuse indicator.
+- `GET /api/projects/{projectId}/opportunities/latest` returns the latest immutable report, status, analyzed-competitor count, score components, sources, validated evidence, risks, limitations, and stale flag.
+
+At least one completed competitor analysis is required. Generation may use completed analyses even when some collected competitors are not analyzed; that limitation is exposed by the response and UI.

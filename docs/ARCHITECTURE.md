@@ -49,3 +49,13 @@ React -> API (202 Accepted) -> Job table -> Worker -> application workflow
 The controller only queues or reads work. The application context builder selects a bounded mix of recent, high-, low-, and representative videos and calculates quantitative signals before the provider is called. `competitor-analysis:v1` is the first immutable prompt contract. The worker claims jobs with PostgreSQL row locking (`FOR UPDATE SKIP LOCKED`), so separate workers do not process the same job.
 
 Completed `CompetitorAnalysis` records are immutable versions. Their nested typed result is stored as one `jsonb` aggregate because it is rendered and consumed as an analysis report; provenance, versions, source timestamp, provider and model remain relational columns. A refresh after `SourceDataAsOf` marks the latest report stale without automatically spending another AI call.
+
+## Phase 4 opportunity-analysis flow
+
+```text
+React -> API (202) -> Job -> Worker -> bounded cross-competitor context
+                                  -> ILlmProvider -> validation -> deterministic scoring
+                                  -> immutable report, sources, candidates, evidence
+```
+
+The provider can assess novelty, audience fit, transferability, story potential and production complexity, but it cannot provide final scores or arbitrary evidence. C# validates backend-issued evidence IDs and derives observed demand, evidence strength, dataset competition risk, and the final `opportunity-score:v1` score. Each report records exact source-analysis versions, enabling stale detection.

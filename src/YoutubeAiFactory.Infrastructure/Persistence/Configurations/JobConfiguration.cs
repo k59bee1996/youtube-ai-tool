@@ -13,6 +13,7 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.Id).HasColumnName("id");
         builder.Property(job => job.Type).HasColumnName("type").HasMaxLength(100).IsRequired();
         builder.Property(job => job.CompetitorChannelId).HasColumnName("competitor_channel_id");
+        builder.Property(job => job.ProjectId).HasColumnName("project_id");
         builder.Property(job => job.Payload).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
         builder.Property(job => job.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(job => job.RetryCount).HasColumnName("retry_count").IsRequired();
@@ -28,5 +29,9 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasDatabaseName("ux_jobs_active_competitor_analysis")
             .IsUnique()
             .HasFilter("type = 'competitor-analysis' AND status IN ('Queued', 'Running', 'Retrying')");
+        builder.HasIndex(job => job.ProjectId)
+            .HasDatabaseName("ux_jobs_active_opportunity_analysis")
+            .IsUnique()
+            .HasFilter("type = 'opportunity-analysis' AND status IN ('Queued', 'Running', 'Retrying')");
     }
 }

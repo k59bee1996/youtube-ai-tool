@@ -4,6 +4,7 @@ using YoutubeAiFactory.Api.Endpoints;
 using YoutubeAiFactory.Api.Errors;
 using YoutubeAiFactory.Api.Health;
 using YoutubeAiFactory.Application.Competitors;
+using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Projects;
 using YoutubeAiFactory.Infrastructure;
 
@@ -19,6 +20,7 @@ builder.Services.AddSingleton(
     builder.Configuration.GetSection("CompetitorCollection").Get<CompetitorCollectionOptions>() ?? new());
 builder.Services.AddSingleton(
     builder.Configuration.GetSection("CompetitorAnalysis").Get<CompetitorAnalysisOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection("OpportunityAnalysis").Get<OpportunityAnalysisOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -29,6 +31,11 @@ builder.Services.AddScoped<RunCompetitorAnalysisHandler>();
 builder.Services.AddScoped<GetCompetitorAnalysisStatusHandler>();
 builder.Services.AddScoped<CompetitorAnalysisContextBuilder>();
 builder.Services.AddScoped<CompetitorAnalysisJobProcessor>();
+builder.Services.AddScoped<RunOpportunityAnalysisHandler>();
+builder.Services.AddScoped<GetOpportunityStatusHandler>();
+builder.Services.AddScoped<OpportunityAnalysisContextBuilder>();
+builder.Services.AddScoped<OpportunityScoringEngine>();
+builder.Services.AddScoped<OpportunityAnalysisJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"])
@@ -41,7 +48,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-3",
+    phase = "phase-4",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -58,6 +65,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 
 app.MapProjectEndpoints();
 app.MapCompetitorEndpoints();
+app.MapOpportunityEndpoints();
 
 app.Run();
 

@@ -1,6 +1,8 @@
+using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Jobs;
+using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Projects;
 
 namespace YoutubeAiFactory.Application.Persistence;
@@ -38,6 +40,24 @@ public interface IYoutubeAiFactoryStore
 
     Task<int> GetNextCompetitorAnalysisVersionAsync(
         Guid competitorId, CancellationToken cancellationToken) => Task.FromResult(1);
+
+    Task<IReadOnlyList<CurrentCompetitorAnalysis>> GetCurrentCompetitorAnalysesForProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CurrentCompetitorAnalysis>>([]);
+
+    Task<OpportunityReportWithDetails?> GetLatestOpportunityReportAsync(Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult<OpportunityReportWithDetails?>(null);
+
+    Task<int> GetNextOpportunityReportVersionAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<Job?> GetActiveOpportunityAnalysisJobAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestOpportunityAnalysisJobAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> TryClaimNextOpportunityAnalysisJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job> EnqueueOpportunityAnalysisJobAsync(Job job, CancellationToken cancellationToken) => throw new NotSupportedException("Opportunity job persistence is not configured.");
+    Task RequeueOpportunityAnalysisJobAsync(Guid jobId, CancellationToken cancellationToken) => throw new NotSupportedException("Opportunity job persistence is not configured.");
+    Task FailOpportunityAnalysisJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => throw new NotSupportedException("Opportunity job persistence is not configured.");
+    void AddOpportunityReport(OpportunityReport report) => throw new NotSupportedException("Opportunity persistence is not configured.");
+    void AddOpportunityReportSource(OpportunityReportSource source) => throw new NotSupportedException("Opportunity persistence is not configured.");
+    void AddOpportunityCandidate(OpportunityCandidate candidate) => throw new NotSupportedException("Opportunity persistence is not configured.");
+    void AddOpportunityEvidence(OpportunityEvidence evidence) => throw new NotSupportedException("Opportunity persistence is not configured.");
 
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
