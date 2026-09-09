@@ -6,8 +6,10 @@ namespace YoutubeAiFactory.Application.Opportunities;
 
 public sealed record OpportunityAnalysisJobPayload(Guid ProjectId);
 public sealed record OpportunityEvidenceContext(string Id, Guid CompetitorAnalysisId, Guid CompetitorId, Guid? VideoId, string Kind, string Summary, int ObservedDemandSignal, int Confidence);
+public sealed record OpportunityAnalysisSourceContext(Guid CompetitorId, Guid CompetitorAnalysisId, int CompetitorAnalysisVersion);
 public sealed record OpportunityAnalysisContext(Guid ProjectId, string Market, string TargetLanguage, string TargetGeography,
-    string Audience, int AnalyzedCompetitorCount, IReadOnlyList<OpportunityEvidenceContext> Evidence, IReadOnlyList<string> Limitations);
+    string Audience, int AnalyzedCompetitorCount, IReadOnlyList<OpportunityEvidenceContext> Evidence, IReadOnlyList<string> Limitations,
+    IReadOnlyList<OpportunityAnalysisSourceContext> Sources);
 public sealed record OpportunityCandidateResult(string Name, string Description, string Audience, string Topic, string ContentFormat,
     string Angle, string WhyThisOpportunity, int NoveltySignal, int AudienceFitSignal, int TransferabilitySignal,
     int StoryPotential, int ProductionComplexity, int Confidence, IReadOnlyList<string> EvidenceIds,

@@ -30,7 +30,8 @@ public sealed class OpportunityAnalysisContextBuilder(OpportunityAnalysisOptions
         if (selected.Length == 1) limitations.Add("Only one competitor has been analyzed; cross-competitor confidence is limited.");
         if (analyses.Count > selected.Length) limitations.Add($"Context was bounded to {selected.Length} higher-confidence analyses.");
         return new OpportunityAnalysisContext(project.Id, project.Market.Name, project.Market.TargetLanguage, project.Market.TargetGeography,
-            project.Audience.Description, selected.Length, bounded, limitations);
+            project.Audience.Description, selected.Length, bounded, limitations,
+            selected.Select(source => new OpportunityAnalysisSourceContext(source.CompetitorId, source.Analysis.Id, source.Analysis.Version)).ToArray());
     }
     private static void Add(List<OpportunityEvidenceContext> target, CurrentCompetitorAnalysis source, string kind, int index, Guid? videoId, string summary, int confidence, string performance)
     {

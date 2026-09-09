@@ -16,6 +16,7 @@ internal sealed class OpportunityReportConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.PromptKey).HasColumnName("prompt_key").HasMaxLength(100).IsRequired(); builder.Property(x => x.PromptVersion).HasColumnName("prompt_version");
         builder.Property(x => x.Provider).HasColumnName("provider").HasMaxLength(100).IsRequired(); builder.Property(x => x.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(x => x.ScoringAlgorithmVersion).HasColumnName("scoring_algorithm_version").HasMaxLength(100).IsRequired(); builder.Property(x => x.SourceAnalysisCount).HasColumnName("source_analysis_count"); builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.LimitationsJson).HasColumnName("limitations_json").HasColumnType("jsonb").IsRequired();
         builder.HasIndex(x => new { x.ProjectId, x.Version }).IsUnique(); builder.HasIndex(x => new { x.ProjectId, x.CreatedAt });
         builder.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
     }

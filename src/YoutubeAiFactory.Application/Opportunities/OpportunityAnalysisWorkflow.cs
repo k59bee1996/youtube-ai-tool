@@ -40,7 +40,7 @@ public sealed class GetOpportunityStatusHandler(IYoutubeAiFactoryStore store)
         return new OpportunityReportDto(report.Report.Id, report.Report.Version, report.Report.PromptKey, report.Report.PromptVersion, report.Report.Provider,
             report.Report.Model, report.Report.ScoringAlgorithmVersion, report.Report.CreatedAt, stale,
             report.Sources.Select(source => new OpportunityReportSourceDto(source.CompetitorChannelId, source.CompetitorAnalysisId, source.CompetitorAnalysisVersion)).ToArray(),
-            report.Limitations, report.Candidates.Select(candidate => new OpportunityCandidateDto(candidate.Candidate.Id, candidate.Candidate.Name, candidate.Candidate.Description,
+            Deserialize(report.Report.LimitationsJson), report.Candidates.Select(candidate => new OpportunityCandidateDto(candidate.Candidate.Id, candidate.Candidate.Name, candidate.Candidate.Description,
                 candidate.Candidate.Audience, candidate.Candidate.Topic, candidate.Candidate.ContentFormat, candidate.Candidate.Angle, candidate.Candidate.WhyThisOpportunity,
                 new OpportunityScoreBreakdown(candidate.Candidate.ObservedDemandSignal, candidate.Candidate.NoveltySignal, candidate.Candidate.CompetitionRiskSignal,
                     candidate.Candidate.AudienceFitSignal, candidate.Candidate.TransferabilitySignal, candidate.Candidate.EvidenceStrength, candidate.Candidate.StoryPotential,
@@ -80,10 +80,12 @@ public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store
             }
             if (answer is null) throw failure ?? new StructuredOutputException("The provider did not return opportunity output.");
             run.RecordProvider(answer.Provider, answer.Model);
+            var reportLimitations = answer.Value.Limitations.Concat(context.Limitations).Where(item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.Ordinal).ToArray();
             var report = new OpportunityReport(project.Id, await store.GetNextOpportunityReportVersionAsync(project.Id, cancellationToken), run.Id,
-                OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, answer.Provider, answer.Model, OpportunityScoringEngine.AlgorithmVersion, analyses.Count, timeProvider.GetUtcNow());
+                OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, answer.Provider, answer.Model, OpportunityScoringEngine.AlgorithmVersion,
+                context.Sources.Count, JsonSerializer.Serialize(reportLimitations, OpportunityAnalysisPrompt.SerializerOptions), timeProvider.GetUtcNow());
             store.AddOpportunityReport(report);
-            foreach (var source in analyses) store.AddOpportunityReportSource(new OpportunityReportSource(report.Id, source.CompetitorId, source.Analysis.Id, source.Analysis.Version));
+            foreach (var source in context.Sources) store.AddOpportunityReportSource(new OpportunityReportSource(report.Id, source.CompetitorId, source.CompetitorAnalysisId, source.CompetitorAnalysisVersion));
             foreach (var result in answer.Value.Opportunities)
             {
                 var score = OpportunityScoringEngine.Calculate(result, context);
