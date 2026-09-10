@@ -367,6 +367,7 @@ function ProjectWorkspace({
   onAddCompetitor,
   onSelectCompetitor,
 }: ProjectWorkspaceProps) {
+  const [opportunitiesOpen, setOpportunitiesOpen] = useState(false)
   return (
     <>
       <section className="project-context">
@@ -420,8 +421,42 @@ function ProjectWorkspace({
       ) : (
         <p className="empty-state">Add a YouTube channel to begin competitor research.</p>
       )}
+      <section className="panel competitor-panel">
+        <div className="section-heading"><div><span className="eyebrow">Research</span><h2>Opportunities</h2><p className="section-copy">Synthesize completed competitor analyses into ranked, evidence-backed opportunities.</p></div>
+          <button className="primary-button" type="button" onClick={() => setOpportunitiesOpen((open) => !open)}>{opportunitiesOpen ? 'Hide opportunities' : 'Open opportunities'}</button></div>
+      </section>
+      {opportunitiesOpen && <OpportunityPanel projectId={project.id} />}
     </>
   )
+}
+
+function OpportunityPanel({ projectId }: { projectId: string }) {
+  const [status, setStatus] = useState<import('./api').OpportunityStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const active = status?.activeJob?.status === 'Queued' || status?.activeJob?.status === 'Running' || status?.activeJob?.status === 'Retrying'
+  const load = useCallback(async () => { try { setStatus(await api.getOpportunities(projectId)); setError(null) } catch (requestError) { setError(messageFrom(requestError)) } finally { setLoading(false) } }, [projectId])
+  useEffect(() => { void Promise.resolve().then(load); return undefined }, [load])
+  useEffect(() => { if (!active) return undefined; const timer = window.setInterval(() => void load(), 2000); return () => window.clearInterval(timer) }, [active, load])
+  async function generate() { setRunning(true); setError(null); try { await api.generateOpportunities(projectId); await load() } catch (requestError) { setError(messageFrom(requestError)) } finally { setRunning(false) } }
+  return <section className="analysis-section panel">
+    <div className="section-heading"><div><span className="eyebrow">Research</span><h2>Opportunities</h2></div>{status?.latestReport && <span>Report v{status.latestReport.version}</span>}</div>
+    {loading ? <p className="empty-state">Loading opportunities…</p> : error ? <p className="error-copy" role="alert">{error}</p> : status && status.analyzedCompetitorCount === 0 ? <div className="analysis-state"><p>No opportunity analysis exists. Analyze at least one competitor first.</p></div> : active ? <div className="analysis-state"><strong>Generating opportunities…</strong><span>Status: {status?.activeJob?.status}</span></div> : status?.latestJob?.status === 'Failed' ? <div className="analysis-state"><p role="alert">{status.latestJob.failureReason ?? 'Opportunity generation failed.'}</p><button className="primary-button" type="button" onClick={() => void generate()} disabled={running}>Generate opportunities</button></div> : status?.latestReport ? <OpportunityReportView report={status.latestReport} /> : <div className="analysis-state"><p>{status && status.analyzedCompetitorCount < status.competitorCount ? `${status.competitorCount - status.analyzedCompetitorCount} of ${status.competitorCount} competitors have not been analyzed. Results use the completed analyses only.` : 'Generate an evidence-backed report from your completed competitor analyses.'}</p><button className="primary-button" type="button" onClick={() => void generate()} disabled={running}>{running ? 'Queuing opportunities…' : 'Generate opportunities'}</button></div>}
+  </section>
+}
+
+function OpportunityReportView({ report }: { report: import('./api').OpportunityReport }) {
+  return <div className="analysis-report">
+    {report.isStale && <p className="stale-note">This report may be outdated because a source competitor analysis has a newer version.</p>}
+    {report.limitations.map((item) => <p className="stale-note" key={item}>{item}</p>)}
+    {report.opportunities.map((item, index) => <article className="analysis-block" key={item.id}>
+      <div className="section-heading"><h3>#{index + 1} {item.name}</h3><strong>{item.scores.overallScore}/100</strong></div><p>{item.description}</p>
+      <p><strong>Audience:</strong> {item.audience} · <strong>Topic:</strong> {item.topic} · <strong>Format:</strong> {item.contentFormat}</p><p><strong>Angle:</strong> {item.angle}</p><p>{item.whyThisOpportunity}</p>
+      <div className="confidence-grid"><div><span>Observed demand</span><strong>{item.scores.observedDemandSignal}</strong></div><div><span>Novelty</span><strong>{item.scores.noveltySignal}</strong></div><div><span>Audience fit</span><strong>{item.scores.audienceFitSignal}</strong></div><div><span>Competition risk</span><strong>{item.scores.competitionRiskSignal}</strong></div><div><span>Evidence strength</span><strong>{item.scores.evidenceStrength}</strong></div><div><span>Confidence</span><strong>{item.confidence}%</strong></div></div>
+      <p><strong>Evidence:</strong> {item.evidence.map((evidence) => evidence.summary).join(' · ')}</p>{item.risks.length > 0 && <p><strong>Risks:</strong> {item.risks.join(' · ')}</p>}{item.limitations.length > 0 && <p><strong>Limitations:</strong> {item.limitations.join(' · ')}</p>}
+    </article>)}
+  </div>
 }
 
 function CompetitorView({ competitor }: { competitor: CompetitorDetails }) {

@@ -60,6 +60,12 @@ export type CompetitorAnalysis = {
 }
 export type CompetitorAnalysisStatus = { latestAnalysis: CompetitorAnalysis | null; activeJob: AnalysisJob | null; latestJob: AnalysisJob | null }
 export type AnalysisRun = { jobId: string; status: string; existing: boolean }
+export type OpportunityEvidence = { id: string; competitorChannelId: string; competitorAnalysisId: string; competitorVideoId: string | null; evidenceId: string; summary: string }
+export type OpportunityScores = { observedDemandSignal: number; noveltySignal: number; competitionRiskSignal: number; audienceFitSignal: number; transferabilitySignal: number; evidenceStrength: number; storyPotential: number; productionComplexity: number; overallScore: number }
+export type OpportunityCandidate = { id: string; name: string; description: string; audience: string; topic: string; contentFormat: string; angle: string; whyThisOpportunity: string; scores: OpportunityScores; confidence: number; risks: string[]; limitations: string[]; decisionStatus: string; evidence: OpportunityEvidence[] }
+export type OpportunityReport = { id: string; version: number; promptKey: string; promptVersion: number; provider: string; model: string; scoringAlgorithmVersion: string; createdAt: string; isStale: boolean; sources: { competitorChannelId: string; competitorAnalysisId: string; competitorAnalysisVersion: number }[]; limitations: string[]; opportunities: OpportunityCandidate[] }
+export type OpportunityStatus = { latestReport: OpportunityReport | null; activeJob: AnalysisJob | null; latestJob: AnalysisJob | null; competitorCount: number; analyzedCompetitorCount: number }
+export type OpportunityRun = { jobId: string; status: string; existing: boolean }
 
 export type CreateProjectRequest = {
   name: string
@@ -115,4 +121,8 @@ export const api = {
     request<CompetitorAnalysisStatus>(`/api/projects/${projectId}/competitors/${competitorId}/analysis`, { signal }),
   runCompetitorAnalysis: (projectId: string, competitorId: string) =>
     request<AnalysisRun>(`/api/projects/${projectId}/competitors/${competitorId}/analysis:run`, { method: 'POST' }),
+  getOpportunities: (projectId: string, signal?: AbortSignal) =>
+    request<OpportunityStatus>(`/api/projects/${projectId}/opportunities/latest`, { signal }),
+  generateOpportunities: (projectId: string) =>
+    request<OpportunityRun>(`/api/projects/${projectId}/opportunities:generate`, { method: 'POST' }),
 }

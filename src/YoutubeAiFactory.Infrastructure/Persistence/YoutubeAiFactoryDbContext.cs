@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Jobs;
+using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Projects;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
@@ -20,6 +21,10 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
     public DbSet<Job> Jobs => Set<Job>();
 
     public DbSet<AiRun> AiRuns => Set<AiRun>();
+    public DbSet<OpportunityReport> OpportunityReports => Set<OpportunityReport>();
+    public DbSet<OpportunityReportSource> OpportunityReportSources => Set<OpportunityReportSource>();
+    public DbSet<OpportunityCandidate> OpportunityCandidates => Set<OpportunityCandidate>();
+    public DbSet<OpportunityEvidence> OpportunityEvidence => Set<OpportunityEvidence>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

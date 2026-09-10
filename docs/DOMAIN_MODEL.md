@@ -18,6 +18,10 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 `Job` models database-backed background work with explicit state transitions and bounded retries. Phase 3 uses it for competitor analysis. `AiRun` records provider, model, prompt version, token usage, cost, latency and failure details.
 
+## Opportunities
+
+`OpportunityReport` is an immutable, project-owned generation version. `OpportunityReportSource` captures exact competitor-analysis IDs and versions. Relational `OpportunityCandidate` rows retain searchable target fields and scores, while `OpportunityEvidence` points to the source analysis, competitor, and optional video. Candidate decision states are `Candidate`, `Approved`, and `Rejected`; Phase 5 idea generation is not implemented.
+
 ## Deferred concepts
 
 Content gaps, ideas, pilots, video projects, research reports, outlines, scripts, and production packages remain intentionally absent.

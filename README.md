@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. The current Phase 3 vertical slice creates projects, collects competitor channels and videos through the official YouTube Data API, then runs a persisted, versioned competitor-intelligence analysis in the worker.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 4 adds persisted, ranked opportunity reports synthesized from completed competitor analyses.
 
 ## Repository layout
 
@@ -44,4 +44,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Phase 3 adds a database-backed competitor-analysis job. Start the Worker as well as the API to process jobs. The analysis uses bounded metadata evidence only; no transcripts, comments, or thumbnail pixels are analyzed. Opportunities, ideas, pilots, research, scripts, and production packages remain outside this phase.
+Start the Worker as well as the API to process competitor and opportunity jobs. Opportunity reports use bounded persisted evidence and describe the analyzed dataset, not global YouTube. Ideas, pilots, research, scripts, and production packages remain outside this phase.

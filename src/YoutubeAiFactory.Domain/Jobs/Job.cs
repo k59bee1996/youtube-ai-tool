@@ -14,7 +14,8 @@ public sealed class Job
         string payload,
         DateTimeOffset queuedAt,
         int maxRetries = 3,
-        Guid? competitorChannelId = null)
+        Guid? competitorChannelId = null,
+        Guid? projectId = null)
     {
         if (maxRetries < 0)
         {
@@ -25,6 +26,7 @@ public sealed class Job
         Id = Guid.NewGuid();
         Type = Guard.Required(type, nameof(type), 100);
         CompetitorChannelId = competitorChannelId;
+        ProjectId = projectId;
         Payload = payload;
         Status = JobStatus.Queued;
         MaxRetries = maxRetries;
@@ -37,6 +39,8 @@ public sealed class Job
     public string Type { get; private set; } = string.Empty;
 
     public Guid? CompetitorChannelId { get; private set; }
+
+    public Guid? ProjectId { get; private set; }
 
     public string Payload { get; private set; } = string.Empty;
 
