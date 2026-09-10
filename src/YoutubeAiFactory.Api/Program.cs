@@ -4,6 +4,7 @@ using YoutubeAiFactory.Api.Endpoints;
 using YoutubeAiFactory.Api.Errors;
 using YoutubeAiFactory.Api.Health;
 using YoutubeAiFactory.Application.Competitors;
+using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Projects;
 using YoutubeAiFactory.Infrastructure;
@@ -21,6 +22,7 @@ builder.Services.AddSingleton(
 builder.Services.AddSingleton(
     builder.Configuration.GetSection("CompetitorAnalysis").Get<CompetitorAnalysisOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection("OpportunityAnalysis").Get<OpportunityAnalysisOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection("IdeaGeneration").Get<IdeaGenerationOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -36,6 +38,13 @@ builder.Services.AddScoped<GetOpportunityStatusHandler>();
 builder.Services.AddScoped<OpportunityAnalysisContextBuilder>();
 builder.Services.AddScoped<OpportunityScoringEngine>();
 builder.Services.AddScoped<OpportunityAnalysisJobProcessor>();
+builder.Services.AddScoped<SetOpportunityDecisionHandler>();
+builder.Services.AddScoped<RunIdeaGenerationHandler>();
+builder.Services.AddScoped<GetIdeaBankHandler>();
+builder.Services.AddScoped<GetIdeaGenerationHandler>();
+builder.Services.AddScoped<SetIdeaDecisionHandler>();
+builder.Services.AddScoped<IdeaGenerationContextBuilder>();
+builder.Services.AddScoped<IdeaGenerationJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"])
@@ -48,7 +57,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-4",
+    phase = "phase-5",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -66,6 +75,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapProjectEndpoints();
 app.MapCompetitorEndpoints();
 app.MapOpportunityEndpoints();
+app.MapIdeaEndpoints();
 
 app.Run();
 

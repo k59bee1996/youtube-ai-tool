@@ -1,6 +1,8 @@
+using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
+using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Projects;
@@ -58,6 +60,23 @@ public interface IYoutubeAiFactoryStore
     void AddOpportunityReportSource(OpportunityReportSource source) => throw new NotSupportedException("Opportunity persistence is not configured.");
     void AddOpportunityCandidate(OpportunityCandidate candidate) => throw new NotSupportedException("Opportunity persistence is not configured.");
     void AddOpportunityEvidence(OpportunityEvidence evidence) => throw new NotSupportedException("Opportunity persistence is not configured.");
+    Task<ApprovedOpportunityWithEvidence?> GetOpportunityWithEvidenceAsync(Guid projectId, Guid opportunityId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<ApprovedOpportunityWithEvidence?>(null);
+    Task<IReadOnlyList<ExistingIdeaContext>> ListExistingIdeaContextAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ExistingIdeaContext>>([]);
+    Task<IReadOnlyList<string>> ListCompetitorTitlesAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<string>>([]);
+    Task<IReadOnlyList<IdeaGeneration>> ListIdeaGenerationsAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<IdeaGeneration>>([]);
+    Task<IdeaGeneration?> GetIdeaGenerationAsync(Guid projectId, Guid generationId, CancellationToken cancellationToken) => Task.FromResult<IdeaGeneration?>(null);
+    Task<IReadOnlyList<VideoIdeaWithEvidence>> ListVideoIdeasAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VideoIdeaWithEvidence>>([]);
+    Task<VideoIdeaWithEvidence?> GetVideoIdeaAsync(Guid projectId, Guid ideaId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoIdeaWithEvidence?>(null);
+    Task<int> GetNextIdeaGenerationVersionAsync(Guid opportunityId, CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<Job?> GetActiveIdeaGenerationJobAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestIdeaGenerationJobAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> TryClaimNextIdeaGenerationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job> EnqueueIdeaGenerationJobAsync(Job job, CancellationToken cancellationToken) => throw new NotSupportedException("Idea generation job persistence is not configured.");
+    Task RequeueIdeaGenerationJobAsync(Guid jobId, CancellationToken cancellationToken) => throw new NotSupportedException("Idea generation job persistence is not configured.");
+    Task FailIdeaGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => throw new NotSupportedException("Idea generation job persistence is not configured.");
+    void AddIdeaGeneration(IdeaGeneration generation) => throw new NotSupportedException("Idea persistence is not configured.");
+    void AddVideoIdea(VideoIdea idea) => throw new NotSupportedException("Idea persistence is not configured.");
+    void AddIdeaEvidence(IdeaEvidence evidence) => throw new NotSupportedException("Idea persistence is not configured.");
 
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>

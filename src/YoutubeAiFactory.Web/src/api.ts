@@ -66,6 +66,10 @@ export type OpportunityCandidate = { id: string; name: string; description: stri
 export type OpportunityReport = { id: string; version: number; promptKey: string; promptVersion: number; provider: string; model: string; scoringAlgorithmVersion: string; createdAt: string; isStale: boolean; sources: { competitorChannelId: string; competitorAnalysisId: string; competitorAnalysisVersion: number }[]; limitations: string[]; opportunities: OpportunityCandidate[] }
 export type OpportunityStatus = { latestReport: OpportunityReport | null; activeJob: AnalysisJob | null; latestJob: AnalysisJob | null; competitorCount: number; analyzedCompetitorCount: number }
 export type OpportunityRun = { jobId: string; status: string; existing: boolean }
+export type IdeaScores = { opportunityFit: number; observedDemandAlignment: number; novelty: number; titlePotential: number; thumbnailPotential: number; storyPotential: number; audienceFit: number; evidenceStrength: number; productionEase: number; competitionRisk: number; researchRisk: number; duplicationPenalty: number; overallScore: number }
+export type IdeaEvidence = { id: string; opportunityEvidenceId: string; summary: string }
+export type VideoIdea = { id: string; opportunityId: string; generationId: string; workingTitle: string; topic: string; angle: string; contentFormat: string; targetAudience: string; viewerIntent: string; hookConcept: string; thumbnailConcept: string; viewerPromise: string; coreQuestion: string; whyViewerWouldCare: string; hypothesis: string; scores: IdeaScores; evidence: IdeaEvidence[]; risks: string[]; confidence: number; decisionStatus: string; createdAt: string }
+export type IdeaBank = { ideas: VideoIdea[]; generations: { id: string; version: number; opportunityReportVersion: number; createdAt: string; candidateCount: number }[]; latestGeneration: { id: string; version: number; opportunityReportVersion: number; isStale: boolean } | null; activeJobStatus: string | null; latestJobFailureReason: string | null }
 
 export type CreateProjectRequest = {
   name: string
@@ -125,4 +129,10 @@ export const api = {
     request<OpportunityStatus>(`/api/projects/${projectId}/opportunities/latest`, { signal }),
   generateOpportunities: (projectId: string) =>
     request<OpportunityRun>(`/api/projects/${projectId}/opportunities:generate`, { method: 'POST' }),
+  approveOpportunity: (projectId: string, opportunityId: string) => request<OpportunityCandidate>(`/api/projects/${projectId}/opportunities/${opportunityId}:approve`, { method: 'POST' }),
+  rejectOpportunity: (projectId: string, opportunityId: string) => request<OpportunityCandidate>(`/api/projects/${projectId}/opportunities/${opportunityId}:reject`, { method: 'POST' }),
+  getIdeaBank: (projectId: string, opportunityId: string, signal?: AbortSignal) => request<IdeaBank>(`/api/projects/${projectId}/opportunities/${opportunityId}/ideas`, { signal }),
+  generateIdeas: (projectId: string, opportunityId: string) => request<AnalysisRun>(`/api/projects/${projectId}/opportunities/${opportunityId}/ideas:generate`, { method: 'POST' }),
+  approveIdea: (projectId: string, ideaId: string) => request<VideoIdea>(`/api/projects/${projectId}/ideas/${ideaId}:approve`, { method: 'POST' }),
+  rejectIdea: (projectId: string, ideaId: string) => request<VideoIdea>(`/api/projects/${projectId}/ideas/${ideaId}:reject`, { method: 'POST' }),
 }

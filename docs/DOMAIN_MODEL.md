@@ -20,8 +20,12 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 ## Opportunities
 
-`OpportunityReport` is an immutable, project-owned generation version. `OpportunityReportSource` captures exact competitor-analysis IDs and versions. Relational `OpportunityCandidate` rows retain searchable target fields and scores, while `OpportunityEvidence` points to the source analysis, competitor, and optional video. Candidate decision states are `Candidate`, `Approved`, and `Rejected`; Phase 5 idea generation is not implemented.
+`OpportunityReport` is an immutable, project-owned generation version. `OpportunityReportSource` captures exact competitor-analysis IDs and versions. Relational `OpportunityCandidate` rows retain searchable target fields and scores, while `OpportunityEvidence` points to the source analysis, competitor, and optional video. Candidate decision states are `Candidate`, `Approved`, and `Rejected`.
+
+## Ideas
+
+`IdeaGeneration` is an immutable batch version scoped to one approved `OpportunityCandidate`, retaining its source report/version, prompt/provider/model provenance, scoring version, and `AiRun`. `VideoIdea` is a concrete structured content hypothesis, not a pilot or video project. It stores packaging concepts, audience and viewer intent, hypothesis, score components, confidence, risks, and decision state (`Candidate`, `Approved`, `Rejected`). `IdeaEvidence` links each idea to persisted `OpportunityEvidence`, preserving the path to competitor intelligence. A newer opportunity report can mark a generation stale without destroying it.
 
 ## Deferred concepts
 
-Content gaps, ideas, pilots, video projects, research reports, outlines, scripts, and production packages remain intentionally absent.
+Content gaps, pilots, video projects, research reports, outlines, scripts, and production packages remain intentionally absent.

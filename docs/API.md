@@ -38,3 +38,13 @@ Competitor IDs are always scoped to their route project. A competitor without co
 - `GET /api/projects/{projectId}/opportunities/latest` returns the latest immutable report, status, analyzed-competitor count, score components, sources, validated evidence, risks, limitations, and stale flag.
 
 At least one completed competitor analysis is required. Generation may use completed analyses even when some collected competitors are not analyzed; that limitation is exposed by the response and UI.
+
+## Ideas
+
+- `POST /api/projects/{projectId}/opportunities/{opportunityId}:approve` and `:reject` persist an opportunity decision.
+- `POST /api/projects/{projectId}/opportunities/{opportunityId}/ideas:generate` queues a generation for an approved opportunity and returns `202`; a matching active job is reused.
+- `GET /api/projects/{projectId}/opportunities/{opportunityId}/ideas` returns ranked persisted ideas, generation history, staleness, and job state without generating anything.
+- `GET /api/projects/{projectId}/opportunities/{opportunityId}/idea-generations` lists immutable generation history; `GET /api/projects/{projectId}/idea-generations/{generationId}` returns one generation and its ideas.
+- `POST /api/projects/{projectId}/ideas/{ideaId}:approve` and `:reject` persist the individual idea decision.
+
+All routes remain project-scoped; non-approved opportunities return a validation problem when generation is requested.

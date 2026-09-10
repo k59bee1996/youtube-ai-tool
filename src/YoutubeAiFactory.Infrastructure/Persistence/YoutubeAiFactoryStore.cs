@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using YoutubeAiFactory.Application.Common;
+using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
+using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Projects;
@@ -127,6 +129,40 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public void AddOpportunityReportSource(OpportunityReportSource source) => dbContext.OpportunityReportSources.Add(source);
     public void AddOpportunityCandidate(OpportunityCandidate candidate) => dbContext.OpportunityCandidates.Add(candidate);
     public void AddOpportunityEvidence(OpportunityEvidence evidence) => dbContext.OpportunityEvidence.Add(evidence);
+    public async Task<ApprovedOpportunityWithEvidence?> GetOpportunityWithEvidenceAsync(Guid projectId, Guid opportunityId, bool forUpdate, CancellationToken cancellationToken)
+    {
+        var candidates = dbContext.OpportunityCandidates.Join(dbContext.OpportunityReports.Where(x => x.ProjectId == projectId), candidate => candidate.ReportId, report => report.Id, (candidate, report) => new { candidate, report }).Where(x => x.candidate.Id == opportunityId);
+        var found = await (forUpdate ? candidates : candidates.AsNoTracking()).SingleOrDefaultAsync(cancellationToken);
+        if (found is null) return null;
+        var evidenceQuery = dbContext.OpportunityEvidence.Where(x => x.CandidateId == opportunityId);
+        var evidence = await (forUpdate ? evidenceQuery : evidenceQuery.AsNoTracking()).ToListAsync(cancellationToken);
+        return new ApprovedOpportunityWithEvidence(found.candidate, found.report, evidence);
+    }
+    public async Task<IReadOnlyList<ExistingIdeaContext>> ListExistingIdeaContextAsync(Guid projectId, CancellationToken cancellationToken) =>
+        await dbContext.VideoIdeas.AsNoTracking().Where(x => x.ProjectId == projectId && x.DecisionStatus != IdeaDecisionStatus.Rejected).OrderByDescending(x => x.CreatedAt).Select(x => new ExistingIdeaContext(x.Id, x.WorkingTitle, x.Topic, x.Angle, x.ContentFormat)).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<string>> ListCompetitorTitlesAsync(Guid projectId, CancellationToken cancellationToken) =>
+        await dbContext.CompetitorVideos.AsNoTracking().Where(x => dbContext.CompetitorChannels.Any(c => c.Id == x.CompetitorChannelId && c.ProjectId == projectId)).Select(x => x.Title).Where(x => x != null).Cast<string>().ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<IdeaGeneration>> ListIdeaGenerationsAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) =>
+        await dbContext.IdeaGenerations.AsNoTracking().Where(x => x.ProjectId == projectId && x.OpportunityId == opportunityId).OrderByDescending(x => x.Version).ToListAsync(cancellationToken);
+
+    public Task<IdeaGeneration?> GetIdeaGenerationAsync(Guid projectId, Guid generationId, CancellationToken cancellationToken) =>
+        dbContext.IdeaGenerations.AsNoTracking().SingleOrDefaultAsync(x => x.ProjectId == projectId && x.Id == generationId, cancellationToken);
+    public async Task<IReadOnlyList<VideoIdeaWithEvidence>> ListVideoIdeasAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken)
+    {
+        var ideas = await dbContext.VideoIdeas.AsNoTracking().Where(x => x.ProjectId == projectId && x.OpportunityId == opportunityId).ToListAsync(cancellationToken); var ids = ideas.Select(x => x.Id).ToArray(); var evidence = await dbContext.IdeaEvidence.AsNoTracking().Where(x => ids.Contains(x.IdeaId)).ToListAsync(cancellationToken); return ideas.Select(x => new VideoIdeaWithEvidence(x, evidence.Where(e => e.IdeaId == x.Id).ToArray())).ToArray();
+    }
+    public async Task<VideoIdeaWithEvidence?> GetVideoIdeaAsync(Guid projectId, Guid ideaId, bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.VideoIdeas.Where(x => x.ProjectId == projectId && x.Id == ideaId); var idea = await (forUpdate ? query : query.AsNoTracking()).SingleOrDefaultAsync(cancellationToken); if (idea is null) return null; var evidenceQuery = dbContext.IdeaEvidence.Where(x => x.IdeaId == ideaId); var evidence = await (forUpdate ? evidenceQuery : evidenceQuery.AsNoTracking()).ToListAsync(cancellationToken); return new VideoIdeaWithEvidence(idea, evidence);
+    }
+    public async Task<int> GetNextIdeaGenerationVersionAsync(Guid opportunityId, CancellationToken cancellationToken) => (await dbContext.IdeaGenerations.Where(x => x.OpportunityId == opportunityId).Select(x => (int?)x.Version).MaxAsync(cancellationToken) ?? 0) + 1;
+    public Task<Job?> GetActiveIdeaGenerationJobAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => FindIdeaJobAsync(projectId, opportunityId, true, cancellationToken);
+    public Task<Job?> GetLatestIdeaGenerationJobAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => FindIdeaJobAsync(projectId, opportunityId, false, cancellationToken);
+    public async Task<Job> EnqueueIdeaGenerationJobAsync(Job job, CancellationToken cancellationToken) { dbContext.Jobs.Add(job); try { await dbContext.SaveChangesAsync(cancellationToken); return job; } catch (DbUpdateException exception) when (IsActiveIdeaJobConflict(exception)) { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "idea-generation" && x.OpportunityId == job.OpportunityId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); } }
+    public Task<Job?> TryClaimNextIdeaGenerationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => TryClaimJobAsync("idea-generation", now, staleRunningBefore, cancellationToken);
+    public Task RequeueIdeaGenerationJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
+    public Task FailIdeaGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
+    public void AddIdeaGeneration(IdeaGeneration generation) => dbContext.IdeaGenerations.Add(generation); public void AddVideoIdea(VideoIdea idea) => dbContext.VideoIdeas.Add(idea); public void AddIdeaEvidence(IdeaEvidence evidence) => dbContext.IdeaEvidence.Add(evidence);
 
     public Task<Job?> GetActiveCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         FindAnalysisJobAsync(projectId, competitorId, activeOnly: true, cancellationToken);
@@ -253,6 +289,11 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
         return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
+    private Task<Job?> FindIdeaJobAsync(Guid projectId, Guid opportunityId, bool activeOnly, CancellationToken cancellationToken)
+    {
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "idea-generation" && job.ProjectId == projectId && job.OpportunityId == opportunityId);
+        if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying); return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+    }
 
     private async Task<Job?> TryClaimJobAsync(string type, DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken)
     {
@@ -271,4 +312,6 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_competitor_analysis" };
     private static bool IsActiveOpportunityJobConflict(DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_opportunity_analysis" };
+    private static bool IsActiveIdeaJobConflict(DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_idea_generation" };
 }

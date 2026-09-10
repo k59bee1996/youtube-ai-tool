@@ -52,6 +52,19 @@ public sealed class GetOpportunityStatusHandler(IYoutubeAiFactoryStore store)
     private static string[] Deserialize(string json) => JsonSerializer.Deserialize<string[]>(json, OpportunityAnalysisPrompt.SerializerOptions) ?? [];
 }
 
+public sealed class SetOpportunityDecisionHandler(IYoutubeAiFactoryStore store)
+{
+    public async Task<OpportunityCandidateDto> HandleAsync(Guid projectId, Guid opportunityId, OpportunityDecisionStatus decision, CancellationToken cancellationToken)
+    {
+        var source = await store.GetOpportunityWithEvidenceAsync(projectId, opportunityId, true, cancellationToken) ?? throw new ResourceNotFoundException("Opportunity was not found.");
+        source.Candidate.SetDecision(decision); await store.SaveChangesAsync(cancellationToken);
+        var candidate = source.Candidate;
+        return new(candidate.Id, candidate.Name, candidate.Description, candidate.Audience, candidate.Topic, candidate.ContentFormat, candidate.Angle, candidate.WhyThisOpportunity,
+            new(candidate.ObservedDemandSignal, candidate.NoveltySignal, candidate.CompetitionRiskSignal, candidate.AudienceFitSignal, candidate.TransferabilitySignal, candidate.EvidenceStrength, candidate.StoryPotential, candidate.ProductionComplexity, candidate.OverallScore), candidate.Confidence,
+            JsonSerializer.Deserialize<string[]>(candidate.RisksJson, OpportunityAnalysisPrompt.SerializerOptions) ?? [], JsonSerializer.Deserialize<string[]>(candidate.LimitationsJson, OpportunityAnalysisPrompt.SerializerOptions) ?? [], candidate.DecisionStatus.ToString(), source.Evidence.Select(e => new OpportunityEvidenceDto(e.Id, e.CompetitorChannelId, e.CompetitorAnalysisId, e.CompetitorVideoId, e.EvidenceId, e.Summary)).ToArray());
+    }
+}
+
 public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, OpportunityAnalysisContextBuilder contextBuilder,
     OpportunityAnalysisOptions options, TimeProvider timeProvider, ILogger<OpportunityAnalysisJobProcessor> logger)
 {
