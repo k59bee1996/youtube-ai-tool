@@ -1,13 +1,26 @@
 namespace YoutubeAiFactory.Application.Ideas;
 
-public static class IdeaScoringEngine
+public sealed class IdeaScoringEngine
 {
     public const string AlgorithmVersion = "idea-score:v1";
-    public static IdeaScoreBreakdown Calculate(VideoIdeaCandidateResult candidate, IdeaGenerationContext context, decimal duplicationPenalty)
+    private readonly IdeaGenerationOptions options;
+
+    public IdeaScoringEngine(IdeaGenerationOptions options)
     {
-        var evidenceStrength = Math.Clamp(context.OpportunityEvidenceStrength + Math.Min(20, candidate.EvidenceIds.Distinct().Count() * 7), 0, 100);
+        this.options = options;
+        var weights = new[] { options.OpportunityFitWeight, options.ObservedDemandAlignmentWeight, options.NoveltyWeight,
+            options.TitlePotentialWeight, options.ThumbnailPotentialWeight, options.StoryPotentialWeight,
+            options.AudienceFitWeight, options.EvidenceStrengthWeight, options.ProductionEaseWeight,
+            options.CompetitionRiskPenaltyWeight, options.ResearchRiskPenaltyWeight };
+        if (weights.Any(weight => weight < 0m) || options.EvidenceSupportBonusPerItem is < 0 or > 100 || options.MaxEvidenceSupportBonus is < 0 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(options), "Idea scoring configuration cannot contain negative weights or invalid evidence bonuses.");
+    }
+
+    public IdeaScoreBreakdown Calculate(VideoIdeaCandidateResult candidate, IdeaGenerationContext context, decimal duplicationPenalty)
+    {
+        var evidenceStrength = Math.Clamp(context.OpportunityEvidenceStrength + Math.Min(options.MaxEvidenceSupportBonus, candidate.EvidenceIds.Distinct().Count() * options.EvidenceSupportBonusPerItem), 0, 100);
         var productionEase = 100 - candidate.Features.ProductionComplexity;
-        var overall = Clamp(context.OpportunityScore * .14m + context.ObservedDemandAlignment * .13m + candidate.Features.Novelty * .13m + candidate.Features.TitlePotential * .11m + candidate.Features.ThumbnailPotential * .11m + candidate.Features.StoryPotential * .11m + candidate.Features.AudienceFit * .10m + evidenceStrength * .09m + productionEase * .08m - candidate.Features.CompetitionRisk * .06m - candidate.Features.ResearchRisk * .04m - duplicationPenalty);
+        var overall = Clamp(context.OpportunityScore * options.OpportunityFitWeight + context.ObservedDemandAlignment * options.ObservedDemandAlignmentWeight + candidate.Features.Novelty * options.NoveltyWeight + candidate.Features.TitlePotential * options.TitlePotentialWeight + candidate.Features.ThumbnailPotential * options.ThumbnailPotentialWeight + candidate.Features.StoryPotential * options.StoryPotentialWeight + candidate.Features.AudienceFit * options.AudienceFitWeight + evidenceStrength * options.EvidenceStrengthWeight + productionEase * options.ProductionEaseWeight - candidate.Features.CompetitionRisk * options.CompetitionRiskPenaltyWeight - candidate.Features.ResearchRisk * options.ResearchRiskPenaltyWeight - duplicationPenalty);
         return new(context.OpportunityScore, context.ObservedDemandAlignment, candidate.Features.Novelty, candidate.Features.TitlePotential, candidate.Features.ThumbnailPotential, candidate.Features.StoryPotential, candidate.Features.AudienceFit, evidenceStrength, productionEase, candidate.Features.CompetitionRisk, candidate.Features.ResearchRisk, duplicationPenalty, overall);
     }
     private static decimal Clamp(decimal value) => decimal.Round(Math.Clamp(value, 0m, 100m), 2);

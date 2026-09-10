@@ -16,6 +16,7 @@ builder.Services.AddScoped<OpportunityAnalysisContextBuilder>();
 builder.Services.AddScoped<OpportunityScoringEngine>();
 builder.Services.AddScoped<OpportunityAnalysisJobProcessor>();
 builder.Services.AddScoped<IdeaGenerationContextBuilder>();
+builder.Services.AddScoped<IdeaScoringEngine>();
 builder.Services.AddScoped<IdeaGenerationJobProcessor>();
 builder.Services.AddHostedService<DatabaseHeartbeatWorker>();
 builder.Services.AddHostedService<CompetitorAnalysisWorker>();

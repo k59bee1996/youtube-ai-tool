@@ -76,6 +76,7 @@ textarea { min-height: 92px; resize: vertical; }
 .idea-title:hover { color: #ffb19f; }
 .idea-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 13px; }
 .idea-sort { display: flex; gap: 9px; align-items: center; color: #c9d4e4; font-size: .86rem; font-weight: 650; }
+.idea-filters { display: flex; flex-wrap: wrap; gap: 14px; }
 .idea-sort select { border: 1px solid #34435c; border-radius: 8px; background: #0a1221; color: #f8fafc; padding: 8px; }
 .video-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .video-card { display: grid; grid-template-columns: 150px 1fr; overflow: hidden; min-height: 96px; border: 1px solid #26334a; border-radius: 12px; background: #0b1424; }

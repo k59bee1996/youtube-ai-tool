@@ -10,8 +10,23 @@ public sealed class IdeaGenerationTests
     {
         var context = Context(); var safe = Candidate(context) with { Features = new(80, 80, 80, 80, 80, 20, 10, 10) };
         var risky = safe with { Features = safe.Features with { CompetitionRisk = 90, ResearchRisk = 90 } };
-        var first = IdeaScoringEngine.Calculate(safe, context, 0);
-        Assert.Equal(first, IdeaScoringEngine.Calculate(safe, context, 0)); Assert.InRange(first.OverallScore, 0, 100); Assert.True(first.OverallScore > IdeaScoringEngine.Calculate(risky, context, 0).OverallScore);
+        var engine = new IdeaScoringEngine(new IdeaGenerationOptions()); var first = engine.Calculate(safe, context, 0);
+        Assert.Equal(first, engine.Calculate(safe, context, 0)); Assert.InRange(first.OverallScore, 0, 100); Assert.True(first.OverallScore > engine.Calculate(risky, context, 0).OverallScore);
+    }
+
+    [Fact]
+    public void Scoring_uses_configured_weights_and_rejects_invalid_configuration()
+    {
+        var context = Context(); var candidate = Candidate(context); var baseline = new IdeaScoringEngine(new IdeaGenerationOptions()).Calculate(candidate, context, 0);
+        var configured = new IdeaScoringEngine(new IdeaGenerationOptions { NoveltyWeight = .50m }).Calculate(candidate with { Features = candidate.Features with { Novelty = 100 } }, context, 0);
+        Assert.True(configured.OverallScore > baseline.OverallScore); Assert.Throws<ArgumentOutOfRangeException>(() => new IdeaScoringEngine(new IdeaGenerationOptions { NoveltyWeight = -.01m }));
+    }
+
+    [Fact]
+    public void Replacement_prompt_includes_accepted_concepts_as_exclusions()
+    {
+        var context = Context(); var request = IdeaGenerationPrompt.Create(context, 5, exclusions: [Candidate(context)]);
+        Assert.Contains("Do not repeat", request.UserContent, StringComparison.Ordinal); Assert.Contains("The Economics of Owning a Medieval Castle", request.UserContent, StringComparison.Ordinal);
     }
 
     [Fact]

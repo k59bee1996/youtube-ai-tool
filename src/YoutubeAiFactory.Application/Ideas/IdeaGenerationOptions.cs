@@ -13,4 +13,17 @@ public sealed class IdeaGenerationOptions
     public int RunningJobLeaseSeconds { get; init; } = 300;
     public decimal NearDuplicateThreshold { get; init; } = .72m;
     public decimal CompetitorTitleThreshold { get; init; } = .72m;
+    public decimal OpportunityFitWeight { get; init; } = .14m;
+    public decimal ObservedDemandAlignmentWeight { get; init; } = .13m;
+    public decimal NoveltyWeight { get; init; } = .13m;
+    public decimal TitlePotentialWeight { get; init; } = .11m;
+    public decimal ThumbnailPotentialWeight { get; init; } = .11m;
+    public decimal StoryPotentialWeight { get; init; } = .11m;
+    public decimal AudienceFitWeight { get; init; } = .10m;
+    public decimal EvidenceStrengthWeight { get; init; } = .09m;
+    public decimal ProductionEaseWeight { get; init; } = .08m;
+    public decimal CompetitionRiskPenaltyWeight { get; init; } = .06m;
+    public decimal ResearchRiskPenaltyWeight { get; init; } = .04m;
+    public int EvidenceSupportBonusPerItem { get; init; } = 7;
+    public int MaxEvidenceSupportBonus { get; init; } = 20;
 }

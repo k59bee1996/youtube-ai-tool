@@ -44,6 +44,7 @@ builder.Services.AddScoped<GetIdeaBankHandler>();
 builder.Services.AddScoped<GetIdeaGenerationHandler>();
 builder.Services.AddScoped<SetIdeaDecisionHandler>();
 builder.Services.AddScoped<IdeaGenerationContextBuilder>();
+builder.Services.AddScoped<IdeaScoringEngine>();
 builder.Services.AddScoped<IdeaGenerationJobProcessor>();
 builder.Services
     .AddHealthChecks()
