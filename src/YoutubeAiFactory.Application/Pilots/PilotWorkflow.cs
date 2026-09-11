@@ -89,11 +89,14 @@ public sealed class ReplacePilotSlotHandler(IYoutubeAiFactoryStore store)
         var videos = await store.ListPilotVideosAsync(pilotId, true, cancellationToken);
         var slot = videos.SingleOrDefault(x => x.Sequence == sequence) ?? throw new ResourceNotFoundException("Pilot slot was not found.");
         if (videos.Any(x => x.VideoIdeaId == request.VideoIdeaId)) throw new ApplicationValidationException("An idea can appear only once in a pilot.");
-        var idea = (await store.ListApprovedPilotIdeasAsync(projectId, cancellationToken)).SingleOrDefault(x => x.VideoIdeaId == request.VideoIdeaId) ?? throw new ApplicationValidationException("Replacement ideas must be approved ideas from this project.");
+        var approvedIdeas = await store.ListApprovedPilotIdeasAsync(projectId, cancellationToken);
+        var idea = approvedIdeas.SingleOrDefault(x => x.VideoIdeaId == request.VideoIdeaId) ?? throw new ApplicationValidationException("Replacement ideas must be approved ideas from this project.");
         var type = PilotPlanValidator.ExpectedType(sequence); var metric = type switch { PilotExperimentType.Topic => "Views relative to channel baseline", PilotExperimentType.Packaging => "CTR", _ => "Audience retention" };
         var variable = type switch { PilotExperimentType.Topic => idea.Topic, PilotExperimentType.Packaging => idea.HookConcept, _ => idea.ContentFormat };
         var control = type switch { PilotExperimentType.Topic => "Keep packaging intensity and format roughly consistent.", PilotExperimentType.Packaging => "Keep topic attractiveness and production quality roughly consistent.", _ => "Keep topic strength and packaging quality roughly consistent." };
         slot.Replace(idea.VideoIdeaId, idea.OpportunityId, idea.Hypothesis, variable, control, metric, $"Compare this {type} result with comparable pilot videos rather than a universal threshold.", $"Manual replacement preserves the {type} experiment block using an approved, unused idea.");
+        var allIdeas = await store.ListPilotIdeaContextAsync(projectId, cancellationToken);
+        pilot.UpdateWarnings(JsonSerializer.Serialize(PilotBalanceAnalyzer.Analyze(videos.Select(x => x.VideoIdeaId), allIdeas), PilotGenerationPrompt.SerializerOptions));
         await store.SaveChangesAsync(cancellationToken); return await PilotDtoMapper.MapAsync(store, pilot, cancellationToken);
     }
 }
@@ -105,7 +108,7 @@ public sealed class MovePilotSlotHandler(IYoutubeAiFactoryStore store)
         if (sequence is < 1 or > 12) throw new ApplicationValidationException("Pilot sequence must be between 1 and 12.");
         var pilot = await store.GetPilotAsync(projectId, pilotId, true, cancellationToken) ?? throw new ResourceNotFoundException("Pilot was not found.");
         if (pilot.Status != PilotStatus.Draft) throw new ApplicationValidationException("Only draft pilots can be changed.");
-        var delta = request.Direction.Equals("up", StringComparison.OrdinalIgnoreCase) ? -1 : request.Direction.Equals("down", StringComparison.OrdinalIgnoreCase) ? 1 : throw new ApplicationValidationException("Move direction must be 'up' or 'down'.");
+        var delta = string.Equals(request.Direction, "up", StringComparison.OrdinalIgnoreCase) ? -1 : string.Equals(request.Direction, "down", StringComparison.OrdinalIgnoreCase) ? 1 : throw new ApplicationValidationException("Move direction must be 'up' or 'down'.");
         var target = sequence + delta; if (target is < 1 or > 12 || PilotPlanValidator.ExpectedType(target) != PilotPlanValidator.ExpectedType(sequence)) throw new ApplicationValidationException("Pilot slots can only move within their experiment block.");
         var videos = await store.ListPilotVideosAsync(pilotId, true, cancellationToken); var current = videos.Single(x => x.Sequence == sequence); var destination = videos.Single(x => x.Sequence == target); current.SwapContentsWith(destination);
         await store.SaveChangesAsync(cancellationToken); return await PilotDtoMapper.MapAsync(store, pilot, cancellationToken);
@@ -129,7 +132,13 @@ public sealed class PilotGenerationJobProcessor(IYoutubeAiFactoryStore store, IL
             LlmResult<PilotPlanResult>? answer = null; Exception? failure = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
             {
-                try { answer = await provider.GenerateStructuredAsync<PilotPlanResult>(PilotGenerationPrompt.Create(context, attempt > 0), cancellationToken); PilotPlanValidator.Validate(answer.Value, context); break; }
+                try
+                {
+                    var candidate = await provider.GenerateStructuredAsync<PilotPlanResult>(PilotGenerationPrompt.Create(context, attempt > 0), cancellationToken);
+                    PilotPlanValidator.Validate(candidate.Value, context);
+                    answer = candidate;
+                    break;
+                }
                 catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; }
                 catch (Exception ex) { failure = ex; break; }
             }

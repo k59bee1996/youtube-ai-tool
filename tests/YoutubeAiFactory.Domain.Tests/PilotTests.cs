@@ -29,6 +29,16 @@ public sealed class PilotTests
         Assert.Throws<DomainException>(() => first.SwapContentsWith(CreateVideo(pilotId, 5, PilotExperimentType.Packaging)));
     }
 
+    [Fact]
+    public void Draft_pilot_can_refresh_its_balance_warnings()
+    {
+        var pilot = CreatePilot();
+        pilot.UpdateWarnings("[\"Packaging experiments are concentrated.\"]");
+        Assert.Equal("[\"Packaging experiments are concentrated.\"]", pilot.WarningsJson);
+        pilot.Approve(DateTimeOffset.UtcNow);
+        Assert.Throws<DomainException>(() => pilot.UpdateWarnings("[]"));
+    }
+
     private static Pilot CreatePilot() => new(Guid.NewGuid(), 1, Guid.NewGuid(), "pilot-generation", 1, "fake", "fake", "pilot-planning:v1", "Pilot", "Learn", "[]", "[]", "[]", 12, DateTimeOffset.UtcNow);
     private static PilotVideo CreateVideo(Guid pilotId, int sequence, PilotExperimentType type) => new(pilotId, Guid.NewGuid(), Guid.NewGuid(), sequence, type, "Hypothesis", "Variable", "Control", "Metric", "Signal", "Rationale");
 }

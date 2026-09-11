@@ -4,7 +4,13 @@ public static class PilotBalanceAnalyzer
 {
     public static IReadOnlyList<string> Analyze(PilotPlanResult plan, PilotGenerationContext context)
     {
-        var selected = plan.Videos.Select(v => context.Ideas.Single(i => i.VideoIdeaId == v.VideoIdeaId)).ToArray();
+        return Analyze(plan.Videos.Select(x => x.VideoIdeaId), context.Ideas);
+    }
+
+    public static IReadOnlyList<string> Analyze(IEnumerable<Guid> selectedIdeaIds, IReadOnlyList<PilotIdeaContext> ideas)
+    {
+        var contexts = ideas.ToDictionary(x => x.VideoIdeaId);
+        var selected = selectedIdeaIds.Select(id => contexts[id]).ToArray();
         var warnings = new List<string>();
         if (selected.Take(4).Select(x => x.Topic).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1) warnings.Add("All Topic tests use the same subject; learning diversity is limited.");
         if (selected.Skip(4).Take(4).Select(x => x.HookConcept).Distinct(StringComparer.OrdinalIgnoreCase).Count() < 2) warnings.Add("Packaging experiments use nearly identical hook mechanisms.");

@@ -335,6 +335,22 @@ test('queues AI analysis from the competitor detail without auto-generating it',
   ))
 })
 
+test('surfaces a failed pilot generation and offers a retry', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/pilots/latest')) return json({ latestPilot: null, activeJobStatus: null, latestJobFailureReason: 'Pilot output did not meet the required experiment constraints.', eligibleIdeaCount: 12, requiredIdeaCount: 12 })
+    if (url.endsWith('/pilots/eligible-ideas')) return json([])
+    throw new Error(`Unexpected request: ${url}`)
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Open pilot' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Pilot output did not meet the required experiment constraints.')
+  expect(screen.getByRole('button', { name: 'Retry Pilot Generation' })).toBeVisible()
+})
+
 function json(body: unknown, status = 200) {
   return Promise.resolve(response(body, status))
 }

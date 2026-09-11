@@ -48,4 +48,10 @@ public sealed class Pilot
         if (Status != PilotStatus.Draft) throw new DomainException("Only a draft pilot can be approved.");
         Status = PilotStatus.Approved; ApprovedAt = approvedAt;
     }
+
+    public void UpdateWarnings(string warningsJson)
+    {
+        if (Status != PilotStatus.Draft) throw new DomainException("Only a draft pilot can be changed.");
+        WarningsJson = Guard.Required(warningsJson, nameof(warningsJson), 20_000);
+    }
 }
