@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 4 adds persisted, ranked opportunity reports synthesized from completed competitor analyses.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 5 adds a versioned Idea Bank that turns an approved opportunity into ranked video hypotheses.
 
 ## Repository layout
 
@@ -44,4 +44,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Start the Worker as well as the API to process competitor and opportunity jobs. Opportunity reports use bounded persisted evidence and describe the analyzed dataset, not global YouTube. Ideas, pilots, research, scripts, and production packages remain outside this phase.
+Start the Worker as well as the API to process competitor, opportunity, and idea-generation jobs. Ideas require an approved opportunity, preserve generation history, validate evidence references, reject near-duplicate titles and concepts, and use deterministic `idea-score:v1` ranking. Pilots, research, scripts, and production packages remain outside this phase.

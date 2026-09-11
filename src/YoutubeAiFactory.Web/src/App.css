@@ -68,6 +68,16 @@ textarea { min-height: 92px; resize: vertical; }
 .analysis-block ul { margin: 0; padding-left: 20px; color: #c9d4e4; line-height: 1.7; }
 .evidence { display: block; margin-top: 8px; }
 .stale-note { margin: 0; padding: 10px; border: 1px solid #8b5b1e; color: #fde68a; background: rgba(146, 64, 14, .2); border-radius: 8px; }
+.idea-bank { display: grid; gap: 16px; margin-top: 22px; padding: 18px; border: 1px solid #34435c; border-radius: 12px; background: rgba(10, 18, 33, .6); }
+.idea-list { display: grid; gap: 12px; }
+.idea-card, .idea-detail { padding: 16px; border: 1px solid #2c3a51; border-radius: 10px; background: #0b1424; }
+.idea-card p, .idea-detail p { color: #c9d4e4; line-height: 1.45; }
+.idea-title { padding: 0; border: 0; background: transparent; color: #f8fafc; font-weight: 800; font-size: 1rem; text-align: left; }
+.idea-title:hover { color: #ffb19f; }
+.idea-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 13px; }
+.idea-sort { display: flex; gap: 9px; align-items: center; color: #c9d4e4; font-size: .86rem; font-weight: 650; }
+.idea-filters { display: flex; flex-wrap: wrap; gap: 14px; }
+.idea-sort select { border: 1px solid #34435c; border-radius: 8px; background: #0a1221; color: #f8fafc; padding: 8px; }
 .video-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .video-card { display: grid; grid-template-columns: 150px 1fr; overflow: hidden; min-height: 96px; border: 1px solid #26334a; border-radius: 12px; background: #0b1424; }
 .video-card img, .thumbnail-placeholder { width: 150px; height: 100%; min-height: 96px; object-fit: cover; background: #1c2940; }

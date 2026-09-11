@@ -59,3 +59,13 @@ React -> API (202) -> Job -> Worker -> bounded cross-competitor context
 ```
 
 The provider can assess novelty, audience fit, transferability, story potential and production complexity, but it cannot provide final scores or arbitrary evidence. C# validates backend-issued evidence IDs and derives observed demand, evidence strength, dataset competition risk, and the final `opportunity-score:v1` score. Each report records exact source-analysis versions, enabling stale detection.
+
+## Phase 5 idea-generation flow
+
+```text
+Approved opportunity -> API (202) -> Job -> Worker -> bounded context -> ILlmProvider
+                                                   -> validation -> duplicate rejection -> deterministic scoring
+                                                   -> immutable generation + ideas + evidence
+```
+
+The context uses project settings, one approved opportunity, its persisted `OpportunityEvidence`, a bounded active Idea Bank summary, and bounded collected competitor titles. The LLM proposes creative subjective features only. C# derives opportunity fit, observed-demand alignment, evidence strength and production ease; calculates `idea-score:v1`; and rejects close matches to competitor titles, prior ideas, and candidates in the same generation.
