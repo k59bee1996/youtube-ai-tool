@@ -261,6 +261,23 @@ test('renders API problem details and allows the user to retry', async () => {
   expect(screen.getByRole('button', { name: 'Add competitor' })).toBeEnabled()
 })
 
+test('shows the pilot insufficient-ideas state without queuing generation', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/pilots/latest')) return json({ latestPilot: null, activeJobStatus: null, latestJobFailureReason: null, eligibleIdeaCount: 11, requiredIdeaCount: 12 })
+    if (url.endsWith('/pilots/eligible-ideas')) return json([])
+    throw new Error(`Unexpected request: ${url}`)
+  }))
+  render(<App />)
+  expect(await screen.findByText('Add a YouTube channel to begin competitor research.')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Open pilot' }))
+  expect(await screen.findByText('11 approved ideas available. At least 12 are required to create a complete pilot.')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Generate 12-Video Pilot' })).toBeDisabled()
+})
+
 test('renders an explicit empty state and unavailable channel metrics', async () => {
   const emptySummary: CompetitorSummary = {
     ...summary,

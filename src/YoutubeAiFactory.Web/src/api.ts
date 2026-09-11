@@ -70,6 +70,10 @@ export type IdeaScores = { opportunityFit: number; observedDemandAlignment: numb
 export type IdeaEvidence = { id: string; opportunityEvidenceId: string; summary: string }
 export type VideoIdea = { id: string; opportunityId: string; generationId: string; workingTitle: string; topic: string; angle: string; contentFormat: string; targetAudience: string; viewerIntent: string; hookConcept: string; thumbnailConcept: string; viewerPromise: string; coreQuestion: string; whyViewerWouldCare: string; hypothesis: string; scores: IdeaScores; evidence: IdeaEvidence[]; risks: string[]; confidence: number; decisionStatus: string; createdAt: string }
 export type IdeaBank = { ideas: VideoIdea[]; generations: { id: string; version: number; opportunityReportVersion: number; createdAt: string; candidateCount: number }[]; latestGeneration: { id: string; version: number; opportunityReportVersion: number; isStale: boolean } | null; activeJobStatus: string | null; latestJobFailureReason: string | null }
+export type PilotVideo = { id: string; sequence: number; videoIdeaId: string; opportunityId: string; workingTitle: string; opportunityName: string; overallIdeaScore: number; experimentType: string; hypothesis: string; variableBeingTested: string; controlStrategy: string; primaryMetric: string; successSignal: string; rationale: string; secondaryMetrics: string[]; notes: string | null }
+export type Pilot = { id: string; version: number; name: string; objective: string; status: string; createdAt: string; approvedAt: string | null; eligibleIdeaCount: number; promptKey: string; promptVersion: number; provider: string; model: string; planningAlgorithmVersion: string; assumptions: string[]; limitations: string[]; warnings: string[]; requiresReview: boolean; videos: PilotVideo[] }
+export type PilotStatus = { latestPilot: Pilot | null; activeJobStatus: string | null; latestJobFailureReason: string | null; eligibleIdeaCount: number; requiredIdeaCount: number }
+export type PilotCandidate = { videoIdeaId: string; opportunityId: string; opportunityName: string; workingTitle: string; topic: string; contentFormat: string; overallScore: number }
 
 export type CreateProjectRequest = {
   name: string
@@ -135,4 +139,10 @@ export const api = {
   generateIdeas: (projectId: string, opportunityId: string) => request<AnalysisRun>(`/api/projects/${projectId}/opportunities/${opportunityId}/ideas:generate`, { method: 'POST' }),
   approveIdea: (projectId: string, ideaId: string) => request<VideoIdea>(`/api/projects/${projectId}/ideas/${ideaId}:approve`, { method: 'POST' }),
   rejectIdea: (projectId: string, ideaId: string) => request<VideoIdea>(`/api/projects/${projectId}/ideas/${ideaId}:reject`, { method: 'POST' }),
+  getPilot: (projectId: string, signal?: AbortSignal) => request<PilotStatus>(`/api/projects/${projectId}/pilots/latest`, { signal }),
+  generatePilot: (projectId: string) => request<AnalysisRun>(`/api/projects/${projectId}/pilots:generate`, { method: 'POST' }),
+  approvePilot: (projectId: string, pilotId: string) => request<Pilot>(`/api/projects/${projectId}/pilots/${pilotId}:approve`, { method: 'POST' }),
+  getPilotCandidates: (projectId: string) => request<PilotCandidate[]>(`/api/projects/${projectId}/pilots/eligible-ideas`),
+  replacePilotSlot: (projectId: string, pilotId: string, sequence: number, videoIdeaId: string) => request<Pilot>(`/api/projects/${projectId}/pilots/${pilotId}/slots/${sequence}:replace`, { method: 'POST', body: JSON.stringify({ videoIdeaId }) }),
+  movePilotSlot: (projectId: string, pilotId: string, sequence: number, direction: 'up' | 'down') => request<Pilot>(`/api/projects/${projectId}/pilots/${pilotId}/slots/${sequence}:move`, { method: 'POST', body: JSON.stringify({ direction }) }),
 }

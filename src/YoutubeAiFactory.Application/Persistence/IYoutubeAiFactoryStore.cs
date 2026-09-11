@@ -1,10 +1,12 @@
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
+using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
+using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 
 namespace YoutubeAiFactory.Application.Persistence;
@@ -77,6 +79,24 @@ public interface IYoutubeAiFactoryStore
     void AddIdeaGeneration(IdeaGeneration generation) => throw new NotSupportedException("Idea persistence is not configured.");
     void AddVideoIdea(VideoIdea idea) => throw new NotSupportedException("Idea persistence is not configured.");
     void AddIdeaEvidence(IdeaEvidence evidence) => throw new NotSupportedException("Idea persistence is not configured.");
+
+    Task<IReadOnlyList<PilotIdeaContext>> ListApprovedPilotIdeasAsync(Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PilotIdeaContext>>([]);
+    Task<IReadOnlyList<PilotIdeaContext>> ListPilotIdeaContextAsync(Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PilotIdeaContext>>([]);
+    Task<Pilot?> GetLatestPilotAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<Pilot?>(null);
+    Task<Pilot?> GetPilotAsync(Guid projectId, Guid pilotId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<Pilot?>(null);
+    Task<IReadOnlyList<Pilot>> ListPilotsAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Pilot>>([]);
+    Task<IReadOnlyList<PilotVideo>> ListPilotVideosAsync(Guid pilotId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PilotVideo>>([]);
+    Task<int> GetNextPilotVersionAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<Job?> GetActivePilotGenerationJobAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestPilotGenerationJobAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> TryClaimNextPilotGenerationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job> EnqueuePilotGenerationJobAsync(Job job, CancellationToken cancellationToken) => throw new NotSupportedException("Pilot job persistence is not configured.");
+    Task RequeuePilotGenerationJobAsync(Guid jobId, CancellationToken cancellationToken) => throw new NotSupportedException("Pilot job persistence is not configured.");
+    Task FailPilotGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => throw new NotSupportedException("Pilot job persistence is not configured.");
+    void AddPilot(Pilot pilot) => throw new NotSupportedException("Pilot persistence is not configured.");
+    void AddPilotVideo(PilotVideo pilotVideo) => throw new NotSupportedException("Pilot persistence is not configured.");
 
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>

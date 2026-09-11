@@ -69,3 +69,12 @@ Approved opportunity -> API (202) -> Job -> Worker -> bounded context -> ILlmPro
 ```
 
 The context uses project settings, one approved opportunity, its persisted `OpportunityEvidence`, a bounded active Idea Bank summary, and bounded collected competitor titles. The LLM proposes creative subjective features only. C# derives opportunity fit, observed-demand alignment, evidence strength and production ease; calculates `idea-score:v1`; and rejects close matches to competitor titles, prior ideas, and candidates in the same generation.
+
+## Phase 6 pilot-generation flow
+
+```text
+Approved project ideas -> API (202) -> Job -> Worker -> bounded pilot context -> ILlmProvider
+                                                          -> hard validation -> balance warnings -> immutable Pilot version
+```
+
+The context builder provides at most 40 approved ideas and calculates topic, format, and opportunity frequency in C#. The model plans meaningful controlled variation and experiment prose only. C# enforces existing IDs/project ownership/approval, unique ideas, sequences 1–12, fixed Topic/Packaging/Storytelling blocks, and required experiment fields. `Pilot` versions are never overwritten; a source idea that is no longer approved makes a plan require review rather than deleting it.
