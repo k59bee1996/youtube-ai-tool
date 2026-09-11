@@ -46,7 +46,7 @@ React -> API (202 Accepted) -> Job table -> Worker -> application workflow
                                                     -> validator -> analysis/AiRun tables
 ```
 
-The controller only queues or reads work. The application context builder selects a bounded mix of recent, high-, low-, and representative videos and calculates quantitative signals before the provider is called. `competitor-analysis:v1` is the first immutable prompt contract. The worker claims jobs with PostgreSQL row locking (`FOR UPDATE SKIP LOCKED`), so separate workers do not process the same job.
+The controller only queues or reads work. The application context builder selects a bounded mix of recent, high-, low-, and representative videos and calculates quantitative signals before the provider is called. `competitor-analysis:v1` is the first immutable prompt contract. The worker claims jobs with PostgreSQL row locking (`FOR UPDATE SKIP LOCKED`), which serializes normal concurrent claims. A future lease-fencing or heartbeat mechanism is still required so that a slow worker cannot finalize work after its lease has expired and another worker has reclaimed the job.
 
 Completed `CompetitorAnalysis` records are immutable versions. Their nested typed result is stored as one `jsonb` aggregate because it is rendered and consumed as an analysis report; provenance, versions, source timestamp, provider and model remain relational columns. A refresh after `SourceDataAsOf` marks the latest report stale without automatically spending another AI call.
 
@@ -77,4 +77,4 @@ Approved project ideas -> API (202) -> Job -> Worker -> bounded pilot context ->
                                                           -> hard validation -> balance warnings -> immutable Pilot version
 ```
 
-The context builder provides at most 40 approved ideas and calculates topic, format, and opportunity frequency in C#. The model plans meaningful controlled variation and experiment prose only. C# enforces existing IDs/project ownership/approval, unique ideas, sequences 1–12, fixed Topic/Packaging/Storytelling blocks, and required experiment fields. `Pilot` versions are never overwritten; a source idea that is no longer approved makes a plan require review rather than deleting it.
+The context builder provides 12–40 ideas whose idea and source opportunity are both approved, and calculates topic, format, and opportunity frequency in C#. The model plans meaningful controlled variation and experiment prose only. C# enforces existing IDs/project ownership/approval, unique ideas, sequences 1–12, fixed Topic/Packaging/Storytelling blocks, and required experiment fields. `Pilot` versions are never overwritten; a source idea or source opportunity that is no longer approved makes a plan require review rather than deleting it.

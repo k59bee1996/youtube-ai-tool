@@ -3,6 +3,7 @@ using Npgsql;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
+using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -97,6 +98,38 @@ public sealed class PostgresPersistenceTests
         await using var verificationContext = new YoutubeAiFactoryDbContext(CreateOptions());
         Assert.Equal(0, await verificationContext.CompetitorChannels.CountAsync());
         Assert.Equal(0, await verificationContext.CompetitorVideos.CountAsync());
+    }
+
+    [PostgresFact]
+    public async Task Pilot_revision_rejects_a_concurrent_draft_mutation()
+    {
+        var options = CreateOptions();
+        await using (var setup = new YoutubeAiFactoryDbContext(options))
+        {
+            await setup.Database.EnsureDeletedAsync();
+            await setup.Database.MigrateAsync();
+            var now = DateTimeOffset.UtcNow;
+            var project = new Project("Pilot concurrency", new Market("Education", "English", "Global"), new AudienceProfile("Creators"), now);
+            var pilot = new Pilot(project.Id, 1, Guid.NewGuid(), "pilot-generation", 1, "fake", "fake", "pilot-planning:v1", "Pilot", "Learn", "[]", "[]", "[]", 12, now);
+            setup.Projects.Add(project);
+            setup.Pilots.Add(pilot);
+            await setup.SaveChangesAsync();
+        }
+
+        await using var firstContext = new YoutubeAiFactoryDbContext(CreateOptions());
+        await using var secondContext = new YoutubeAiFactoryDbContext(CreateOptions());
+        var firstStore = new YoutubeAiFactoryStore(firstContext);
+        var secondStore = new YoutubeAiFactoryStore(secondContext);
+        var pilotId = await firstContext.Pilots.Select(item => item.Id).SingleAsync();
+        var projectId = await firstContext.Pilots.Select(item => item.ProjectId).SingleAsync();
+        var first = await firstStore.GetPilotAsync(projectId, pilotId, true, CancellationToken.None);
+        var second = await secondStore.GetPilotAsync(projectId, pilotId, true, CancellationToken.None);
+
+        first!.RecordDraftChange();
+        await firstStore.SaveChangesAsync(CancellationToken.None);
+        second!.RecordDraftChange();
+
+        await Assert.ThrowsAsync<ResourceConflictException>(() => secondStore.SaveChangesAsync(CancellationToken.None));
     }
 
     [PostgresFact]

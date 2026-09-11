@@ -173,11 +173,13 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         var ideaQuery = dbContext.VideoIdeas.AsNoTracking().Where(x => x.ProjectId == projectId);
         if (approvedOnly) ideaQuery = ideaQuery.Where(x => x.DecisionStatus == IdeaDecisionStatus.Approved);
         var ideas = await ideaQuery
-            .Join(dbContext.OpportunityCandidates.AsNoTracking(), idea => idea.OpportunityId, opportunity => opportunity.Id, (idea, opportunity) => new { idea, opportunity }).ToListAsync(cancellationToken);
+            .Join(dbContext.OpportunityCandidates.AsNoTracking(), idea => idea.OpportunityId, opportunity => opportunity.Id, (idea, opportunity) => new { idea, opportunity })
+            .Where(x => !approvedOnly || x.opportunity.DecisionStatus == OpportunityDecisionStatus.Approved)
+            .ToListAsync(cancellationToken);
         var topicCounts = ideas.GroupBy(x => x.idea.Topic, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
         var formatCounts = ideas.GroupBy(x => x.idea.ContentFormat, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
         var opportunityCounts = ideas.GroupBy(x => x.idea.OpportunityId).ToDictionary(x => x.Key, x => x.Count());
-        return ideas.Select(x => new PilotIdeaContext(x.idea.Id, x.idea.OpportunityId, x.opportunity.Name, x.idea.WorkingTitle, x.idea.Topic, x.idea.Angle, x.idea.ContentFormat, x.idea.TargetAudience, x.idea.HookConcept, x.idea.ThumbnailConcept, x.idea.ViewerPromise, x.idea.Hypothesis, x.idea.OverallScore, x.idea.EvidenceStrength, x.idea.ProductionEase, x.idea.Novelty, x.idea.StoryPotential, x.idea.DecisionStatus, topicCounts[x.idea.Topic], formatCounts[x.idea.ContentFormat], opportunityCounts[x.idea.OpportunityId])).ToArray();
+        return ideas.Select(x => new PilotIdeaContext(x.idea.Id, x.idea.OpportunityId, x.opportunity.Name, x.idea.WorkingTitle, x.idea.Topic, x.idea.Angle, x.idea.ContentFormat, x.idea.TargetAudience, x.idea.HookConcept, x.idea.ThumbnailConcept, x.idea.ViewerPromise, x.idea.Hypothesis, x.idea.OverallScore, x.idea.EvidenceStrength, x.idea.ProductionEase, x.idea.Novelty, x.idea.StoryPotential, x.idea.DecisionStatus, x.opportunity.DecisionStatus, topicCounts[x.idea.Topic], formatCounts[x.idea.ContentFormat], opportunityCounts[x.idea.OpportunityId])).ToArray();
     }
     public Task<Pilot?> GetLatestPilotAsync(Guid projectId, CancellationToken cancellationToken) => dbContext.Pilots.AsNoTracking().Where(x => x.ProjectId == projectId).OrderByDescending(x => x.Version).FirstOrDefaultAsync(cancellationToken);
     public Task<Pilot?> GetPilotAsync(Guid projectId, Guid pilotId, bool forUpdate, CancellationToken cancellationToken)
@@ -303,6 +305,10 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ResourceConflictException("The pilot was changed by another request. Refresh it and try again.");
         }
         catch (DbUpdateException exception)
             when (exception.InnerException is PostgresException

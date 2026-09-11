@@ -28,7 +28,7 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 ## Pilots
 
-`Pilot` is a project-owned, immutable-generation version of a learning plan, not a `VideoProject`. Its draft/approved state records provenance, prompt and planning versions, limitations, and balance warnings. A `PilotVideo` directly references one `VideoIdea` and its source opportunity, and records sequence, experiment type, hypothesis, variable, control strategy, planned primary metric, success signal, and rationale. Database constraints make `(PilotId, Sequence)` and `(PilotId, VideoIdeaId)` unique. A Pilot always uses sequence blocks 1–4 Topic, 5–8 Packaging, and 9–12 Storytelling.
+`Pilot` is a project-owned generation version of a learning plan, not a `VideoProject`. Its draft/approved state records provenance, prompt and planning versions, limitations, and balance warnings; a draft may be adjusted, while approval freezes it. A `PilotVideo` directly references one `VideoIdea` and its source opportunity, and records sequence, experiment type, hypothesis, variable, control strategy, planned primary metric, success signal, and rationale. Database constraints make `(PilotId, Sequence)` and `(PilotId, VideoIdeaId)` unique, and enforce 1–4 Topic, 5–8 Packaging, and 9–12 Storytelling blocks. A source idea or source opportunity becoming unapproved makes the Pilot require review.
 
 ## Deferred concepts
 

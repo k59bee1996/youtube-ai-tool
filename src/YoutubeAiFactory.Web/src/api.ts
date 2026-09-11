@@ -140,6 +140,7 @@ export const api = {
   approveIdea: (projectId: string, ideaId: string) => request<VideoIdea>(`/api/projects/${projectId}/ideas/${ideaId}:approve`, { method: 'POST' }),
   rejectIdea: (projectId: string, ideaId: string) => request<VideoIdea>(`/api/projects/${projectId}/ideas/${ideaId}:reject`, { method: 'POST' }),
   getPilot: (projectId: string, signal?: AbortSignal) => request<PilotStatus>(`/api/projects/${projectId}/pilots/latest`, { signal }),
+  listPilots: (projectId: string, signal?: AbortSignal) => request<Pilot[]>(`/api/projects/${projectId}/pilots`, { signal }),
   generatePilot: (projectId: string) => request<AnalysisRun>(`/api/projects/${projectId}/pilots:generate`, { method: 'POST' }),
   approvePilot: (projectId: string, pilotId: string) => request<Pilot>(`/api/projects/${projectId}/pilots/${pilotId}:approve`, { method: 'POST' }),
   getPilotCandidates: (projectId: string) => request<PilotCandidate[]>(`/api/projects/${projectId}/pilots/eligible-ideas`),

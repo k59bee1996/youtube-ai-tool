@@ -7,6 +7,7 @@ public sealed class PilotGenerationContextBuilder(PilotGenerationOptions options
 {
     public PilotGenerationContext Build(Project project, IReadOnlyList<PilotIdeaContext> approvedIdeas)
     {
+        options.Validate();
         if (approvedIdeas.Count < PilotGenerationOptions.RequiredIdeaCount)
             throw new ApplicationValidationException($"Only {approvedIdeas.Count} approved ideas are available. At least 12 are required to generate a full pilot.");
         var bounded = approvedIdeas.OrderBy(x => x.TopicFrequency).ThenBy(x => x.OpportunityFrequency)

@@ -44,4 +44,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Start the Worker as well as the API to process competitor, opportunity, idea-generation, and pilot-generation jobs. A Pilot consumes only approved ideas, preserves previous versions, and enforces four Topic, four Packaging, and four Storytelling tests. Research, scripts, and production packages remain outside this phase.
+Start the Worker as well as the API to process competitor, opportunity, idea-generation, and pilot-generation jobs. A Pilot consumes only ideas whose source opportunity is also approved, preserves previous versions, and enforces four Topic, four Packaging, and four Storytelling tests. Research, scripts, and production packages remain outside this phase.

@@ -15,9 +15,26 @@ public sealed class PilotTests
     }
 
     [Fact]
+    public void Pilot_revision_changes_when_a_draft_is_changed_or_approved()
+    {
+        var pilot = CreatePilot();
+
+        pilot.RecordDraftChange();
+        pilot.Approve(DateTimeOffset.UtcNow);
+
+        Assert.Equal(2, pilot.Revision);
+    }
+
+    [Fact]
     public void Pilot_video_rejects_sequences_outside_the_twelve_slot_invariant()
     {
         Assert.Throws<DomainException>(() => new PilotVideo(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 13, PilotExperimentType.Topic, "Hypothesis", "Variable", "Control", "Metric", "Signal", "Rationale"));
+    }
+
+    [Fact]
+    public void Pilot_video_rejects_an_experiment_type_outside_its_sequence_block()
+    {
+        Assert.Throws<DomainException>(() => new PilotVideo(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, PilotExperimentType.Packaging, "Hypothesis", "Variable", "Control", "Metric", "Signal", "Rationale"));
     }
 
     [Fact]
@@ -37,6 +54,17 @@ public sealed class PilotTests
         Assert.Equal("[\"Packaging experiments are concentrated.\"]", pilot.WarningsJson);
         pilot.Approve(DateTimeOffset.UtcNow);
         Assert.Throws<DomainException>(() => pilot.UpdateWarnings("[]"));
+    }
+
+    [Fact]
+    public void Replacing_a_slot_discards_optional_details_from_the_previous_experiment()
+    {
+        var video = new PilotVideo(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, PilotExperimentType.Topic, "Hypothesis", "Variable", "Control", "Metric", "Signal", "Rationale", "[\"Secondary metric\"]", "Old note");
+
+        video.Replace(Guid.NewGuid(), Guid.NewGuid(), "Replacement hypothesis", "Replacement variable", "Replacement control", "Replacement metric", "Replacement signal", "Replacement rationale");
+
+        Assert.Equal("[]", video.SecondaryMetricsJson);
+        Assert.Null(video.Notes);
     }
 
     private static Pilot CreatePilot() => new(Guid.NewGuid(), 1, Guid.NewGuid(), "pilot-generation", 1, "fake", "fake", "pilot-planning:v1", "Pilot", "Learn", "[]", "[]", "[]", 12, DateTimeOffset.UtcNow);

@@ -21,7 +21,7 @@ public sealed class Pilot
         AssumptionsJson = Guard.Required(assumptionsJson, nameof(assumptionsJson), 20_000);
         LimitationsJson = Guard.Required(limitationsJson, nameof(limitationsJson), 20_000);
         WarningsJson = Guard.Required(warningsJson, nameof(warningsJson), 20_000);
-        EligibleIdeaCount = eligibleIdeaCount; Status = PilotStatus.Draft; CreatedAt = createdAt;
+        EligibleIdeaCount = eligibleIdeaCount; Status = PilotStatus.Draft; Revision = 0; CreatedAt = createdAt;
     }
 
     public Guid Id { get; private set; }
@@ -39,6 +39,7 @@ public sealed class Pilot
     public string LimitationsJson { get; private set; } = "[]";
     public string WarningsJson { get; private set; } = "[]";
     public int EligibleIdeaCount { get; private set; }
+    public int Revision { get; private set; }
     public PilotStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
@@ -46,12 +47,18 @@ public sealed class Pilot
     public void Approve(DateTimeOffset approvedAt)
     {
         if (Status != PilotStatus.Draft) throw new DomainException("Only a draft pilot can be approved.");
-        Status = PilotStatus.Approved; ApprovedAt = approvedAt;
+        Status = PilotStatus.Approved; ApprovedAt = approvedAt; Revision++;
     }
 
     public void UpdateWarnings(string warningsJson)
     {
         if (Status != PilotStatus.Draft) throw new DomainException("Only a draft pilot can be changed.");
-        WarningsJson = Guard.Required(warningsJson, nameof(warningsJson), 20_000);
+        WarningsJson = Guard.Required(warningsJson, nameof(warningsJson), 20_000); Revision++;
+    }
+
+    public void RecordDraftChange()
+    {
+        if (Status != PilotStatus.Draft) throw new DomainException("Only a draft pilot can be changed.");
+        Revision++;
     }
 }

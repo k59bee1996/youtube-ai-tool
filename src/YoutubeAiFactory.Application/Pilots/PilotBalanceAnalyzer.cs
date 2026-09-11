@@ -4,7 +4,7 @@ public static class PilotBalanceAnalyzer
 {
     public static IReadOnlyList<string> Analyze(PilotPlanResult plan, PilotGenerationContext context)
     {
-        return Analyze(plan.Videos.Select(x => x.VideoIdeaId), context.Ideas);
+        return Analyze(plan.Videos.OrderBy(x => x.Sequence).Select(x => x.VideoIdeaId), context.Ideas);
     }
 
     public static IReadOnlyList<string> Analyze(IEnumerable<Guid> selectedIdeaIds, IReadOnlyList<PilotIdeaContext> ideas)

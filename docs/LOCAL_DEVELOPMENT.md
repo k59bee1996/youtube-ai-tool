@@ -28,7 +28,7 @@ $env:OpportunityAnalysis__MaxCompetitors = "8"
 $env:OpportunityAnalysis__MaxEvidenceItems = "60"
 $env:IdeaGeneration__TargetIdeaCount = "25"
 $env:IdeaGeneration__MinIdeaCount = "20"
-$env:PilotGeneration__MaxCandidateIdeas = "40"
+$env:PilotGeneration__MaxCandidateIdeas = "40" # Allowed range: 12-40
 ```
 
 Readiness reports `Degraded` when the key is absent. Project endpoints still work, while collection returns a `503` problem response. The adapter sends the key in the `X-Goog-Api-Key` header and logs no credentials.

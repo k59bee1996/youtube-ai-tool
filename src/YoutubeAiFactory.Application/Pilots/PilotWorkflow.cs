@@ -9,10 +9,11 @@ using YoutubeAiFactory.Domain.Pilots;
 
 namespace YoutubeAiFactory.Application.Pilots;
 
-public sealed class RunPilotGenerationHandler(IYoutubeAiFactoryStore store, TimeProvider timeProvider)
+public sealed class RunPilotGenerationHandler(IYoutubeAiFactoryStore store, PilotGenerationOptions options, TimeProvider timeProvider)
 {
     public async Task<RunPilotGenerationResult> HandleAsync(Guid projectId, CancellationToken cancellationToken)
     {
+        options.Validate();
         if (!await store.ProjectExistsAsync(projectId, cancellationToken)) throw new ResourceNotFoundException("Project was not found.");
         var ideas = await store.ListApprovedPilotIdeasAsync(projectId, cancellationToken);
         if (ideas.Count < PilotGenerationOptions.RequiredIdeaCount) throw new ApplicationValidationException($"Only {ideas.Count} approved ideas are available. At least 12 are required to generate a full pilot.");
@@ -73,7 +74,7 @@ public sealed class ApprovePilotHandler(IYoutubeAiFactoryStore store, TimeProvid
     {
         var pilot = await store.GetPilotAsync(projectId, pilotId, true, cancellationToken) ?? throw new ResourceNotFoundException("Pilot was not found.");
         var dto = await PilotDtoMapper.MapAsync(store, pilot, cancellationToken);
-        if (dto.RequiresReview) throw new ApplicationValidationException("This pilot requires review because an included idea is no longer approved.");
+        if (dto.RequiresReview) throw new ApplicationValidationException("This pilot requires review because an included idea or its source opportunity is no longer approved.");
         pilot.Approve(timeProvider.GetUtcNow()); await store.SaveChangesAsync(cancellationToken);
         return await PilotDtoMapper.MapAsync(store, pilot, cancellationToken);
     }
@@ -110,7 +111,7 @@ public sealed class MovePilotSlotHandler(IYoutubeAiFactoryStore store)
         if (pilot.Status != PilotStatus.Draft) throw new ApplicationValidationException("Only draft pilots can be changed.");
         var delta = string.Equals(request.Direction, "up", StringComparison.OrdinalIgnoreCase) ? -1 : string.Equals(request.Direction, "down", StringComparison.OrdinalIgnoreCase) ? 1 : throw new ApplicationValidationException("Move direction must be 'up' or 'down'.");
         var target = sequence + delta; if (target is < 1 or > 12 || PilotPlanValidator.ExpectedType(target) != PilotPlanValidator.ExpectedType(sequence)) throw new ApplicationValidationException("Pilot slots can only move within their experiment block.");
-        var videos = await store.ListPilotVideosAsync(pilotId, true, cancellationToken); var current = videos.Single(x => x.Sequence == sequence); var destination = videos.Single(x => x.Sequence == target); current.SwapContentsWith(destination);
+        var videos = await store.ListPilotVideosAsync(pilotId, true, cancellationToken); var current = videos.Single(x => x.Sequence == sequence); var destination = videos.Single(x => x.Sequence == target); current.SwapContentsWith(destination); pilot.RecordDraftChange();
         await store.SaveChangesAsync(cancellationToken); return await PilotDtoMapper.MapAsync(store, pilot, cancellationToken);
     }
 }
@@ -129,17 +130,19 @@ public sealed class PilotGenerationJobProcessor(IYoutubeAiFactoryStore store, IL
             var project = await store.GetProjectAsync(payload.ProjectId, cancellationToken) ?? throw new ResourceNotFoundException("The project for this pilot job no longer exists.");
             var context = contextBuilder.Build(project, await store.ListApprovedPilotIdeasAsync(payload.ProjectId, cancellationToken));
             run = new AiRun("PilotGeneration", payload.ProjectId, "pending", "pending", PilotGenerationPrompt.Key, PilotGenerationPrompt.Version, now); store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
-            LlmResult<PilotPlanResult>? answer = null; Exception? failure = null;
+            LlmResult<PilotPlanResult>? answer = null; Exception? failure = null; PilotOutputCorrection? correction = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
             {
                 try
                 {
-                    var candidate = await provider.GenerateStructuredAsync<PilotPlanResult>(PilotGenerationPrompt.Create(context, attempt > 0), cancellationToken);
-                    PilotPlanValidator.Validate(candidate.Value, context);
+                    var candidate = await provider.GenerateStructuredAsync<PilotPlanResult>(PilotGenerationPrompt.Create(context, correction), cancellationToken);
+                    run.RecordProvider(candidate.Provider, candidate.Model);
+                    try { PilotPlanValidator.Validate(candidate.Value, context); }
+                    catch (StructuredOutputException ex) { correction = new PilotOutputCorrection(ex.Message, candidate.RawOutput); throw; }
                     answer = candidate;
                     break;
                 }
-                catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; }
+                catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { correction ??= new PilotOutputCorrection(ex.Message, null); run.RecordRetry(); failure = ex; await store.SaveChangesAsync(cancellationToken); }
                 catch (Exception ex) { failure = ex; break; }
             }
             if (answer is null) throw failure ?? new StructuredOutputException("The provider did not return a valid pilot plan.");
@@ -160,7 +163,7 @@ internal static class PilotDtoMapper
     {
         var ideas = (await store.ListPilotIdeaContextAsync(pilot.ProjectId, cancellationToken)).ToDictionary(x => x.VideoIdeaId);
         var videos = await store.ListPilotVideosAsync(pilot.Id, false, cancellationToken);
-        var requiresReview = videos.Any(x => !ideas.TryGetValue(x.VideoIdeaId, out var idea) || idea.DecisionStatus != Domain.Ideas.IdeaDecisionStatus.Approved);
+        var requiresReview = videos.Any(x => !ideas.TryGetValue(x.VideoIdeaId, out var idea) || idea.DecisionStatus != Domain.Ideas.IdeaDecisionStatus.Approved || idea.OpportunityDecisionStatus != Domain.Opportunities.OpportunityDecisionStatus.Approved);
         var mapped = videos.Select(x => { ideas.TryGetValue(x.VideoIdeaId, out var idea); return new PilotVideoDto(x.Id, x.Sequence, x.VideoIdeaId, x.OpportunityId, idea?.WorkingTitle ?? "Unavailable idea", idea?.OpportunityName ?? "Unavailable opportunity", idea?.OverallScore ?? 0, x.ExperimentType.ToString(), x.Hypothesis, x.VariableBeingTested, x.ControlStrategy, x.PrimaryMetric, x.SuccessSignal, x.Rationale, Parse(x.SecondaryMetricsJson), x.Notes); }).ToArray();
         return new PilotDto(pilot.Id, pilot.Version, pilot.Name, pilot.Objective, pilot.Status.ToString(), pilot.CreatedAt, pilot.ApprovedAt, pilot.EligibleIdeaCount, pilot.PromptKey, pilot.PromptVersion, pilot.Provider, pilot.Model, pilot.PlanningAlgorithmVersion, Parse(pilot.AssumptionsJson), Parse(pilot.LimitationsJson), Parse(pilot.WarningsJson), requiresReview, mapped);
     }

@@ -17,7 +17,7 @@ The repository provides the foundation plus the first end-to-end business slice:
 - bounded, background competitor AI analysis with deterministic performance features, validated typed output, immutable report versions, `AiRun` provenance, job progress, staleness detection, and a React intelligence report.
 - bounded background cross-competitor opportunity analysis with immutable report versions, source provenance, validated evidence IDs, deterministic scoring, and a ranked React report.
 - a bounded, worker-backed Idea Bank that requires an approved opportunity, retains immutable generation history, validates evidence provenance, avoids competitor-title and internal near-duplicates, calculates deterministic versioned scores, and supports idea approval/rejection.
-- a worker-backed, versioned 12-video Pilot built only from approved ideas. It has four Topic tests (1–4), four Packaging tests (5–8), and four Storytelling tests (9–12), each with an explicit hypothesis, variable, control strategy, planned metric, success signal, and rationale.
+- a worker-backed, versioned 12-video Pilot built only from ideas whose source opportunity is also approved. It has four Topic tests (1–4), four Packaging tests (5–8), and four Storytelling tests (9–12), each with an explicit hypothesis, variable, control strategy, planned metric, success signal, and rationale.
 
 ## Explicitly deferred
 

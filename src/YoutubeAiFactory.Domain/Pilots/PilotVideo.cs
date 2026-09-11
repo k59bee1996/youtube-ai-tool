@@ -12,6 +12,8 @@ public sealed class PilotVideo
         string successSignal, string rationale, string? secondaryMetricsJson = null, string? notes = null)
     {
         if (sequence is < 1 or > 12) throw new DomainException("Pilot sequence must be between 1 and 12.");
+        if (experimentType != ExpectedExperimentType(sequence))
+            throw new DomainException("Pilot experiment blocks must be Topic 1-4, Packaging 5-8, and Storytelling 9-12.");
         Id = Guid.NewGuid(); PilotId = Guard.NotEmpty(pilotId, nameof(pilotId)); VideoIdeaId = Guard.NotEmpty(videoIdeaId, nameof(videoIdeaId));
         OpportunityId = Guard.NotEmpty(opportunityId, nameof(opportunityId)); Sequence = sequence; ExperimentType = experimentType;
         Hypothesis = Guard.Required(hypothesis, nameof(hypothesis), 4000); VariableBeingTested = Guard.Required(variableBeingTested, nameof(variableBeingTested), 2000);
@@ -42,6 +44,8 @@ public sealed class PilotVideo
         Hypothesis = Guard.Required(hypothesis, nameof(hypothesis), 4000); VariableBeingTested = Guard.Required(variableBeingTested, nameof(variableBeingTested), 2000);
         ControlStrategy = Guard.Required(controlStrategy, nameof(controlStrategy), 2000); PrimaryMetric = Guard.Required(primaryMetric, nameof(primaryMetric), 500);
         SuccessSignal = Guard.Required(successSignal, nameof(successSignal), 2000); Rationale = Guard.Required(rationale, nameof(rationale), 4000);
+        SecondaryMetricsJson = "[]";
+        Notes = null;
     }
 
     public void SwapContentsWith(PilotVideo other)
@@ -59,4 +63,8 @@ public sealed class PilotVideo
         (SecondaryMetricsJson, other.SecondaryMetricsJson) = (other.SecondaryMetricsJson, SecondaryMetricsJson);
         (Notes, other.Notes) = (other.Notes, Notes);
     }
+
+    private static PilotExperimentType ExpectedExperimentType(int sequence) =>
+        sequence <= 4 ? PilotExperimentType.Topic :
+        sequence <= 8 ? PilotExperimentType.Packaging : PilotExperimentType.Storytelling;
 }

@@ -1,5 +1,6 @@
 using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
+using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 
 namespace YoutubeAiFactory.Application.Pilots;
@@ -8,7 +9,7 @@ public sealed record PilotGenerationJobPayload(Guid ProjectId);
 public sealed record PilotIdeaContext(Guid VideoIdeaId, Guid OpportunityId, string OpportunityName, string WorkingTitle,
     string Topic, string Angle, string ContentFormat, string TargetAudience, string HookConcept, string ThumbnailConcept,
     string ViewerPromise, string Hypothesis, decimal OverallScore, int EvidenceStrength, int ProductionEase,
-    int Novelty, int StoryPotential, IdeaDecisionStatus DecisionStatus, int TopicFrequency, int FormatFrequency,
+    int Novelty, int StoryPotential, IdeaDecisionStatus DecisionStatus, OpportunityDecisionStatus OpportunityDecisionStatus, int TopicFrequency, int FormatFrequency,
     int OpportunityFrequency);
 public sealed record PilotGenerationContext(Guid ProjectId, string Market, string Audience, int EligibleIdeaCount, IReadOnlyList<PilotIdeaContext> Ideas);
 public sealed record PilotVideoResult(int Sequence, Guid VideoIdeaId, Guid OpportunityId, PilotExperimentType ExperimentType,
