@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 5 adds a versioned Idea Bank that turns an approved opportunity into ranked video hypotheses.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 6 adds a versioned 12-video Pilot that turns approved video ideas into explicit topic, packaging, and storytelling experiments.
 
 ## Repository layout
 
@@ -44,4 +44,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Start the Worker as well as the API to process competitor, opportunity, and idea-generation jobs. Ideas require an approved opportunity, preserve generation history, validate evidence references, reject near-duplicate titles and concepts, and use deterministic `idea-score:v1` ranking. Pilots, research, scripts, and production packages remain outside this phase.
+Start the Worker as well as the API to process competitor, opportunity, idea-generation, and pilot-generation jobs. A Pilot consumes only ideas whose source opportunity is also approved, preserves previous versions, and enforces four Topic, four Packaging, and four Storytelling tests. Research, scripts, and production packages remain outside this phase.

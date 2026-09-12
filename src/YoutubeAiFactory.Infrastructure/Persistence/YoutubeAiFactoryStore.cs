@@ -4,11 +4,13 @@ using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Persistence;
+using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
+using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
@@ -164,6 +166,46 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public Task FailIdeaGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
     public void AddIdeaGeneration(IdeaGeneration generation) => dbContext.IdeaGenerations.Add(generation); public void AddVideoIdea(VideoIdea idea) => dbContext.VideoIdeas.Add(idea); public void AddIdeaEvidence(IdeaEvidence evidence) => dbContext.IdeaEvidence.Add(evidence);
 
+    public Task<IReadOnlyList<PilotIdeaContext>> ListApprovedPilotIdeasAsync(Guid projectId, CancellationToken cancellationToken) => ListPilotIdeaContextInternalAsync(projectId, true, cancellationToken);
+    public Task<IReadOnlyList<PilotIdeaContext>> ListPilotIdeaContextAsync(Guid projectId, CancellationToken cancellationToken) => ListPilotIdeaContextInternalAsync(projectId, false, cancellationToken);
+    private async Task<IReadOnlyList<PilotIdeaContext>> ListPilotIdeaContextInternalAsync(Guid projectId, bool approvedOnly, CancellationToken cancellationToken)
+    {
+        var ideaQuery = dbContext.VideoIdeas.AsNoTracking().Where(x => x.ProjectId == projectId);
+        if (approvedOnly) ideaQuery = ideaQuery.Where(x => x.DecisionStatus == IdeaDecisionStatus.Approved);
+        var ideas = await ideaQuery
+            .Join(dbContext.OpportunityCandidates.AsNoTracking(), idea => idea.OpportunityId, opportunity => opportunity.Id, (idea, opportunity) => new { idea, opportunity })
+            .Where(x => !approvedOnly || x.opportunity.DecisionStatus == OpportunityDecisionStatus.Approved)
+            .ToListAsync(cancellationToken);
+        var topicCounts = ideas.GroupBy(x => x.idea.Topic, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
+        var formatCounts = ideas.GroupBy(x => x.idea.ContentFormat, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
+        var opportunityCounts = ideas.GroupBy(x => x.idea.OpportunityId).ToDictionary(x => x.Key, x => x.Count());
+        return ideas.Select(x => new PilotIdeaContext(x.idea.Id, x.idea.OpportunityId, x.opportunity.Name, x.idea.WorkingTitle, x.idea.Topic, x.idea.Angle, x.idea.ContentFormat, x.idea.TargetAudience, x.idea.HookConcept, x.idea.ThumbnailConcept, x.idea.ViewerPromise, x.idea.Hypothesis, x.idea.OverallScore, x.idea.EvidenceStrength, x.idea.ProductionEase, x.idea.Novelty, x.idea.StoryPotential, x.idea.DecisionStatus, x.opportunity.DecisionStatus, topicCounts[x.idea.Topic], formatCounts[x.idea.ContentFormat], opportunityCounts[x.idea.OpportunityId])).ToArray();
+    }
+    public Task<Pilot?> GetLatestPilotAsync(Guid projectId, CancellationToken cancellationToken) => dbContext.Pilots.AsNoTracking().Where(x => x.ProjectId == projectId).OrderByDescending(x => x.Version).FirstOrDefaultAsync(cancellationToken);
+    public Task<Pilot?> GetPilotAsync(Guid projectId, Guid pilotId, bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.Pilots.Where(x => x.ProjectId == projectId && x.Id == pilotId);
+        return (forUpdate ? query : query.AsNoTracking()).SingleOrDefaultAsync(cancellationToken);
+    }
+    public async Task<IReadOnlyList<Pilot>> ListPilotsAsync(Guid projectId, CancellationToken cancellationToken) => await dbContext.Pilots.AsNoTracking().Where(x => x.ProjectId == projectId).OrderByDescending(x => x.Version).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<PilotVideo>> ListPilotVideosAsync(Guid pilotId, bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.PilotVideos.Where(x => x.PilotId == pilotId); return await (forUpdate ? query : query.AsNoTracking()).OrderBy(x => x.Sequence).ToListAsync(cancellationToken);
+    }
+    public async Task<int> GetNextPilotVersionAsync(Guid projectId, CancellationToken cancellationToken) => (await dbContext.Pilots.Where(x => x.ProjectId == projectId).Select(x => (int?)x.Version).MaxAsync(cancellationToken) ?? 0) + 1;
+    public Task<Job?> GetActivePilotGenerationJobAsync(Guid projectId, CancellationToken cancellationToken) => FindPilotJobAsync(projectId, true, cancellationToken);
+    public Task<Job?> GetLatestPilotGenerationJobAsync(Guid projectId, CancellationToken cancellationToken) => FindPilotJobAsync(projectId, false, cancellationToken);
+    public async Task<Job> EnqueuePilotGenerationJobAsync(Job job, CancellationToken cancellationToken)
+    {
+        dbContext.Jobs.Add(job); try { await dbContext.SaveChangesAsync(cancellationToken); return job; }
+        catch (DbUpdateException exception) when (IsActivePilotJobConflict(exception)) { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "pilot-generation" && x.ProjectId == job.ProjectId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); }
+    }
+    public Task<Job?> TryClaimNextPilotGenerationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => TryClaimJobAsync("pilot-generation", now, staleRunningBefore, cancellationToken);
+    public Task RequeuePilotGenerationJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
+    public Task FailPilotGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
+    public void AddPilot(Pilot pilot) => dbContext.Pilots.Add(pilot);
+    public void AddPilotVideo(PilotVideo pilotVideo) => dbContext.PilotVideos.Add(pilotVideo);
+
     public Task<Job?> GetActiveCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         FindAnalysisJobAsync(projectId, competitorId, activeOnly: true, cancellationToken);
 
@@ -264,6 +306,10 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ResourceConflictException("The pilot was changed by another request. Refresh it and try again.");
+        }
         catch (DbUpdateException exception)
             when (exception.InnerException is PostgresException
             {
@@ -289,6 +335,12 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
         return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
+    private Task<Job?> FindPilotJobAsync(Guid projectId, bool activeOnly, CancellationToken cancellationToken)
+    {
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "pilot-generation" && job.ProjectId == projectId);
+        if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
+        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+    }
     private Task<Job?> FindIdeaJobAsync(Guid projectId, Guid opportunityId, bool activeOnly, CancellationToken cancellationToken)
     {
         var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "idea-generation" && job.ProjectId == projectId && job.OpportunityId == opportunityId);
@@ -311,7 +363,9 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     private static bool IsActiveAnalysisJobConflict(DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_competitor_analysis" };
     private static bool IsActiveOpportunityJobConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_opportunity_analysis" };
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_project_analysis" };
+    private static bool IsActivePilotJobConflict(DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_project_analysis" };
     private static bool IsActiveIdeaJobConflict(DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_idea_generation" };
 }

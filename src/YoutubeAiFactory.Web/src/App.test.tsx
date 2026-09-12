@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
-import type { CompetitorDetails, CompetitorSummary, Project } from './api'
+import type { CompetitorDetails, CompetitorSummary, Pilot, Project } from './api'
 
 const project: Project = {
   id: 'project-1',
@@ -261,6 +261,24 @@ test('renders API problem details and allows the user to retry', async () => {
   expect(screen.getByRole('button', { name: 'Add competitor' })).toBeEnabled()
 })
 
+test('shows the pilot insufficient-ideas state without queuing generation', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/pilots/latest')) return json({ latestPilot: null, activeJobStatus: null, latestJobFailureReason: null, eligibleIdeaCount: 11, requiredIdeaCount: 12 })
+    if (url.endsWith('/pilots/eligible-ideas')) return json([])
+    if (url.endsWith('/pilots')) return json([])
+    throw new Error(`Unexpected request: ${url}`)
+  }))
+  render(<App />)
+  expect(await screen.findByText('Add a YouTube channel to begin competitor research.')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Open pilot' }))
+  expect(await screen.findByText('11 approved ideas available. At least 12 are required to create a complete pilot.')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Generate 12-Video Pilot' })).toBeDisabled()
+})
+
 test('renders an explicit empty state and unavailable channel metrics', async () => {
   const emptySummary: CompetitorSummary = {
     ...summary,
@@ -316,6 +334,49 @@ test('queues AI analysis from the competitor detail without auto-generating it',
     `/api/projects/${project.id}/competitors/${summary.id}/analysis:run`,
     expect.objectContaining({ method: 'POST' }),
   ))
+})
+
+test('surfaces a failed pilot generation and offers a retry', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/pilots/latest')) return json({ latestPilot: null, activeJobStatus: null, latestJobFailureReason: 'Pilot output did not meet the required experiment constraints.', eligibleIdeaCount: 12, requiredIdeaCount: 12 })
+    if (url.endsWith('/pilots/eligible-ideas')) return json([])
+    if (url.endsWith('/pilots')) return json([])
+    throw new Error(`Unexpected request: ${url}`)
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Open pilot' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Pilot output did not meet the required experiment constraints.')
+  expect(screen.getByRole('button', { name: 'Retry Pilot Generation' })).toBeVisible()
+})
+
+test('lets a user regenerate a pilot and inspect preserved pilot versions', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  const previousPilot: Pilot = { id: 'pilot-1', version: 1, name: 'Initial plan', objective: 'Learn what works.', status: 'Approved', createdAt: '2026-09-10T00:00:00Z', approvedAt: '2026-09-10T01:00:00Z', eligibleIdeaCount: 12, promptKey: 'pilot-generation', promptVersion: 1, provider: 'fake', model: 'fake', planningAlgorithmVersion: 'pilot-planning:v1', assumptions: [], limitations: [], warnings: [], requiresReview: false, videos: [] }
+  const latestPilot: Pilot = { ...previousPilot, id: 'pilot-2', version: 2, name: 'Refined plan', status: 'Draft', approvedAt: null }
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input); const method = init?.method ?? 'GET'
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/pilots/latest')) return json({ latestPilot, activeJobStatus: null, latestJobFailureReason: null, eligibleIdeaCount: 12, requiredIdeaCount: 12 })
+    if (url.endsWith('/pilots/eligible-ideas')) return json([])
+    if (url.endsWith('/pilots') && method === 'GET') return json([latestPilot, previousPilot])
+    if (url.endsWith('/pilots:generate') && method === 'POST') return json({ jobId: 'pilot-job', status: 'Queued', existing: false }, 202)
+    throw new Error(`Unexpected request: ${method} ${url}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Open pilot' }))
+  const versionPicker = await screen.findByLabelText('View version')
+  expect(versionPicker).toHaveValue(latestPilot.id)
+  fireEvent.change(versionPicker, { target: { value: previousPilot.id } })
+  expect(versionPicker).toHaveValue(previousPilot.id)
+  fireEvent.click(screen.getByRole('button', { name: 'Generate new pilot version' }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/projects/${project.id}/pilots:generate`, expect.objectContaining({ method: 'POST' })))
 })
 
 function json(body: unknown, status = 200) {

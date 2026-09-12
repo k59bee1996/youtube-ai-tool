@@ -6,6 +6,7 @@ using YoutubeAiFactory.Api.Health;
 using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
+using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Projects;
 using YoutubeAiFactory.Infrastructure;
 
@@ -23,6 +24,7 @@ builder.Services.AddSingleton(
     builder.Configuration.GetSection("CompetitorAnalysis").Get<CompetitorAnalysisOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection("OpportunityAnalysis").Get<OpportunityAnalysisOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection("IdeaGeneration").Get<IdeaGenerationOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection("PilotGeneration").Get<PilotGenerationOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -46,6 +48,16 @@ builder.Services.AddScoped<SetIdeaDecisionHandler>();
 builder.Services.AddScoped<IdeaGenerationContextBuilder>();
 builder.Services.AddScoped<IdeaScoringEngine>();
 builder.Services.AddScoped<IdeaGenerationJobProcessor>();
+builder.Services.AddScoped<RunPilotGenerationHandler>();
+builder.Services.AddScoped<GetPilotStatusHandler>();
+builder.Services.AddScoped<GetPilotHandler>();
+builder.Services.AddScoped<ListPilotsHandler>();
+builder.Services.AddScoped<ListPilotCandidatesHandler>();
+builder.Services.AddScoped<ApprovePilotHandler>();
+builder.Services.AddScoped<ReplacePilotSlotHandler>();
+builder.Services.AddScoped<MovePilotSlotHandler>();
+builder.Services.AddScoped<PilotGenerationContextBuilder>();
+builder.Services.AddScoped<PilotGenerationJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"])
@@ -58,7 +70,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-5",
+    phase = "phase-6",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -77,6 +89,7 @@ app.MapProjectEndpoints();
 app.MapCompetitorEndpoints();
 app.MapOpportunityEndpoints();
 app.MapIdeaEndpoints();
+app.MapPilotEndpoints();
 
 app.Run();
 

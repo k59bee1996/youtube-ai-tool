@@ -48,3 +48,16 @@ At least one completed competitor analysis is required. Generation may use compl
 - `POST /api/projects/{projectId}/ideas/{ideaId}:approve` and `:reject` persist the individual idea decision.
 
 All routes remain project-scoped; non-approved opportunities return a validation problem when generation is requested.
+
+## Pilots
+
+- `POST /api/projects/{projectId}/pilots:generate` queues a project-level Pilot from ideas whose idea and source opportunity are approved, and returns `202`. A matching queued/running job is reused.
+- `GET /api/projects/{projectId}/pilots/latest` returns eligibility count, active/latest job state, and the latest persisted Pilot.
+- `GET /api/projects/{projectId}/pilots` lists immutable Pilot versions, newest first.
+- `GET /api/projects/{projectId}/pilots/eligible-ideas` lists approved project ideas available for a draft-slot replacement.
+- `GET /api/projects/{projectId}/pilots/{pilotId}` returns one Pilot version.
+- `POST /api/projects/{projectId}/pilots/{pilotId}:approve` approves a draft Pilot unless it requires review because a source idea or source opportunity is no longer approved.
+- `POST /api/projects/{projectId}/pilots/{pilotId}/slots/{sequence}:replace` replaces a draft slot with an unused approved project idea while preserving its fixed experiment block.
+- `POST /api/projects/{projectId}/pilots/{pilotId}/slots/{sequence}:move` moves a draft slot within its existing experiment block.
+
+At least 12 ideas with approved source opportunities are required. The API does not generate ideas automatically, ingest analytics, create VideoProjects, or start production.

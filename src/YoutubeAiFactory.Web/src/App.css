@@ -78,6 +78,11 @@ textarea { min-height: 92px; resize: vertical; }
 .idea-sort { display: flex; gap: 9px; align-items: center; color: #c9d4e4; font-size: .86rem; font-weight: 650; }
 .idea-filters { display: flex; flex-wrap: wrap; gap: 14px; }
 .idea-sort select { border: 1px solid #34435c; border-radius: 8px; background: #0a1221; color: #f8fafc; padding: 8px; }
+.pilot-block { border-top: 1px solid #26334a; padding-top: 18px; }
+.pilot-block h3 { margin: 0 0 12px; color: #f8fafc; }
+.pilot-card { display: grid; gap: 4px; margin: 10px 0; padding: 14px; border-left: 3px solid #ff6846; background: #0b1424; }
+.pilot-card p { margin: 4px 0; color: #c9d4e4; line-height: 1.45; }
+.pilot-card details { color: #c9d4e4; margin-top: 5px; }
 .video-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .video-card { display: grid; grid-template-columns: 150px 1fr; overflow: hidden; min-height: 96px; border: 1px solid #26334a; border-radius: 12px; background: #0b1424; }
 .video-card img, .thumbnail-placeholder { width: 150px; height: 100%; min-height: 96px; object-fit: cover; background: #1c2940; }

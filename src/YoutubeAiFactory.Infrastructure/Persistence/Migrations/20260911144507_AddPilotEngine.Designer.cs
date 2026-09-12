@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using YoutubeAiFactory.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    partial class YoutubeAiFactoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911144507_AddPilotEngine")]
+    partial class AddPilotEngine
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1037,11 +1040,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("provider");
 
-                    b.Property<int>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("revision");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -1150,8 +1148,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 
                     b.ToTable("pilot_videos", "yaf", t =>
                         {
-                            t.HasCheckConstraint("ck_pilot_videos_experiment_block", "(sequence BETWEEN 1 AND 4 AND experiment_type = 'Topic') OR (sequence BETWEEN 5 AND 8 AND experiment_type = 'Packaging') OR (sequence BETWEEN 9 AND 12 AND experiment_type = 'Storytelling')");
-
                             t.HasCheckConstraint("ck_pilot_videos_sequence", "sequence >= 1 AND sequence <= 12");
                         });
                 });

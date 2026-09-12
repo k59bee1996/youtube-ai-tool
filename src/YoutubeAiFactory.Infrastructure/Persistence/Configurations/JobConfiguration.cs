@@ -30,10 +30,10 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasDatabaseName("ux_jobs_active_competitor_analysis")
             .IsUnique()
             .HasFilter("type = 'competitor-analysis' AND status IN ('Queued', 'Running', 'Retrying')");
-        builder.HasIndex(job => job.ProjectId)
-            .HasDatabaseName("ux_jobs_active_opportunity_analysis")
+        builder.HasIndex(job => new { job.ProjectId, job.Type })
+            .HasDatabaseName("ux_jobs_active_project_analysis")
             .IsUnique()
-            .HasFilter("type = 'opportunity-analysis' AND status IN ('Queued', 'Running', 'Retrying')");
+            .HasFilter("type IN ('opportunity-analysis', 'pilot-generation') AND status IN ('Queued', 'Running', 'Retrying')");
         builder.HasIndex(job => job.OpportunityId)
             .HasDatabaseName("ux_jobs_active_idea_generation")
             .IsUnique()
