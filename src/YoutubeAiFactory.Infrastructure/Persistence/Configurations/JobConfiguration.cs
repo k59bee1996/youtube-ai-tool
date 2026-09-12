@@ -15,7 +15,7 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.CompetitorChannelId).HasColumnName("competitor_channel_id");
         builder.Property(job => job.ProjectId).HasColumnName("project_id");
         builder.Property(job => job.OpportunityId).HasColumnName("opportunity_id");
-        builder.Property(job => job.Payload).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
+        builder.Property(job => job.Payload).HasColumnName("payload").HasColumnType("nvarchar(max)").IsRequired();
         builder.Property(job => job.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(job => job.RetryCount).HasColumnName("retry_count").IsRequired();
         builder.Property(job => job.MaxRetries).HasColumnName("max_retries").IsRequired();

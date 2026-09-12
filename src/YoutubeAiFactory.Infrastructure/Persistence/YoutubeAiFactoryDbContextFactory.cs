@@ -8,11 +8,16 @@ public sealed class YoutubeAiFactoryDbContextFactory
 {
     public YoutubeAiFactoryDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Database")
-            ?? "Host=localhost;Port=5432;Database=youtube_ai_factory;Username=yaf;Password=yaf_dev_password";
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings__DefaultConnection is required to run EF Core design-time commands.");
 
         var options = new DbContextOptionsBuilder<YoutubeAiFactoryDbContext>()
-            .UseNpgsql(connectionString)
+            .UseSqlServer(connectionString, sqlServer =>
+            {
+                sqlServer.MigrationsAssembly(typeof(YoutubeAiFactoryDbContext).Assembly.FullName);
+                sqlServer.EnableRetryOnFailure();
+            })
             .Options;
 
         return new YoutubeAiFactoryDbContext(options);

@@ -15,16 +15,16 @@ namespace YoutubeAiFactory.IntegrationTests;
 
 public sealed class Phase2ApiTests
 {
-    [PostgresFact]
+    [SqlServerFact]
     public async Task Create_project_add_competitor_and_retrieve_persisted_result()
     {
-        var connectionString = PostgresPersistenceTests.GetConnectionString();
+        var connectionString = SqlServerPersistenceTests.GetConnectionString();
         await ResetDatabaseAsync(connectionString);
         var fakeYouTubeClient = new FakeYouTubeClient();
         await using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:Database", connectionString);
+                builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll<IYouTubeClient>();
@@ -79,7 +79,7 @@ public sealed class Phase2ApiTests
         Assert.Equal(2, fakeYouTubeClient.ChannelRequests);
 
         await using var context = new YoutubeAiFactoryDbContext(
-            PostgresPersistenceTests.CreateOptions());
+            SqlServerPersistenceTests.CreateOptions());
         Assert.Equal(1, await context.CompetitorChannels.CountAsync());
         Assert.Equal(2, await context.CompetitorVideos.CountAsync());
     }
@@ -87,7 +87,7 @@ public sealed class Phase2ApiTests
     private static async Task ResetDatabaseAsync(string connectionString)
     {
         var options = new DbContextOptionsBuilder<YoutubeAiFactoryDbContext>()
-            .UseNpgsql(connectionString)
+            .UseSqlServer(connectionString)
             .Options;
         await using var context = new YoutubeAiFactoryDbContext(options);
         await context.Database.EnsureDeletedAsync();

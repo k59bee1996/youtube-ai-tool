@@ -1,17 +1,20 @@
+using System.Text.Json;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
+using YoutubeAiFactory.Domain.Ideas;
+using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
 namespace YoutubeAiFactory.IntegrationTests;
 
-public sealed class PostgresPersistenceTests
+public sealed class SqlServerPersistenceTests
 {
-    [PostgresFact]
+    [SqlServerFact]
     public async Task Migrations_persist_versioned_competitor_analysis_and_ai_run_provenance()
     {
         var options = CreateOptions();
@@ -19,12 +22,17 @@ public sealed class PostgresPersistenceTests
         await context.Database.EnsureDeletedAsync();
         await context.Database.MigrateAsync();
         var now = DateTimeOffset.UtcNow;
-        var project = new Project("Analysis", new Market("Education", "English", "Global"), new AudienceProfile("Developers"), now);
+        var project = new Project("Analysis – Nhà sáng tạo", new Market("Education", "English", "Global"), new AudienceProfile("Developers"), now);
         var competitor = CreateCompetitor(project.Id, "https://youtube.com/@analysis");
         var run = new AiRun("CompetitorAnalysis", project.Id, competitor.Id, "Fake", "fake-model", "competitor-analysis", 1, now);
-        run.Complete(10, 20, null, now.AddSeconds(1));
+        run.Complete(10, 20, 0.123456m, now.AddSeconds(1));
+        var resultJson = JsonSerializer.Serialize(new
+        {
+            audience = new { summary = "Nhà sáng tạo nội dung" },
+            diagnostic = new string('x', 16_000),
+        });
         var analysis = new CompetitorAnalysis(competitor.Id, 1, run.Id, "competitor-analysis", 1, "Fake", "fake-model", now, 1,
-            "{\"audience\":{},\"confidence\":{}}", now.AddSeconds(1));
+            resultJson, now.AddSeconds(1));
         context.Projects.Add(project);
         context.CompetitorChannels.Add(competitor);
         context.AiRuns.Add(run);
@@ -38,9 +46,11 @@ public sealed class PostgresPersistenceTests
         Assert.Equal(competitor.Id, stored.CompetitorChannelId);
         Assert.Equal(run.Id, stored.AiRunId);
         Assert.Equal(competitor.Id, storedRun.CompetitorId);
+        Assert.Equal(resultJson, stored.ResultJson);
+        Assert.Equal(0.123456m, storedRun.EstimatedCost);
     }
 
-    [PostgresFact]
+    [SqlServerFact]
     public async Task Migrations_persist_and_read_project_competitor_and_videos()
     {
         var options = CreateOptions();
@@ -73,7 +83,38 @@ public sealed class PostgresPersistenceTests
         Assert.Equal(TimeSpan.FromMinutes(12), storedVideo.Duration);
     }
 
-    [PostgresFact]
+    [SqlServerFact]
+    public async Task Migrations_persist_and_read_opportunity_idea_and_pilot_versions()
+    {
+        var options = CreateOptions();
+        await using var context = new YoutubeAiFactoryDbContext(options);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var project = new Project("Workflow persistence", new Market("Education", "English", "Global"), new AudienceProfile("Creators"), now);
+        var report = new OpportunityReport(project.Id, 1, Guid.NewGuid(), "opportunity-analysis", 1, "Fake", "fake", "opportunity-score:v1", 1, "[]", now);
+        var opportunity = new OpportunityCandidate(report.Id, "Opportunity", "Description", "Creators", "Topic", "Explainer", "Angle", "Why", 80, 70, 40, 85, 75, 70, 80, 30, 85, 82.40m, "[]", "[]", now);
+        var generation = new IdeaGeneration(project.Id, opportunity.Id, report.Id, report.Version, 1, Guid.NewGuid(), "idea-generation", 1, "Fake", "fake", "idea-score:v1", now);
+        var idea = new VideoIdea(project.Id, opportunity.Id, generation.Id, "Working title", "Topic", "Angle", "Explainer", "Creators", "Learn", "Hook", "Thumbnail", "Promise", "Question", "Why care", "Hypothesis", 80, 80, 70, 80, 75, 85, 85, 70, 80, 30, 20, 85, 82.40m, 0m, "idea-score:v1", "[]", now);
+        var pilot = new Pilot(project.Id, 1, Guid.NewGuid(), "pilot-generation", 1, "Fake", "fake", "pilot-planning:v1", "Pilot", "Learn", "[]", "[]", "[]", 12, now);
+        context.AddRange(project, report, opportunity, generation, idea, pilot);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        Assert.Equal(82.40m, (await context.OpportunityCandidates.SingleAsync()).OverallScore);
+        Assert.Equal("Working title", (await context.VideoIdeas.SingleAsync()).WorkingTitle);
+        Assert.Equal(1, (await context.Pilots.SingleAsync()).Version);
+
+        context.Remove(await context.Projects.SingleAsync());
+        await context.SaveChangesAsync();
+
+        Assert.Equal(0, await context.OpportunityReports.CountAsync());
+        Assert.Equal(0, await context.IdeaGenerations.CountAsync());
+        Assert.Equal(0, await context.VideoIdeas.CountAsync());
+        Assert.Equal(0, await context.Pilots.CountAsync());
+    }
+
+    [SqlServerFact]
     public async Task Store_maps_duplicate_channel_constraint_to_conflict()
     {
         var options = CreateOptions();
@@ -100,7 +141,7 @@ public sealed class PostgresPersistenceTests
         Assert.Equal(0, await verificationContext.CompetitorVideos.CountAsync());
     }
 
-    [PostgresFact]
+    [SqlServerFact]
     public async Task Pilot_revision_rejects_a_concurrent_draft_mutation()
     {
         var options = CreateOptions();
@@ -132,7 +173,7 @@ public sealed class PostgresPersistenceTests
         await Assert.ThrowsAsync<ResourceConflictException>(() => secondStore.SaveChangesAsync(CancellationToken.None));
     }
 
-    [PostgresFact]
+    [SqlServerFact]
     public async Task Database_rejects_duplicate_video_identity_within_a_competitor()
     {
         var options = CreateOptions();
@@ -149,19 +190,46 @@ public sealed class PostgresPersistenceTests
         context.CompetitorChannels.Add(competitor);
         await context.SaveChangesAsync();
 
-        var exception = await Assert.ThrowsAsync<PostgresException>(() =>
+        var exception = await Assert.ThrowsAsync<SqlException>(() =>
             context.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO yaf.competitor_videos
-                    (id, competitor_channel_id, youtube_video_id, title, url, collected_at)
+                INSERT INTO [yaf].[competitor_videos]
+                    ([id], [competitor_channel_id], [youtube_video_id], [title], [url], [collected_at])
                 VALUES
                     ({Guid.NewGuid()}, {competitor.Id}, {"a1b2c3d4e5F"}, {"Duplicate"},
                      {"https://youtube.com/watch?v=a1b2c3d4e5F"}, {DateTimeOffset.UtcNow})
                 """));
 
-        Assert.Equal(PostgresErrorCodes.UniqueViolation, exception.SqlState);
+        Assert.True(exception.Number is 2601 or 2627);
     }
 
-    [PostgresFact]
+    [SqlServerFact]
+    public async Task Database_preserves_case_distinct_youtube_channel_ids()
+    {
+        var options = CreateOptions();
+        await using var context = new YoutubeAiFactoryDbContext(options);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        var project = new Project(
+            "Case-sensitive identifiers",
+            new Market("Education", "English", "Global"),
+            new AudienceProfile("Developers"),
+            DateTimeOffset.UtcNow);
+        context.Projects.Add(project);
+        context.CompetitorChannels.Add(CreateCompetitor(
+            project.Id,
+            "https://youtube.com/@upper",
+            "UC1234567890abcdefghij12"));
+        context.CompetitorChannels.Add(CreateCompetitor(
+            project.Id,
+            "https://youtube.com/@lower",
+            "uc1234567890abcdefghij12"));
+
+        await context.SaveChangesAsync();
+
+        Assert.Equal(2, await context.CompetitorChannels.CountAsync());
+    }
+
+    [SqlServerFact]
     public async Task Database_requires_resolved_competitor_identity()
     {
         var options = CreateOptions();
@@ -176,47 +244,50 @@ public sealed class PostgresPersistenceTests
         context.Projects.Add(project);
         await context.SaveChangesAsync();
 
-        var exception = await Assert.ThrowsAsync<PostgresException>(() =>
+        var exception = await Assert.ThrowsAsync<SqlException>(() =>
             context.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO yaf.competitor_channels
-                    (id, project_id, source_url, created_at)
+                INSERT INTO [yaf].[competitor_channels]
+                    ([id], [project_id], [source_url], [created_at])
                 VALUES
                     ({Guid.NewGuid()}, {project.Id}, {"https://youtube.com/@incomplete"},
                      {DateTimeOffset.UtcNow})
                 """));
 
-        Assert.Equal(PostgresErrorCodes.NotNullViolation, exception.SqlState);
+        Assert.Equal(515, exception.Number);
     }
 
     internal static DbContextOptions<YoutubeAiFactoryDbContext> CreateOptions()
     {
         var connectionString = GetConnectionString();
         return new DbContextOptionsBuilder<YoutubeAiFactoryDbContext>()
-            .UseNpgsql(connectionString)
+            .UseSqlServer(connectionString)
             .Options;
     }
 
     internal static string GetConnectionString()
     {
-        var connectionString = Environment.GetEnvironmentVariable("YAF_TEST_POSTGRES")
-            ?? throw new InvalidOperationException("YAF_TEST_POSTGRES is required.");
+        var connectionString = Environment.GetEnvironmentVariable("YAF_TEST_SQLSERVER")
+            ?? throw new InvalidOperationException("YAF_TEST_SQLSERVER is required.");
 
-        var builder = new NpgsqlConnectionStringBuilder(connectionString);
-        if (builder.Database is not { } database ||
-            !database.EndsWith("_tests", StringComparison.OrdinalIgnoreCase))
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        if (builder.InitialCatalog is not { } database ||
+            !database.EndsWith("Tests", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Integration tests require a database name ending in '_tests'.");
+            throw new InvalidOperationException("Integration tests require a database name ending in 'Tests'.");
         }
 
         return connectionString;
     }
 
-    private static CompetitorChannel CreateCompetitor(Guid projectId, string sourceUrl)
+    private static CompetitorChannel CreateCompetitor(
+        Guid projectId,
+        string sourceUrl,
+        string youtubeChannelId = "UC1234567890abcdefghij12")
     {
         var now = DateTimeOffset.UtcNow;
         var competitor = new CompetitorChannel(projectId, sourceUrl, now);
         competitor.RecordMetadata(
-            "UC1234567890abcdefghij12",
+            youtubeChannelId,
             "Practical Creator",
             "Evidence-based creator education.",
             "@practicalcreator",

@@ -26,7 +26,7 @@ Phase 2 is intentionally single-user and has no authentication or workspace auth
 
 - `GET /` returns the service name and phase marker.
 - `GET /health/live` confirms the process can answer requests.
-- `GET /health/ready` checks PostgreSQL connectivity and YouTube API-key configuration.
+- `GET /health/ready` checks SQL Server connectivity and YouTube API-key configuration.
 
 ## AI analysis behavior
 

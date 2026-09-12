@@ -1,5 +1,5 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
@@ -114,7 +114,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     {
         dbContext.Jobs.Add(job);
         try { await dbContext.SaveChangesAsync(cancellationToken); return job; }
-        catch (DbUpdateException exception) when (IsActiveOpportunityJobConflict(exception))
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
             dbContext.ChangeTracker.Clear();
             return await dbContext.Jobs.AsNoTracking().SingleAsync(item => item.Type == "opportunity-analysis" && item.ProjectId == job.ProjectId && (item.Status == JobStatus.Queued || item.Status == JobStatus.Running || item.Status == JobStatus.Retrying), cancellationToken);
@@ -160,7 +160,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public async Task<int> GetNextIdeaGenerationVersionAsync(Guid opportunityId, CancellationToken cancellationToken) => (await dbContext.IdeaGenerations.Where(x => x.OpportunityId == opportunityId).Select(x => (int?)x.Version).MaxAsync(cancellationToken) ?? 0) + 1;
     public Task<Job?> GetActiveIdeaGenerationJobAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => FindIdeaJobAsync(projectId, opportunityId, true, cancellationToken);
     public Task<Job?> GetLatestIdeaGenerationJobAsync(Guid projectId, Guid opportunityId, CancellationToken cancellationToken) => FindIdeaJobAsync(projectId, opportunityId, false, cancellationToken);
-    public async Task<Job> EnqueueIdeaGenerationJobAsync(Job job, CancellationToken cancellationToken) { dbContext.Jobs.Add(job); try { await dbContext.SaveChangesAsync(cancellationToken); return job; } catch (DbUpdateException exception) when (IsActiveIdeaJobConflict(exception)) { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "idea-generation" && x.OpportunityId == job.OpportunityId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); } }
+    public async Task<Job> EnqueueIdeaGenerationJobAsync(Job job, CancellationToken cancellationToken) { dbContext.Jobs.Add(job); try { await dbContext.SaveChangesAsync(cancellationToken); return job; } catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception)) { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "idea-generation" && x.OpportunityId == job.OpportunityId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); } }
     public Task<Job?> TryClaimNextIdeaGenerationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => TryClaimJobAsync("idea-generation", now, staleRunningBefore, cancellationToken);
     public Task RequeueIdeaGenerationJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
     public Task FailIdeaGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
@@ -198,7 +198,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public async Task<Job> EnqueuePilotGenerationJobAsync(Job job, CancellationToken cancellationToken)
     {
         dbContext.Jobs.Add(job); try { await dbContext.SaveChangesAsync(cancellationToken); return job; }
-        catch (DbUpdateException exception) when (IsActivePilotJobConflict(exception)) { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "pilot-generation" && x.ProjectId == job.ProjectId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception)) { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "pilot-generation" && x.ProjectId == job.ProjectId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); }
     }
     public Task<Job?> TryClaimNextPilotGenerationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => TryClaimJobAsync("pilot-generation", now, staleRunningBefore, cancellationToken);
     public Task RequeuePilotGenerationJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
@@ -220,7 +220,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
             await dbContext.SaveChangesAsync(cancellationToken);
             return job;
         }
-        catch (DbUpdateException exception) when (IsActiveAnalysisJobConflict(exception))
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
             dbContext.ChangeTracker.Clear();
             return await dbContext.Jobs.AsNoTracking().SingleAsync(candidate =>
@@ -235,21 +235,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         DateTimeOffset staleRunningBefore,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var job = await dbContext.Jobs.FromSqlRaw("""
-            SELECT * FROM yaf.jobs
-            WHERE type = 'competitor-analysis'
-              AND (status IN ('Queued', 'Retrying') OR (status = 'Running' AND started_at <= {1}))
-              AND available_at <= {0}
-            ORDER BY available_at, created_at
-            LIMIT 1 FOR UPDATE SKIP LOCKED
-            """, now, staleRunningBefore).FirstOrDefaultAsync(cancellationToken);
-        if (job is null) return null;
-        if (job.Status == JobStatus.Running) job.Requeue(now);
-        job.Start(now);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return job;
+        return await TryClaimJobAsync("competitor-analysis", now, staleRunningBefore, cancellationToken);
     }
 
     public async Task RequeueCompetitorAnalysisJobAsync(Guid jobId, CancellationToken cancellationToken)
@@ -310,11 +296,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         {
             throw new ResourceConflictException("The pilot was changed by another request. Refresh it and try again.");
         }
-        catch (DbUpdateException exception)
-            when (exception.InnerException is PostgresException
-            {
-                SqlState: PostgresErrorCodes.UniqueViolation,
-            })
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
             throw new ResourceConflictException(
                 "The project already contains this YouTube channel or video.");
@@ -349,23 +331,35 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
 
     private async Task<Job?> TryClaimJobAsync(string type, DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var job = await dbContext.Jobs.FromSqlRaw("""
-            SELECT * FROM yaf.jobs WHERE type = {0}
-              AND (status IN ('Queued', 'Retrying') OR (status = 'Running' AND started_at <= {2}))
-              AND available_at <= {1} ORDER BY available_at, created_at LIMIT 1 FOR UPDATE SKIP LOCKED
-            """, type, now, staleRunningBefore).FirstOrDefaultAsync(cancellationToken);
-        if (job is null) return null;
-        if (job.Status == JobStatus.Running) job.Requeue(now);
-        job.Start(now); await dbContext.SaveChangesAsync(cancellationToken); await transaction.CommitAsync(cancellationToken); return job;
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var job = await dbContext.Jobs.FromSqlRaw("""
+                SELECT TOP (1) * FROM [yaf].[jobs] WITH (UPDLOCK, READPAST, ROWLOCK)
+                WHERE type = {0}
+                  AND (status IN ('Queued', 'Retrying') OR (status = 'Running' AND started_at <= {2}))
+                  AND available_at <= {1}
+                ORDER BY available_at, created_at
+                """, type, now, staleRunningBefore).FirstOrDefaultAsync(cancellationToken);
+
+            if (job is null)
+            {
+                return null;
+            }
+
+            if (job.Status == JobStatus.Running)
+            {
+                job.Requeue(now);
+            }
+
+            job.Start(now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return job;
+        });
     }
 
-    private static bool IsActiveAnalysisJobConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_competitor_analysis" };
-    private static bool IsActiveOpportunityJobConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_project_analysis" };
-    private static bool IsActivePilotJobConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_project_analysis" };
-    private static bool IsActiveIdeaJobConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_jobs_active_idea_generation" };
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException { Number: 2601 or 2627 };
 }

@@ -390,7 +390,7 @@ Architect for future extensibility, but do not implement speculative infrastruct
 
 \- Entity Framework Core
 
-\- PostgreSQL
+\- Microsoft SQL Server
 
 **## Frontend**
 
@@ -526,7 +526,7 @@ Domain must NOT depend on:
 
 \- YouTube SDK;
 
-\- PostgreSQL;
+\- Microsoft SQL Server;
 
 \- HTTP;
 
@@ -1010,7 +1010,7 @@ Never use infinite retries.
 
 **# 15. DATABASE**
 
-Use PostgreSQL from the start.
+Use Microsoft SQL Server from the start.
 
 EF Core migrations must be used.
 
@@ -1018,7 +1018,7 @@ Do not manually edit production schema.
 
 Use normal relational columns for important queryable business data.
 
-Use \`jsonb\` only where semi-structured storage provides meaningful benefits, for example:
+Use \`nvarchar(max)\` JSON columns only where semi-structured storage provides meaningful benefits, for example:
 
 \- raw provider response;
 
@@ -1032,7 +1032,7 @@ Do not turn the whole database into JSON documents.
 
 **# 16. FILE / LARGE OBJECT STORAGE**
 
-Do not store large binary assets directly in PostgreSQL.
+Do not store large binary assets directly in SQL Server.
 
 Future objects such as:
 
@@ -1342,7 +1342,7 @@ Examples:
 
 \- EF Core;
 
-\- PostgreSQL;
+\- Microsoft SQL Server;
 
 \- repositories;
 
@@ -1458,7 +1458,7 @@ Examples:
 
 ADR-001-modular-monolith.md
 
-ADR-002-postgresql.md
+ADR-004-sql-server-persistence.md
 
 ADR-003-background-jobs.md
 
@@ -1544,7 +1544,7 @@ Set up:
 
 \- React frontend;
 
-\- PostgreSQL;
+\- Microsoft SQL Server;
 
 \- development configuration;
 
@@ -2420,7 +2420,7 @@ Collect channel/video metadata
 
  ↓
 
-Persist to PostgreSQL
+Persist to SQL Server
 
  ↓
 

@@ -174,8 +174,8 @@ public sealed class Phase2ApiContractTests
                 .WithWebHostBuilder(builder =>
                 {
                     builder.UseSetting(
-                        "ConnectionStrings:Database",
-                        "Host=localhost;Database=unused;Username=unused;Password=unused");
+                        "ConnectionStrings:DefaultConnection",
+                        "Server=localhost;Database=unused;User Id=unused;Password=unused;TrustServerCertificate=True");
                     builder.ConfigureServices(services =>
                     {
                         services.RemoveAll<IYoutubeAiFactoryStore>();

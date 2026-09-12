@@ -1,6 +1,6 @@
 # ADR-002: PostgreSQL persistence and database-backed jobs
 
-- Status: Accepted
+- Status: Superseded by ADR-004 for the database provider; retained as historical context for the database-backed job decision
 - Date: 2026-09-06
 
 ## Context

@@ -4,7 +4,7 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 
 namespace YoutubeAiFactory.Api.Health;
 
-internal sealed class PostgresHealthCheck(
+internal sealed class SqlServerHealthCheck(
     IDbContextFactory<YoutubeAiFactoryDbContext> contextFactory) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -17,12 +17,12 @@ internal sealed class PostgresHealthCheck(
             var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
 
             return canConnect
-                ? HealthCheckResult.Healthy("PostgreSQL is reachable.")
-                : HealthCheckResult.Unhealthy("PostgreSQL is not reachable.");
+                ? HealthCheckResult.Healthy("SQL Server is reachable.")
+                : HealthCheckResult.Unhealthy("SQL Server is not reachable.");
         }
         catch (Exception exception)
         {
-            return HealthCheckResult.Unhealthy("PostgreSQL health check failed.", exception);
+            return HealthCheckResult.Unhealthy("SQL Server health check failed.", exception);
         }
     }
 }

@@ -20,7 +20,7 @@ internal sealed class CompetitorAnalysisConfiguration : IEntityTypeConfiguration
         builder.Property(analysis => analysis.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(analysis => analysis.SourceDataAsOf).HasColumnName("source_data_as_of").IsRequired();
         builder.Property(analysis => analysis.AnalyzedVideoCount).HasColumnName("analyzed_video_count").IsRequired();
-        builder.Property(analysis => analysis.ResultJson).HasColumnName("result_json").HasColumnType("jsonb").IsRequired();
+        builder.Property(analysis => analysis.ResultJson).HasColumnName("result_json").HasColumnType("nvarchar(max)").IsRequired();
         builder.Property(analysis => analysis.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.HasIndex(analysis => new { analysis.CompetitorChannelId, analysis.Version }).IsUnique();
         builder.HasIndex(analysis => new { analysis.CompetitorChannelId, analysis.CreatedAt });

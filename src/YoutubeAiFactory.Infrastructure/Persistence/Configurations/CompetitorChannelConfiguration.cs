@@ -14,9 +14,9 @@ internal sealed class CompetitorChannelConfiguration : IEntityTypeConfiguration<
         builder.Property(channel => channel.Id).HasColumnName("id");
         builder.Property(channel => channel.ProjectId).HasColumnName("project_id").IsRequired();
         builder.Property(channel => channel.SourceUrl).HasColumnName("source_url").HasMaxLength(2_048).IsRequired();
-        builder.Property(channel => channel.YoutubeChannelId).HasColumnName("youtube_channel_id").HasMaxLength(100).IsRequired();
+        builder.Property(channel => channel.YoutubeChannelId).HasColumnName("youtube_channel_id").HasMaxLength(100).UseCollation("Latin1_General_100_BIN2").IsRequired();
         builder.Property(channel => channel.Title).HasColumnName("title").HasMaxLength(500).IsRequired();
-        builder.Property(channel => channel.Description).HasColumnName("description").HasColumnType("text");
+        builder.Property(channel => channel.Description).HasColumnName("description").HasColumnType("nvarchar(max)");
         builder.Property(channel => channel.Handle).HasColumnName("handle").HasMaxLength(100);
         builder.Property(channel => channel.ThumbnailUrl).HasColumnName("thumbnail_url").HasMaxLength(2_048);
         builder.Property(channel => channel.SubscriberCount).HasColumnName("subscriber_count");
