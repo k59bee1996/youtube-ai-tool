@@ -8,14 +8,15 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
 {
     public void Configure(EntityTypeBuilder<Job> builder)
     {
-        builder.ToTable("jobs");
+        builder.ToTable("jobs", table =>
+            table.HasCheckConstraint("ck_jobs_payload_json", "ISJSON([payload]) = 1"));
         builder.HasKey(job => job.Id);
         builder.Property(job => job.Id).HasColumnName("id");
         builder.Property(job => job.Type).HasColumnName("type").HasMaxLength(100).IsRequired();
         builder.Property(job => job.CompetitorChannelId).HasColumnName("competitor_channel_id");
         builder.Property(job => job.ProjectId).HasColumnName("project_id");
         builder.Property(job => job.OpportunityId).HasColumnName("opportunity_id");
-        builder.Property(job => job.Payload).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
+        builder.Property(job => job.Payload).HasColumnName("payload").HasColumnType("nvarchar(max)").IsRequired();
         builder.Property(job => job.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(job => job.RetryCount).HasColumnName("retry_count").IsRequired();
         builder.Property(job => job.MaxRetries).HasColumnName("max_retries").IsRequired();

@@ -16,12 +16,15 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Database")
-            ?? throw new InvalidOperationException("Connection string 'Database' is required.");
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
 
         services.AddDbContextFactory<YoutubeAiFactoryDbContext>(options =>
-            options.UseNpgsql(connectionString, postgres =>
-                postgres.MigrationsAssembly(typeof(YoutubeAiFactoryDbContext).Assembly.FullName)));
+            options.UseSqlServer(connectionString, sqlServer =>
+            {
+                sqlServer.MigrationsAssembly(typeof(YoutubeAiFactoryDbContext).Assembly.FullName);
+                sqlServer.EnableRetryOnFailure();
+            }));
 
         services.AddScoped<IYoutubeAiFactoryStore, YoutubeAiFactoryStore>();
         services.Configure<YouTubeOptions>(configuration.GetSection(YouTubeOptions.SectionName));

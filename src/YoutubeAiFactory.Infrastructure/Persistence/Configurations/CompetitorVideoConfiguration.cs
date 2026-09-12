@@ -12,9 +12,9 @@ internal sealed class CompetitorVideoConfiguration : IEntityTypeConfiguration<Co
         builder.HasKey(video => video.Id);
         builder.Property(video => video.Id).HasColumnName("id");
         builder.Property(video => video.CompetitorChannelId).HasColumnName("competitor_channel_id").IsRequired();
-        builder.Property(video => video.YoutubeVideoId).HasColumnName("youtube_video_id").HasMaxLength(100).IsRequired();
+        builder.Property(video => video.YoutubeVideoId).HasColumnName("youtube_video_id").HasMaxLength(100).UseCollation("Latin1_General_100_BIN2").IsRequired();
         builder.Property(video => video.Title).HasColumnName("title").HasMaxLength(500).IsRequired();
-        builder.Property(video => video.Description).HasColumnName("description").HasColumnType("text");
+        builder.Property(video => video.Description).HasColumnName("description").HasColumnType("nvarchar(max)");
         builder.Property(video => video.Url).HasColumnName("url").HasMaxLength(2_048).IsRequired();
         builder.Property(video => video.ThumbnailUrl).HasColumnName("thumbnail_url").HasMaxLength(2_048);
         builder.Property(video => video.Duration).HasColumnName("duration");

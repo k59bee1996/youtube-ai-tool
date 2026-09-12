@@ -9,7 +9,7 @@ YouTube AI Factory converts market and competitor evidence into structured, reus
 The repository provides the foundation plus the first end-to-end business slice:
 
 - modular monolith, React client, API and worker hosts;
-- PostgreSQL development/test services and EF Core migrations;
+- SQL Server EF Core migrations and SQL Server-backed integration tests;
 - project creation, listing, lookup, and persisted workspace selection;
 - official YouTube Data API channel resolution and bounded recent-video collection;
 - idempotent competitor refresh with channel and video metadata displayed from storage;

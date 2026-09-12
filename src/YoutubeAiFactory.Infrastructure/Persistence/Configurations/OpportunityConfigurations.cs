@@ -10,13 +10,14 @@ internal sealed class OpportunityReportConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<OpportunityReport> builder)
     {
-        builder.ToTable("opportunity_reports"); builder.HasKey(x => x.Id);
+        builder.ToTable("opportunity_reports", table =>
+            table.HasCheckConstraint("ck_opportunity_reports_limitations_json", "ISJSON([limitations_json]) = 1")); builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id"); builder.Property(x => x.ProjectId).HasColumnName("project_id").IsRequired();
         builder.Property(x => x.Version).HasColumnName("version").IsRequired(); builder.Property(x => x.AiRunId).HasColumnName("ai_run_id").IsRequired();
         builder.Property(x => x.PromptKey).HasColumnName("prompt_key").HasMaxLength(100).IsRequired(); builder.Property(x => x.PromptVersion).HasColumnName("prompt_version");
         builder.Property(x => x.Provider).HasColumnName("provider").HasMaxLength(100).IsRequired(); builder.Property(x => x.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(x => x.ScoringAlgorithmVersion).HasColumnName("scoring_algorithm_version").HasMaxLength(100).IsRequired(); builder.Property(x => x.SourceAnalysisCount).HasColumnName("source_analysis_count"); builder.Property(x => x.CreatedAt).HasColumnName("created_at");
-        builder.Property(x => x.LimitationsJson).HasColumnName("limitations_json").HasColumnType("jsonb").IsRequired();
+        builder.Property(x => x.LimitationsJson).HasColumnName("limitations_json").HasColumnType("nvarchar(max)").IsRequired();
         builder.HasIndex(x => new { x.ProjectId, x.Version }).IsUnique(); builder.HasIndex(x => new { x.ProjectId, x.CreatedAt });
         builder.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
     }
@@ -36,11 +37,15 @@ internal sealed class OpportunityCandidateConfiguration : IEntityTypeConfigurati
 {
     public void Configure(EntityTypeBuilder<OpportunityCandidate> builder)
     {
-        builder.ToTable("opportunity_candidates"); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id"); builder.Property(x => x.ReportId).HasColumnName("report_id");
+        builder.ToTable("opportunity_candidates", table =>
+        {
+            table.HasCheckConstraint("ck_opportunity_candidates_risks_json", "ISJSON([risks_json]) = 1");
+            table.HasCheckConstraint("ck_opportunity_candidates_limitations_json", "ISJSON([limitations_json]) = 1");
+        }); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id"); builder.Property(x => x.ReportId).HasColumnName("report_id");
         foreach (var property in new[] { nameof(OpportunityCandidate.Name), nameof(OpportunityCandidate.Audience), nameof(OpportunityCandidate.Topic), nameof(OpportunityCandidate.ContentFormat), nameof(OpportunityCandidate.Angle) }) builder.Property(property).HasMaxLength(1000).IsRequired();
-        builder.Property(x => x.Description).HasColumnName("description").HasColumnType("text"); builder.Property(x => x.WhyThisOpportunity).HasColumnName("why_this_opportunity").HasColumnType("text");
+        builder.Property(x => x.Description).HasColumnName("description").HasColumnType("nvarchar(max)"); builder.Property(x => x.WhyThisOpportunity).HasColumnName("why_this_opportunity").HasColumnType("nvarchar(max)");
         builder.Property(x => x.ObservedDemandSignal).HasColumnName("observed_demand_signal"); builder.Property(x => x.NoveltySignal).HasColumnName("novelty_signal"); builder.Property(x => x.CompetitionRiskSignal).HasColumnName("competition_risk_signal"); builder.Property(x => x.AudienceFitSignal).HasColumnName("audience_fit_signal"); builder.Property(x => x.TransferabilitySignal).HasColumnName("transferability_signal"); builder.Property(x => x.EvidenceStrength).HasColumnName("evidence_strength"); builder.Property(x => x.StoryPotential).HasColumnName("story_potential"); builder.Property(x => x.ProductionComplexity).HasColumnName("production_complexity"); builder.Property(x => x.Confidence).HasColumnName("confidence"); builder.Property(x => x.OverallScore).HasColumnName("overall_score").HasPrecision(5, 2);
-        builder.Property(x => x.RisksJson).HasColumnName("risks_json").HasColumnType("jsonb"); builder.Property(x => x.LimitationsJson).HasColumnName("limitations_json").HasColumnType("jsonb"); builder.Property(x => x.DecisionStatus).HasColumnName("decision_status").HasConversion<string>().HasMaxLength(30); builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.RisksJson).HasColumnName("risks_json").HasColumnType("nvarchar(max)"); builder.Property(x => x.LimitationsJson).HasColumnName("limitations_json").HasColumnType("nvarchar(max)"); builder.Property(x => x.DecisionStatus).HasColumnName("decision_status").HasConversion<string>().HasMaxLength(30); builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.HasIndex(x => new { x.ReportId, x.OverallScore }); builder.HasOne<OpportunityReport>().WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.Cascade);
     }
 }

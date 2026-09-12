@@ -8,7 +8,8 @@ internal sealed class CompetitorAnalysisConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<CompetitorAnalysis> builder)
     {
-        builder.ToTable("competitor_analyses");
+        builder.ToTable("competitor_analyses", table =>
+            table.HasCheckConstraint("ck_competitor_analyses_result_json", "ISJSON([result_json]) = 1"));
         builder.HasKey(analysis => analysis.Id);
         builder.Property(analysis => analysis.Id).HasColumnName("id");
         builder.Property(analysis => analysis.CompetitorChannelId).HasColumnName("competitor_channel_id").IsRequired();
@@ -20,7 +21,7 @@ internal sealed class CompetitorAnalysisConfiguration : IEntityTypeConfiguration
         builder.Property(analysis => analysis.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(analysis => analysis.SourceDataAsOf).HasColumnName("source_data_as_of").IsRequired();
         builder.Property(analysis => analysis.AnalyzedVideoCount).HasColumnName("analyzed_video_count").IsRequired();
-        builder.Property(analysis => analysis.ResultJson).HasColumnName("result_json").HasColumnType("jsonb").IsRequired();
+        builder.Property(analysis => analysis.ResultJson).HasColumnName("result_json").HasColumnType("nvarchar(max)").IsRequired();
         builder.Property(analysis => analysis.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.HasIndex(analysis => new { analysis.CompetitorChannelId, analysis.Version }).IsUnique();
         builder.HasIndex(analysis => new { analysis.CompetitorChannelId, analysis.CreatedAt });

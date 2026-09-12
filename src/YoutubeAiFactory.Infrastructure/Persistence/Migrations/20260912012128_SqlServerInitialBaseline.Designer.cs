@@ -2,9 +2,9 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
 #nullable disable
@@ -12,8 +12,8 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    [Migration("20260911144507_AddPilotEngine")]
-    partial class AddPilotEngine
+    [Migration("20260912012128_SqlServerInitialBaseline")]
+    partial class SqlServerInitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -22,37 +22,37 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
             modelBuilder
                 .HasDefaultSchema("yaf")
                 .HasAnnotation("ProductVersion", "10.0.4")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("YoutubeAiFactory.Domain.AI.AiRun", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid?>("CompetitorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("completed_at");
 
                     b.Property<decimal?>("EstimatedCost")
                         .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)")
+                        .HasColumnType("decimal(18,6)")
                         .HasColumnName("estimated_cost");
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("nvarchar(2000)")
                         .HasColumnName("failure_reason");
 
                     b.Property<int?>("InputTokens")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("input_tokens");
 
                     b.Property<long?>("LatencyMilliseconds")
@@ -62,51 +62,51 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("model");
 
                     b.Property<int?>("OutputTokens")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("output_tokens");
 
                     b.Property<Guid?>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<string>("PromptKey")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("prompt_key");
 
                     b.Property<int>("PromptVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("prompt_version");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
 
                     b.Property<int>("RetryCount")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("retry_count");
 
                     b.Property<DateTimeOffset>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("started_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasColumnType("nvarchar(30)")
                         .HasColumnName("status");
 
                     b.Property<string>("Workflow")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("workflow");
 
                     b.HasKey("Id");
@@ -122,58 +122,58 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("AiRunId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("ai_run_id");
 
                     b.Property<int>("AnalyzedVideoCount")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("analyzed_video_count");
 
                     b.Property<Guid>("CompetitorChannelId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("model");
 
                     b.Property<string>("PromptKey")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("prompt_key");
 
                     b.Property<int>("PromptVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("prompt_version");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
 
                     b.Property<string>("ResultJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("result_json");
 
                     b.Property<DateTimeOffset>("SourceDataAsOf")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("source_data_as_of");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("version");
 
                     b.HasKey("Id");
@@ -190,38 +190,38 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("description");
 
                     b.Property<string>("Handle")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("handle");
 
                     b.Property<DateTimeOffset>("LastCollectedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("last_collected_at");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("published_at");
 
                     b.Property<string>("SourceUrl")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("source_url");
 
                     b.Property<long?>("SubscriberCount")
@@ -230,13 +230,13 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ThumbnailUrl")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("thumbnail_url");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasColumnType("nvarchar(500)")
                         .HasColumnName("title");
 
                     b.Property<long?>("VideoCount")
@@ -250,8 +250,9 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<string>("YoutubeChannelId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("youtube_channel_id");
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("youtube_channel_id")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.HasKey("Id");
 
@@ -265,11 +266,11 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CollectedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("collected_at");
 
                     b.Property<long?>("CommentCount")
@@ -277,15 +278,15 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnName("comment_count");
 
                     b.Property<Guid>("CompetitorChannelId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("description");
 
                     b.Property<TimeSpan?>("Duration")
-                        .HasColumnType("interval")
+                        .HasColumnType("time")
                         .HasColumnName("duration");
 
                     b.Property<long?>("LikeCount")
@@ -293,24 +294,24 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnName("like_count");
 
                     b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("published_at");
 
                     b.Property<string>("ThumbnailUrl")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("thumbnail_url");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasColumnType("nvarchar(500)")
                         .HasColumnName("title");
 
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
+                        .HasColumnType("nvarchar(2048)")
                         .HasColumnName("url");
 
                     b.Property<long?>("ViewCount")
@@ -320,8 +321,9 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<string>("YoutubeVideoId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("youtube_video_id");
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("youtube_video_id")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.HasKey("Id");
 
@@ -335,21 +337,21 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("IdeaId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("idea_id");
 
                     b.Property<Guid>("OpportunityEvidenceId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("opportunity_evidence_id");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("nvarchar(2000)")
                         .HasColumnName("summary");
 
                     b.HasKey("Id");
@@ -366,63 +368,63 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("AiRunId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("ai_run_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("model");
 
                     b.Property<Guid>("OpportunityId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("opportunity_id");
 
                     b.Property<Guid>("OpportunityReportId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("opportunity_report_id");
 
                     b.Property<int>("OpportunityReportVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("opportunity_report_version");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<string>("PromptKey")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("prompt_key");
 
                     b.Property<int>("PromptVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("prompt_version");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
 
                     b.Property<string>("ScoringAlgorithmVersion")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("scoring_algorithm_version");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("version");
 
                     b.HasKey("Id");
@@ -441,161 +443,161 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<string>("Angle")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<int>("AudienceFit")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("audience_fit");
 
                     b.Property<int>("CompetitionRisk")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("competition_risk");
 
                     b.Property<int>("Confidence")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("confidence");
 
                     b.Property<string>("ContentFormat")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("nvarchar(1000)")
                         .HasColumnName("content_format");
 
                     b.Property<string>("CoreQuestion")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("core_question");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("DecisionStatus")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasColumnType("nvarchar(30)")
                         .HasColumnName("decision_status");
 
                     b.Property<decimal>("DuplicationPenalty")
                         .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
+                        .HasColumnType("decimal(5,2)")
                         .HasColumnName("duplication_penalty");
 
                     b.Property<int>("EvidenceStrength")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("evidence_strength");
 
                     b.Property<Guid>("GenerationId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("generation_id");
 
                     b.Property<string>("HookConcept")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("hook_concept");
 
                     b.Property<string>("Hypothesis")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Novelty")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("novelty");
 
                     b.Property<int>("ObservedDemandAlignment")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("observed_demand_alignment");
 
                     b.Property<int>("OpportunityFit")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("opportunity_fit");
 
                     b.Property<Guid>("OpportunityId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("opportunity_id");
 
                     b.Property<decimal>("OverallScore")
                         .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
+                        .HasColumnType("decimal(5,2)")
                         .HasColumnName("overall_score");
 
                     b.Property<int>("ProductionEase")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("production_ease");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<int>("ResearchRisk")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("research_risk");
 
                     b.Property<string>("RisksJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("risks_json");
 
                     b.Property<string>("ScoringAlgorithmVersion")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("scoring_algorithm_version");
 
                     b.Property<int>("StoryPotential")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("story_potential");
 
                     b.Property<string>("TargetAudience")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("nvarchar(1000)")
                         .HasColumnName("target_audience");
 
                     b.Property<string>("ThumbnailConcept")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("thumbnail_concept");
 
                     b.Property<int>("ThumbnailPotential")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("thumbnail_potential");
 
                     b.Property<int>("TitlePotential")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("title_potential");
 
                     b.Property<string>("Topic")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("ViewerIntent")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("nvarchar(1000)")
                         .HasColumnName("viewer_intent");
 
                     b.Property<string>("ViewerPromise")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("viewer_promise");
 
                     b.Property<string>("WhyViewerWouldCare")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("why_viewer_would_care");
 
                     b.Property<string>("WorkingTitle")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("nvarchar(1000)")
                         .HasColumnName("working_title");
 
                     b.HasKey("Id");
@@ -613,65 +615,65 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("AvailableAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("available_at");
 
                     b.Property<Guid?>("CompetitorChannelId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("completed_at");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("nvarchar(2000)")
                         .HasColumnName("failure_reason");
 
                     b.Property<int>("MaxRetries")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("max_retries");
 
                     b.Property<Guid?>("OpportunityId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("opportunity_id");
 
                     b.Property<string>("Payload")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("payload");
 
                     b.Property<Guid?>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<int>("RetryCount")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("retry_count");
 
                     b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("started_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasColumnType("nvarchar(30)")
                         .HasColumnName("status");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("type");
 
                     b.HasKey("Id");
@@ -700,107 +702,107 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<string>("Angle")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("Audience")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<int>("AudienceFitSignal")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("audience_fit_signal");
 
                     b.Property<int>("CompetitionRiskSignal")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("competition_risk_signal");
 
                     b.Property<int>("Confidence")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("confidence");
 
                     b.Property<string>("ContentFormat")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("DecisionStatus")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasColumnType("nvarchar(30)")
                         .HasColumnName("decision_status");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("description");
 
                     b.Property<int>("EvidenceStrength")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("evidence_strength");
 
                     b.Property<string>("LimitationsJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("limitations_json");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<int>("NoveltySignal")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("novelty_signal");
 
                     b.Property<int>("ObservedDemandSignal")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("observed_demand_signal");
 
                     b.Property<decimal>("OverallScore")
                         .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
+                        .HasColumnType("decimal(5,2)")
                         .HasColumnName("overall_score");
 
                     b.Property<int>("ProductionComplexity")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("production_complexity");
 
                     b.Property<Guid>("ReportId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("report_id");
 
                     b.Property<string>("RisksJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("risks_json");
 
                     b.Property<int>("StoryPotential")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("story_potential");
 
                     b.Property<string>("Topic")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<int>("TransferabilitySignal")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("transferability_signal");
 
                     b.Property<string>("WhyThisOpportunity")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("why_this_opportunity");
 
                     b.HasKey("Id");
@@ -814,35 +816,35 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("candidate_id");
 
                     b.Property<Guid>("CompetitorAnalysisId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_analysis_id");
 
                     b.Property<Guid>("CompetitorChannelId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
 
                     b.Property<Guid?>("CompetitorVideoId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_video_id");
 
                     b.Property<string>("EvidenceId")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("nvarchar(200)")
                         .HasColumnName("evidence_id");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("nvarchar(2000)")
                         .HasColumnName("summary");
 
                     b.HasKey("Id");
@@ -863,60 +865,60 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("AiRunId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("ai_run_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("LimitationsJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("limitations_json");
 
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("model");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<string>("PromptKey")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("prompt_key");
 
                     b.Property<int>("PromptVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("prompt_version");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
 
                     b.Property<string>("ScoringAlgorithmVersion")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("scoring_algorithm_version");
 
                     b.Property<int>("SourceAnalysisCount")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("source_analysis_count");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("version");
 
                     b.HasKey("Id");
@@ -933,23 +935,23 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("CompetitorAnalysisId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_analysis_id");
 
                     b.Property<int>("CompetitorAnalysisVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("competitor_analysis_version");
 
                     b.Property<Guid>("CompetitorChannelId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
 
                     b.Property<Guid>("ReportId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("report_id");
 
                     b.HasKey("Id");
@@ -968,91 +970,96 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<Guid>("AiRunId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("ai_run_id");
 
                     b.Property<DateTimeOffset?>("ApprovedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("approved_at");
 
                     b.Property<string>("AssumptionsJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("assumptions_json");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<int>("EligibleIdeaCount")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("eligible_idea_count");
 
                     b.Property<string>("LimitationsJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("limitations_json");
 
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("model");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
+                        .HasColumnType("nvarchar(300)")
                         .HasColumnName("name");
 
                     b.Property<string>("Objective")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("objective");
 
                     b.Property<string>("PlanningAlgorithmVersion")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("planning_algorithm_version");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
 
                     b.Property<string>("PromptKey")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("prompt_key");
 
                     b.Property<int>("PromptVersion")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("prompt_version");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int")
+                        .HasColumnName("revision");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasColumnType("nvarchar(30)")
                         .HasColumnName("status");
 
                     b.Property<int>("Version")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("version");
 
                     b.Property<string>("WarningsJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("warnings_json");
 
                     b.HasKey("Id");
@@ -1069,69 +1076,69 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<string>("ControlStrategy")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("control_strategy");
 
                     b.Property<string>("ExperimentType")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasColumnType("nvarchar(30)")
                         .HasColumnName("experiment_type");
 
                     b.Property<string>("Hypothesis")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("hypothesis");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("notes");
 
                     b.Property<Guid>("OpportunityId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("opportunity_id");
 
                     b.Property<Guid>("PilotId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("pilot_id");
 
                     b.Property<string>("PrimaryMetric")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasColumnType("nvarchar(500)")
                         .HasColumnName("primary_metric");
 
                     b.Property<string>("Rationale")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("rationale");
 
                     b.Property<string>("SecondaryMetricsJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("secondary_metrics_json");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("sequence");
 
                     b.Property<string>("SuccessSignal")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("success_signal");
 
                     b.Property<string>("VariableBeingTested")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("variable_being_tested");
 
                     b.Property<Guid>("VideoIdeaId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("video_idea_id");
 
                     b.HasKey("Id");
@@ -1148,6 +1155,8 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 
                     b.ToTable("pilot_videos", "yaf", t =>
                         {
+                            t.HasCheckConstraint("ck_pilot_videos_experiment_block", "(sequence BETWEEN 1 AND 4 AND experiment_type = 'Topic') OR (sequence BETWEEN 5 AND 8 AND experiment_type = 'Packaging') OR (sequence BETWEEN 9 AND 12 AND experiment_type = 'Storytelling')");
+
                             t.HasCheckConstraint("ck_pilot_videos_sequence", "sequence >= 1 AND sequence <= 12");
                         });
                 });
@@ -1156,21 +1165,21 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("nvarchar(200)")
                         .HasColumnName("name");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("datetimeoffset")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
@@ -1266,7 +1275,7 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.HasOne("YoutubeAiFactory.Domain.Projects.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired();
                 });
 
@@ -1370,12 +1379,12 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.OwnsOne("YoutubeAiFactory.Domain.Projects.AudienceProfile", "Audience", b1 =>
                         {
                             b1.Property<Guid>("ProjectId")
-                                .HasColumnType("uuid");
+                                .HasColumnType("uniqueidentifier");
 
                             b1.Property<string>("Description")
                                 .IsRequired()
                                 .HasMaxLength(2000)
-                                .HasColumnType("character varying(2000)")
+                                .HasColumnType("nvarchar(2000)")
                                 .HasColumnName("audience_description");
 
                             b1.HasKey("ProjectId");
@@ -1389,24 +1398,24 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.OwnsOne("YoutubeAiFactory.Domain.Projects.Market", "Market", b1 =>
                         {
                             b1.Property<Guid>("ProjectId")
-                                .HasColumnType("uuid");
+                                .HasColumnType("uniqueidentifier");
 
                             b1.Property<string>("Name")
                                 .IsRequired()
                                 .HasMaxLength(200)
-                                .HasColumnType("character varying(200)")
+                                .HasColumnType("nvarchar(200)")
                                 .HasColumnName("market_name");
 
                             b1.Property<string>("TargetGeography")
                                 .IsRequired()
                                 .HasMaxLength(100)
-                                .HasColumnType("character varying(100)")
+                                .HasColumnType("nvarchar(100)")
                                 .HasColumnName("target_geography");
 
                             b1.Property<string>("TargetLanguage")
                                 .IsRequired()
                                 .HasMaxLength(50)
-                                .HasColumnType("character varying(50)")
+                                .HasColumnType("nvarchar(50)")
                                 .HasColumnName("target_language");
 
                             b1.HasKey("ProjectId");

@@ -60,7 +60,7 @@ builder.Services.AddScoped<PilotGenerationContextBuilder>();
 builder.Services.AddScoped<PilotGenerationJobProcessor>();
 builder.Services
     .AddHealthChecks()
-    .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"])
+    .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"])
     .AddCheck<YouTubeConfigurationHealthCheck>("youtube-configuration", tags: ["ready"]);
 
 var app = builder.Build();

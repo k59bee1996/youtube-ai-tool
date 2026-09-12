@@ -20,22 +20,21 @@ jobs:
     timeout-minutes: 15
 
     services:
-      postgres:
-        image: postgres:17-alpine
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
         env:
-          POSTGRES_DB: youtube_ai_factory_tests
-          POSTGRES_USER: yaf
-          POSTGRES_PASSWORD: yaf_test_password
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: YafTest!2026Sql
         ports:
-          - 5432:5432
+          - 1433:1433
         options: >-
-          --health-cmd "pg_isready -U yaf -d youtube_ai_factory_tests"
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'YafTest!2026Sql' -Q 'SELECT 1' || exit 1"
           --health-interval 5s
           --health-timeout 3s
-          --health-retries 15
+          --health-retries 20
 
     env:
-      YAF_TEST_POSTGRES: Host=localhost;Port=5432;Database=youtube_ai_factory_tests;Username=yaf;Password=yaf_test_password
+      YAF_TEST_SQLSERVER: Server=localhost,1433;Database=YoutubeAiFactoryIntegrationTests;User Id=sa;Password=YafTest!2026Sql;Encrypt=False;TrustServerCertificate=True
 
     steps:
       - name: Check out source

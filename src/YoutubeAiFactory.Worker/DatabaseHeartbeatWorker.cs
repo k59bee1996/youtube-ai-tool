@@ -17,19 +17,19 @@ public sealed class DatabaseHeartbeatWorker(
         LoggerMessage.Define(
             LogLevel.Debug,
             new EventId(2, nameof(LogDatabaseHealthy)),
-            "PostgreSQL connectivity check: healthy");
+            "SQL Server connectivity check: healthy");
 
     private static readonly Action<ILogger, Exception?> LogDatabaseUnavailable =
         LoggerMessage.Define(
             LogLevel.Warning,
             new EventId(3, nameof(LogDatabaseUnavailable)),
-            "PostgreSQL connectivity check: unavailable");
+            "SQL Server connectivity check: unavailable");
 
     private static readonly Action<ILogger, Exception?> LogDatabaseCheckFailed =
         LoggerMessage.Define(
             LogLevel.Warning,
             new EventId(4, nameof(LogDatabaseCheckFailed)),
-            "PostgreSQL connectivity check failed.");
+            "SQL Server connectivity check failed.");
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
