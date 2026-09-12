@@ -14,7 +14,7 @@ Use `Microsoft.EntityFrameworkCore.SqlServer` with an externally configured `Con
 
 The repository is development-only and has no declared production PostgreSQL data set. Therefore, its PostgreSQL migration chain is replaced by one clean SQL Server baseline migration generated from the current Phase 6 model. Existing PostgreSQL databases and Docker volumes are not deleted, modified, or imported by this change.
 
-Structured report and diagnostic payloads remain application-serialized JSON, now stored in `nvarchar(max)` rather than `jsonb`. Business-queryable values remain relational. UTC event values stay `DateTimeOffset` and map to SQL Server `datetimeoffset`; IDs stay application-generated `Guid` values and map to `uniqueidentifier`. SQL Server filtered unique indexes preserve active-job uniqueness. Case-sensitive YouTube identifiers use binary collation.
+Structured report and diagnostic payloads remain application-serialized JSON, now stored in `nvarchar(max)` rather than `jsonb` and protected by `ISJSON` check constraints. Business-queryable values remain relational. UTC event values stay `DateTimeOffset` and map to SQL Server `datetimeoffset`; IDs stay application-generated `Guid` values and map to `uniqueidentifier`. SQL Server filtered unique indexes preserve active-job uniqueness. Case-sensitive YouTube identifiers use binary collation.
 
 ## Consequences
 

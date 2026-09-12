@@ -8,7 +8,8 @@ internal sealed class CompetitorAnalysisConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<CompetitorAnalysis> builder)
     {
-        builder.ToTable("competitor_analyses");
+        builder.ToTable("competitor_analyses", table =>
+            table.HasCheckConstraint("ck_competitor_analyses_result_json", "ISJSON([result_json]) = 1"));
         builder.HasKey(analysis => analysis.Id);
         builder.Property(analysis => analysis.Id).HasColumnName("id");
         builder.Property(analysis => analysis.CompetitorChannelId).HasColumnName("competitor_channel_id").IsRequired();

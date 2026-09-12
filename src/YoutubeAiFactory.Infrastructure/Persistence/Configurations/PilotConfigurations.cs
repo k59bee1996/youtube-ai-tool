@@ -11,7 +11,12 @@ internal sealed class PilotConfiguration : IEntityTypeConfiguration<Pilot>
 {
     public void Configure(EntityTypeBuilder<Pilot> builder)
     {
-        builder.ToTable("pilots"); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id");
+        builder.ToTable("pilots", table =>
+        {
+            table.HasCheckConstraint("ck_pilots_assumptions_json", "ISJSON([assumptions_json]) = 1");
+            table.HasCheckConstraint("ck_pilots_limitations_json", "ISJSON([limitations_json]) = 1");
+            table.HasCheckConstraint("ck_pilots_warnings_json", "ISJSON([warnings_json]) = 1");
+        }); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.ProjectId).HasColumnName("project_id"); builder.Property(x => x.Version).HasColumnName("version"); builder.Property(x => x.AiRunId).HasColumnName("ai_run_id");
         builder.Property(x => x.PromptKey).HasColumnName("prompt_key").HasMaxLength(100); builder.Property(x => x.PromptVersion).HasColumnName("prompt_version"); builder.Property(x => x.Provider).HasColumnName("provider").HasMaxLength(100); builder.Property(x => x.Model).HasColumnName("model").HasMaxLength(100);
         builder.Property(x => x.PlanningAlgorithmVersion).HasColumnName("planning_algorithm_version").HasMaxLength(100); builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(300); builder.Property(x => x.Objective).HasColumnName("objective").HasColumnType("nvarchar(max)");
@@ -30,6 +35,7 @@ internal sealed class PilotVideoConfiguration : IEntityTypeConfiguration<PilotVi
         {
             table.HasCheckConstraint("ck_pilot_videos_sequence", "sequence >= 1 AND sequence <= 12");
             table.HasCheckConstraint("ck_pilot_videos_experiment_block", "(sequence BETWEEN 1 AND 4 AND experiment_type = 'Topic') OR (sequence BETWEEN 5 AND 8 AND experiment_type = 'Packaging') OR (sequence BETWEEN 9 AND 12 AND experiment_type = 'Storytelling')");
+            table.HasCheckConstraint("ck_pilot_videos_secondary_metrics_json", "ISJSON([secondary_metrics_json]) = 1");
         });
         builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id"); builder.Property(x => x.PilotId).HasColumnName("pilot_id"); builder.Property(x => x.VideoIdeaId).HasColumnName("video_idea_id"); builder.Property(x => x.OpportunityId).HasColumnName("opportunity_id");
         builder.Property(x => x.Sequence).HasColumnName("sequence"); builder.Property(x => x.ExperimentType).HasColumnName("experiment_type").HasConversion<string>().HasMaxLength(30);

@@ -51,6 +51,38 @@ public sealed class SqlServerPersistenceTests
     }
 
     [SqlServerFact]
+    public async Task Database_rejects_malformed_structured_json()
+    {
+        var options = CreateOptions();
+        await using var context = new YoutubeAiFactoryDbContext(options);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var project = new Project("JSON integrity", new Market("Education", "English", "Global"), new AudienceProfile("Creators"), now);
+        var competitor = CreateCompetitor(project.Id, "https://youtube.com/@jsonintegrity");
+        context.AddRange(project, competitor);
+        await context.SaveChangesAsync();
+
+        context.CompetitorAnalyses.Add(new CompetitorAnalysis(
+            competitor.Id,
+            1,
+            Guid.NewGuid(),
+            "competitor-analysis",
+            1,
+            "Fake",
+            "fake-model",
+            now,
+            1,
+            "not-json",
+            now));
+
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            context.SaveChangesAsync());
+
+        Assert.Equal(547, Assert.IsType<SqlException>(exception.InnerException).Number);
+    }
+
+    [SqlServerFact]
     public async Task Migrations_persist_and_read_project_competitor_and_videos()
     {
         var options = CreateOptions();

@@ -23,7 +23,8 @@ internal sealed class VideoIdeaConfiguration : IEntityTypeConfiguration<VideoIde
 {
     public void Configure(EntityTypeBuilder<VideoIdea> builder)
     {
-        builder.ToTable("video_ideas"); builder.HasKey(x => x.Id);
+        builder.ToTable("video_ideas", table =>
+            table.HasCheckConstraint("ck_video_ideas_risks_json", "ISJSON([risks_json]) = 1")); builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id"); builder.Property(x => x.ProjectId).HasColumnName("project_id"); builder.Property(x => x.OpportunityId).HasColumnName("opportunity_id"); builder.Property(x => x.GenerationId).HasColumnName("generation_id");
         foreach (var property in new[] { nameof(VideoIdea.WorkingTitle), nameof(VideoIdea.Topic), nameof(VideoIdea.Angle), nameof(VideoIdea.ContentFormat), nameof(VideoIdea.TargetAudience), nameof(VideoIdea.ViewerIntent) }) builder.Property(property).HasMaxLength(1000).IsRequired();
         foreach (var property in new[] { nameof(VideoIdea.HookConcept), nameof(VideoIdea.ThumbnailConcept), nameof(VideoIdea.ViewerPromise), nameof(VideoIdea.CoreQuestion), nameof(VideoIdea.WhyViewerWouldCare), nameof(VideoIdea.Hypothesis) }) builder.Property(property).HasColumnType("nvarchar(max)").IsRequired();

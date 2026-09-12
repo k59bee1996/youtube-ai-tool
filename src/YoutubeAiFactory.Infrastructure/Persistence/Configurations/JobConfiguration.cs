@@ -8,7 +8,8 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
 {
     public void Configure(EntityTypeBuilder<Job> builder)
     {
-        builder.ToTable("jobs");
+        builder.ToTable("jobs", table =>
+            table.HasCheckConstraint("ck_jobs_payload_json", "ISJSON([payload]) = 1"));
         builder.HasKey(job => job.Id);
         builder.Property(job => job.Id).HasColumnName("id");
         builder.Property(job => job.Type).HasColumnName("type").HasMaxLength(100).IsRequired();
