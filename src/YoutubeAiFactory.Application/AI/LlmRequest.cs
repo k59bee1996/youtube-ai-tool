@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace YoutubeAiFactory.Application.AI;
 
 public sealed record LlmRequest
@@ -7,7 +9,8 @@ public sealed record LlmRequest
         int promptVersion,
         string systemInstructions,
         string userContent,
-        IReadOnlyDictionary<string, string>? modelConfiguration = null)
+        IReadOnlyDictionary<string, string>? modelConfiguration = null,
+        JsonNode? outputSchema = null)
     {
         if (string.IsNullOrWhiteSpace(promptKey))
         {
@@ -34,6 +37,7 @@ public sealed record LlmRequest
         SystemInstructions = systemInstructions.Trim();
         UserContent = userContent.Trim();
         ModelConfiguration = modelConfiguration ?? new Dictionary<string, string>();
+        OutputSchema = outputSchema?.DeepClone();
     }
 
     public string PromptKey { get; }
@@ -45,4 +49,7 @@ public sealed record LlmRequest
     public string UserContent { get; }
 
     public IReadOnlyDictionary<string, string> ModelConfiguration { get; }
+
+    /// <summary>A provider-neutral JSON Schema for the structured response, when supported.</summary>
+    public JsonNode? OutputSchema { get; }
 }

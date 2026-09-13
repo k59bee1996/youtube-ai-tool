@@ -46,7 +46,7 @@ React -> API (202 Accepted) -> Job table -> Worker -> application workflow
                                                     -> validator -> analysis/AiRun tables
 ```
 
-The controller only queues or reads work. The application context builder selects a bounded mix of recent, high-, low-, and representative videos and calculates quantitative signals before the provider is called. `competitor-analysis:v1` is the first immutable prompt contract. The worker claims jobs through a short SQL Server transaction using `UPDLOCK`, `READPAST`, and `ROWLOCK`; the transaction runs inside EF Core's SQL Server retry strategy. A future lease-fencing or heartbeat mechanism is still required so that a slow worker cannot finalize work after its lease has expired and another worker has reclaimed the job.
+The controller only queues or reads work. The application context builder selects a bounded mix of recent, high-, low-, and representative videos and calculates quantitative signals before the provider is called. `competitor-analysis:v2` is the current immutable prompt contract; it supplies a strict JSON Schema to supported providers, while historical analyses retain their recorded prompt version. The worker claims jobs through a short SQL Server transaction using `UPDLOCK`, `READPAST`, and `ROWLOCK`; the transaction runs inside EF Core's SQL Server retry strategy. A future lease-fencing or heartbeat mechanism is still required so that a slow worker cannot finalize work after its lease has expired and another worker has reclaimed the job.
 
 Completed `CompetitorAnalysis` records are immutable versions. Their nested typed result is stored as JSON in `nvarchar(max)` because it is rendered and consumed as an analysis report; provenance, versions, source timestamp, provider and model remain relational columns. A refresh after `SourceDataAsOf` marks the latest report stale without automatically spending another AI call.
 
@@ -58,7 +58,7 @@ React -> API (202) -> Job -> Worker -> bounded cross-competitor context
                                   -> immutable report, sources, candidates, evidence
 ```
 
-The provider can assess novelty, audience fit, transferability, story potential and production complexity, but it cannot provide final scores or arbitrary evidence. C# validates backend-issued evidence IDs and derives observed demand, evidence strength, dataset competition risk, and the final `opportunity-score:v1` score. Each report records exact source-analysis versions, enabling stale detection.
+The provider can assess novelty, audience fit, transferability, story potential and production complexity, but it cannot provide final scores or arbitrary evidence. `opportunity-analysis:v2` supplies a strict JSON Schema to supported providers so typed list fields cannot be emitted as scalar strings; one correction request receives the failed parse or validation diagnostic. C# validates backend-issued evidence IDs and derives observed demand, evidence strength, dataset competition risk, and the final `opportunity-score:v1` score. Each report records exact source-analysis versions, enabling stale detection.
 
 ## Phase 5 idea-generation flow
 
