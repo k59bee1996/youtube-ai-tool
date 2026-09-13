@@ -86,11 +86,12 @@ public sealed class CompetitorAnalysisJobProcessor(
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<CompetitorAnalysisResult>? answer = null;
             Exception? finalFailure = null;
+            string? repairDiagnostic = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
             {
                 try
                 {
-                    answer = await provider.GenerateStructuredAsync<CompetitorAnalysisResult>(CompetitorAnalysisPrompt.Create(context, attempt > 0), cancellationToken);
+                    answer = await provider.GenerateStructuredAsync<CompetitorAnalysisResult>(CompetitorAnalysisPrompt.Create(context, repairDiagnostic), cancellationToken);
                     CompetitorAnalysisValidator.Validate(answer.Value, context);
                     break;
                 }
@@ -98,6 +99,7 @@ public sealed class CompetitorAnalysisJobProcessor(
                 {
                     run.RecordRetry();
                     finalFailure = exception;
+                    repairDiagnostic = exception.Message;
                     await store.SaveChangesAsync(cancellationToken);
                 }
                 catch (Exception exception)
