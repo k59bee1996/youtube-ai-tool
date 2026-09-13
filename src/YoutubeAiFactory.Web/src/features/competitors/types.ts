@@ -1,0 +1,14 @@
+export type CompetitorSummary = { id: string; projectId: string; youtubeChannelId: string; title: string; handle: string | null; thumbnailUrl: string | null; subscriberCount: number | null; videoCount: number | null; viewCount: number | null; lastCollectedAt: string }
+export type CompetitorVideo = { id: string; youtubeVideoId: string; title: string; description: string | null; url: string; thumbnailUrl: string | null; duration: string | null; viewCount: number | null; likeCount: number | null; commentCount: number | null; publishedAt: string | null; collectedAt: string }
+export type CompetitorDetails = CompetitorSummary & { sourceUrl: string; description: string | null; publishedAt: string | null; videos: CompetitorVideo[] }
+export type AnalysisJob = { id: string; status: string; failureReason: string | null }
+export type AudienceAnalysis = { likelyAgeRange: string | null; likelyInterests: string[]; likelyViewerIntent: string[]; geographyHints: string[]; confidence: number; evidence: string[] }
+export type TopicCluster = { name: string; description: string; exampleVideoIds: string[]; frequency: number; performanceSignal: string; confidence: number }
+export type TitlePattern = { patternName: string; description: string; template: string; exampleTitles: string[]; observedFrequency: number; performanceSignal: string; confidence: number }
+export type EvidencePattern = { patternName: string; observation: string; evidenceVideoIds: string[]; confidence: number; limitations: string[] }
+export type ContentFormat = { format: string; evidenceVideoIds: string[]; performanceSignal: string; confidence: number }
+export type VideoInsight = { insight?: string; observation?: string; supportingVideoIds: string[]; confidence: number }
+export type TransferableFormat = { format: string; whyItMayWork: string; evidenceVideoIds: string[]; transferableMechanic: string; doNotCopy: string; confidence: number }
+export type EvidenceNote = { note: string; videoIds: string[] }
+export type CompetitorAnalysis = { id: string; version: number; promptKey: string; promptVersion: number; provider: string; model: string; sourceDataAsOf: string; analyzedVideoCount: number; createdAt: string; isStale: boolean; result: { audience: AudienceAnalysis; topicClusters: TopicCluster[]; titlePatterns: TitlePattern[]; thumbnailPatterns: EvidencePattern[]; hookPatterns: EvidencePattern[]; contentFormats: ContentFormat[]; performanceInsights: VideoInsight[]; potentialWeaknesses: VideoInsight[]; transferableFormats: TransferableFormat[]; evidenceNotes: EvidenceNote[]; confidence: { overallConfidence: number; dataQuality: string; limitations: string[] } } }
+export type CompetitorAnalysisStatus = { latestAnalysis: CompetitorAnalysis | null; activeJob: AnalysisJob | null; latestJob: AnalysisJob | null }

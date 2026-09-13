@@ -12,6 +12,8 @@
 *.tsbuildinfo
 
 # Local configuration and tooling
+.agents/
+skills-lock.json
 .env
 .env.*
 !.env.example
