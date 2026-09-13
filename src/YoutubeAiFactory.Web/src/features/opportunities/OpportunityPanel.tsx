@@ -53,7 +53,17 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
           <h2>Opportunities</h2>
         </div>
         {status?.latestReport && (
-          <span>Report v{status.latestReport.version}</span>
+          <div className="section-actions">
+            <span>Report v{status.latestReport.version}</span>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => void generate()}
+              disabled={running || active}
+            >
+              {running ? "Queuing report…" : "Generate new report"}
+            </button>
+          </div>
         )}
       </div>
       {loading ? (
@@ -74,25 +84,26 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
           <strong>Generating opportunities…</strong>
           <span>Status: {status?.activeJob?.status}</span>
         </div>
-      ) : status?.latestJob?.status === "Failed" ? (
-        <div className="analysis-state">
-          <p role="alert">
-            {status.latestJob.failureReason ?? "Opportunity generation failed."}
-          </p>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => void generate()}
-            disabled={running}
-          >
-            Generate opportunities
-          </button>
-        </div>
       ) : status?.latestReport ? (
-        <OpportunityReportView
-          projectId={projectId}
-          report={status.latestReport}
-          onChanged={load}
+        <>
+          {status.latestJob?.status === "Failed" && (
+            <OpportunityGenerationFailure
+              failureReason={status.latestJob.failureReason}
+              onRetry={generate}
+              running={running}
+            />
+          )}
+          <OpportunityReportView
+            projectId={projectId}
+            report={status.latestReport}
+            onChanged={load}
+          />
+        </>
+      ) : status?.latestJob?.status === "Failed" ? (
+        <OpportunityGenerationFailure
+          failureReason={status.latestJob.failureReason}
+          onRetry={generate}
+          running={running}
         />
       ) : (
         <div className="analysis-state">
@@ -113,6 +124,32 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
       )}
     </section>
   );
+}
+
+function OpportunityGenerationFailure({
+  failureReason,
+  onRetry,
+  running,
+}: {
+  failureReason: string | null
+  onRetry: () => Promise<void>
+  running: boolean
+}) {
+  return (
+    <div className="analysis-state">
+      <p role="alert">
+        {failureReason ?? "Opportunity generation failed."}
+      </p>
+      <button
+        className="primary-button"
+        type="button"
+        onClick={() => void onRetry()}
+        disabled={running}
+      >
+        {running ? "Queuing opportunities…" : "Retry opportunity generation"}
+      </button>
+    </div>
+  )
 }
 
 function OpportunityReportView({

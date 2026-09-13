@@ -43,10 +43,11 @@ public sealed class CompetitorAnalysisWorkflowTests
         var analysis = Assert.Single(store.Analyses);
         Assert.Equal(1, analysis.Version);
         Assert.Equal("competitor-analysis", analysis.PromptKey);
-        Assert.Equal(1, analysis.PromptVersion);
+        Assert.Equal(CompetitorAnalysisPrompt.Version, analysis.PromptVersion);
         Assert.Equal(1, Assert.Single(store.Runs).RetryCount);
         Assert.Equal(AiRunStatus.Succeeded, store.Runs.Single().Status);
         Assert.Equal(JobStatus.Completed, job.Status);
+        Assert.Contains("Analysis references a video that was not included", provider.Requests[1].UserContent);
     }
 
     [Fact]
@@ -56,6 +57,19 @@ public sealed class CompetitorAnalysisWorkflowTests
         var context = new CompetitorAnalysisContextBuilder(new CompetitorAnalysisOptions()).Build(competitor);
         var invalid = ValidResult(Guid.NewGuid());
         Assert.Throws<StructuredOutputException>(() => CompetitorAnalysisValidator.Validate(invalid, context));
+    }
+
+    [Fact]
+    public void Prompt_supplies_a_schema_that_requires_thumbnail_pattern_object_fields()
+    {
+        var context = new CompetitorAnalysisContextBuilder(new CompetitorAnalysisOptions()).Build(CreateCompetitor(10));
+
+        var schema = CompetitorAnalysisPrompt.Create(context).OutputSchema!;
+
+        Assert.Equal("object", schema["type"]!.GetValue<string>());
+        Assert.Equal("integer", schema["$defs"]!["evidencePattern"]!["properties"]!["confidence"]!["type"]!.GetValue<string>());
+        Assert.Equal("#/$defs/stringArray", schema["$defs"]!["evidencePattern"]!["properties"]!["limitations"]!["$ref"]!.GetValue<string>());
+        Assert.Equal("array", schema["$defs"]!["stringArray"]!["type"]!.GetValue<string>());
     }
 
     [Fact]
@@ -142,8 +156,13 @@ public sealed class CompetitorAnalysisWorkflowTests
     private sealed class SequencedProvider(params CompetitorAnalysisResult[] results) : ILlmProvider
     {
         private readonly Queue<CompetitorAnalysisResult> _results = new(results);
-        public Task<LlmResult<T>> GenerateStructuredAsync<T>(LlmRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(new LlmResult<T>((T)(object)_results.Dequeue(), "Fake", "fake-model", 12, 34, null));
+        public List<LlmRequest> Requests { get; } = [];
+
+        public Task<LlmResult<T>> GenerateStructuredAsync<T>(LlmRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Task.FromResult(new LlmResult<T>((T)(object)_results.Dequeue(), "Fake", "fake-model", 12, 34, null));
+        }
     }
 
     private sealed class FailingProvider : ILlmProvider
