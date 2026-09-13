@@ -9,6 +9,7 @@ using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
+using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
@@ -82,6 +83,38 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public async Task<int> GetNextCompetitorAnalysisVersionAsync(Guid competitorId, CancellationToken cancellationToken) =>
         (await dbContext.CompetitorAnalyses.Where(analysis => analysis.CompetitorChannelId == competitorId)
             .Select(analysis => (int?)analysis.Version).MaxAsync(cancellationToken) ?? 0) + 1;
+
+    public Task<CompetitorAnalysis?> GetCompetitorAnalysisAsync(Guid projectId, Guid analysisId, CancellationToken cancellationToken) =>
+        dbContext.CompetitorAnalyses.AsNoTracking().Where(analysis => analysis.Id == analysisId)
+            .Join(dbContext.CompetitorChannels.AsNoTracking().Where(channel => channel.ProjectId == projectId), analysis => analysis.CompetitorChannelId, channel => channel.Id, (analysis, _) => analysis)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public Task<ArtifactLocalization?> GetArtifactLocalizationAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, CancellationToken cancellationToken) =>
+        dbContext.ArtifactLocalizations.AsNoTracking().SingleOrDefaultAsync(item => item.ArtifactType == artifactType && item.ArtifactId == artifactId && item.ArtifactVersion == artifactVersion && item.Locale == locale, cancellationToken);
+
+    public Task<Job?> GetActiveArtifactLocalizationJobAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, CancellationToken cancellationToken) =>
+        FindArtifactLocalizationJobAsync(artifactType, artifactId, artifactVersion, locale, true, cancellationToken);
+
+    public Task<Job?> GetLatestArtifactLocalizationJobAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, CancellationToken cancellationToken) =>
+        FindArtifactLocalizationJobAsync(artifactType, artifactId, artifactVersion, locale, false, cancellationToken);
+
+    public async Task<Job> EnqueueArtifactLocalizationJobAsync(Job job, CancellationToken cancellationToken)
+    {
+        dbContext.Jobs.Add(job);
+        try { await dbContext.SaveChangesAsync(cancellationToken); return job; }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return await dbContext.Jobs.AsNoTracking().SingleAsync(candidate => candidate.Type == "artifact-localization" && candidate.ArtifactType == job.ArtifactType && candidate.ArtifactId == job.ArtifactId && candidate.ArtifactVersion == job.ArtifactVersion && candidate.Locale == job.Locale && (candidate.Status == JobStatus.Queued || candidate.Status == JobStatus.Running || candidate.Status == JobStatus.Retrying), cancellationToken);
+        }
+    }
+
+    public Task<Job?> TryClaimNextArtifactLocalizationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) =>
+        TryClaimJobAsync("artifact-localization", now, staleRunningBefore, cancellationToken);
+    public Task RequeueArtifactLocalizationJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
+    public Task FailArtifactLocalizationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
+        FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
+    public void AddArtifactLocalization(ArtifactLocalization localization) => dbContext.ArtifactLocalizations.Add(localization);
 
     public async Task<IReadOnlyList<CurrentCompetitorAnalysis>> GetCurrentCompetitorAnalysesForProjectAsync(Guid projectId, CancellationToken cancellationToken)
     {
@@ -307,6 +340,13 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     {
         var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "competitor-analysis" && job.CompetitorChannelId == competitorId &&
             dbContext.CompetitorChannels.Any(channel => channel.Id == competitorId && channel.ProjectId == projectId));
+        if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
+        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private Task<Job?> FindArtifactLocalizationJobAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, bool activeOnly, CancellationToken cancellationToken)
+    {
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "artifact-localization" && job.ArtifactType == artifactType && job.ArtifactId == artifactId && job.ArtifactVersion == artifactVersion && job.Locale == locale);
         if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
         return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }

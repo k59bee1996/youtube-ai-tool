@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    partial class YoutubeAiFactoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913094217_AddArtifactLocalizations")]
+    partial class AddArtifactLocalizations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1306,6 +1309,151 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.ToTable("projects", "yaf");
                 });
 
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Videos.VideoProject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Angle")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("angle");
+
+                    b.Property<string>("ContentFormat")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("content_format");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ExecutionNotes")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("execution_notes");
+
+                    b.Property<string>("ExperimentType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("experiment_type");
+
+                    b.Property<string>("HookConcept")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("hook_concept");
+
+                    b.Property<Guid>("OpportunityId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("opportunity_id");
+
+                    b.Property<string>("PilotHypothesis")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("pilot_hypothesis");
+
+                    b.Property<Guid>("PilotId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("pilot_id");
+
+                    b.Property<int>("PilotVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("pilot_version");
+
+                    b.Property<Guid>("PilotVideoId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("pilot_video_id");
+
+                    b.Property<string>("PrimaryMetric")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("primary_metric");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("SourceWarningsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("source_warnings_json");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SuccessSignal")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("success_signal");
+
+                    b.Property<string>("TargetAudience")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("target_audience");
+
+                    b.Property<string>("ThumbnailConcept")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("thumbnail_concept");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("topic");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("VariableBeingTested")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("variable_being_tested");
+
+                    b.Property<Guid>("VideoIdeaId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("video_idea_id");
+
+                    b.Property<string>("ViewerPromise")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("viewer_promise");
+
+                    b.Property<string>("WorkingTitle")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("working_title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpportunityId");
+
+                    b.HasIndex("PilotId");
+
+                    b.HasIndex("PilotVideoId")
+                        .IsUnique();
+
+                    b.HasIndex("VideoIdeaId");
+
+                    b.HasIndex("ProjectId", "CreatedAt");
+
+                    b.ToTable("video_projects", "yaf", t =>
+                        {
+                            t.HasCheckConstraint("ck_video_projects_source_warnings_json", "ISJSON([source_warnings_json]) = 1");
+                        });
+                });
+
             modelBuilder.Entity("YoutubeAiFactory.Domain.AI.AiRun", b =>
                 {
                     b.HasOne("YoutubeAiFactory.Domain.Projects.Project", null)
@@ -1549,6 +1697,39 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Market")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Videos.VideoProject", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Opportunities.OpportunityCandidate", null)
+                        .WithMany()
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Pilots.Pilot", null)
+                        .WithMany()
+                        .HasForeignKey("PilotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Pilots.PilotVideo", null)
+                        .WithMany()
+                        .HasForeignKey("PilotVideoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Ideas.VideoIdea", null)
+                        .WithMany()
+                        .HasForeignKey("VideoIdeaId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

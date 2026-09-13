@@ -8,6 +8,14 @@ The result contract contains audience, topic clusters, observed title, thumbnail
 
 `competitor-analysis:v1` instructs the provider to use supplied evidence only, distinguish inference from observation, and never claim transcript, comments, or thumbnail-image evidence. Thumbnail and hook fields must explicitly report insufficient evidence when pixel or transcript evidence is absent. It extracts mechanics, not copy instructions. Each completed result is immutable and retains source data timestamp, provider/model, prompt version, usage where available, latency, and retry count. Transient provider failures use bounded exponential job retries; stale running jobs are recovered by the configured lease. Normal tests use fakes and make no paid calls.
 
+## Localized analysis reading aids (`competitor-analysis-localization:v1`)
+
+The UI remains English. Localization is not frontend i18n and it never changes navigation, controls, status labels, scores, IDs, URLs, timestamps, enums, version metadata, evidence references, model metadata, example titles, or title templates.
+
+For completed competitor analyses, the UI can request the `EN | VI` reading-aid toggle. English is the canonical persisted `resultJson`. A Vietnamese selection checks `artifact_localizations` by `(artifact_type, artifact_id, artifact_version, locale)`; a completed entry is returned directly. On a miss, an `artifact-localization` background job translates only reader-facing analysis fields, validates that its list topology matches the canonical artifact, and persists a separate immutable JSON overlay with `AiRun` provenance. Concurrent selections coalesce to one active job. Translation failure leaves the canonical English artifact untouched and immediately usable.
+
+The localization prompt explicitly excludes production-facing or evidence-derived title content. This keeps a working title such as `Why Owning a Castle Could Bankrupt You` canonical when the content target language is English. A future title-reading-aid field must be a separate localized representation and can never mutate that title. Content target language remains independent from analysis display language.
+
 ## Opportunity analysis (`opportunity-analysis:v1`)
 
 The worker consumes only current persisted competitor analyses and sends a bounded context of high-confidence audience, topic, format, and transferable-mechanic evidence. Backend-issued evidence IDs are validated before persistence. The LLM assesses coherent adjacent opportunities, novelty, audience fit, transferability, story potential, complexity, confidence, risks, and limitations; it cannot claim global demand or provide a final score. C# calculates observed dataset demand, evidence strength, competitor diversity/competition risk, production ease, and the final `opportunity-score:v1` result. Reports preserve source-analysis versions and can be flagged stale after a newer analysis exists.

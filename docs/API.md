@@ -15,6 +15,8 @@ All business responses use JSON. Failures use RFC 7807 problem details without p
 - `GET /api/projects/{projectId}/competitors/{competitorId}` returns channel metadata and collected videos.
 - `POST /api/projects/{projectId}/competitors/{competitorId}/analysis:run` queues competitor intelligence and returns `202 Accepted` with `jobId`, `status`, and whether an equivalent active job was reused.
 - `GET /api/projects/{projectId}/competitors/{competitorId}/analysis` returns the newest persisted report plus active/latest job status. The report contains version and provenance metadata, source-data timestamp/count, stale flag, and typed structured intelligence; it does not regenerate analysis.
+- `POST /api/projects/{projectId}/competitors/{competitorId}/analysis/{analysisId}/localizations/vi` returns a persisted Vietnamese reading aid when available, otherwise queues one translation job and returns `202`. It never changes the canonical analysis.
+- `GET /api/projects/{projectId}/competitors/{competitorId}/analysis/{analysisId}/localizations/vi` returns the persisted Vietnamese overlay and its job state for polling. English is returned from the canonical analysis endpoint and does not require localization.
 
 Supported inputs are absolute HTTP(S) URLs no longer than 2,048 characters in the forms `youtube.com/@handle` and `youtube.com/channel/{24-character-channel-id}`, with optional `www`/`m`, trailing slash, or query string. Valid international handles are accepted. Malformed or unsupported URLs return `400`; missing projects or channels return `404`; concurrent duplicates return `409`. YouTube quota exhaustion returns `429`, configuration/authentication/transient failures return `503`, and malformed upstream data returns `502`.
 

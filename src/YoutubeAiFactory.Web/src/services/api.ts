@@ -59,6 +59,8 @@ export type CompetitorAnalysis = {
   result: { audience: AudienceAnalysis; topicClusters: TopicCluster[]; titlePatterns: TitlePattern[]; thumbnailPatterns: EvidencePattern[]; hookPatterns: EvidencePattern[]; contentFormats: ContentFormat[]; performanceInsights: VideoInsight[]; potentialWeaknesses: VideoInsight[]; transferableFormats: TransferableFormat[]; evidenceNotes: EvidenceNote[]; confidence: { overallConfidence: number; dataQuality: string; limitations: string[] } }
 }
 export type CompetitorAnalysisStatus = { latestAnalysis: CompetitorAnalysis | null; activeJob: AnalysisJob | null; latestJob: AnalysisJob | null }
+export type LocalizedCompetitorAnalysisContent = { audience: { likelyAgeRange: string | null; likelyInterests: string[]; likelyViewerIntent: string[]; geographyHints: string[]; evidence: string[] }; topicClusters: { name: string; description: string; performanceSignal: string }[]; titlePatterns: { patternName: string; description: string; performanceSignal: string }[]; thumbnailPatterns: { patternName: string; observation: string; limitations: string[] }[]; hookPatterns: { patternName: string; observation: string; limitations: string[] }[]; contentFormats: { format: string; performanceSignal: string }[]; performanceInsights: string[]; potentialWeaknesses: string[]; transferableFormats: { format: string; whyItMayWork: string; transferableMechanic: string; doNotCopy: string }[]; evidenceNotes: string[]; confidence: { dataQuality: string; limitations: string[] } }
+export type ArtifactLocalizationStatus = { content: LocalizedCompetitorAnalysisContent | null; activeJob: AnalysisJob | null; latestJob: AnalysisJob | null }
 export type AnalysisRun = { jobId: string; status: string; existing: boolean }
 export type OpportunityEvidence = { id: string; competitorChannelId: string; competitorAnalysisId: string; competitorVideoId: string | null; evidenceId: string; summary: string }
 export type OpportunityScores = { observedDemandSignal: number; noveltySignal: number; competitionRiskSignal: number; audienceFitSignal: number; transferabilitySignal: number; evidenceStrength: number; storyPotential: number; productionComplexity: number; overallScore: number }
@@ -129,6 +131,10 @@ export const api = {
     request<CompetitorAnalysisStatus>(`/api/projects/${projectId}/competitors/${competitorId}/analysis`, { signal }),
   runCompetitorAnalysis: (projectId: string, competitorId: string) =>
     request<AnalysisRun>(`/api/projects/${projectId}/competitors/${competitorId}/analysis:run`, { method: 'POST' }),
+  getCompetitorAnalysisLocalization: (projectId: string, competitorId: string, analysisId: string, locale: 'vi') =>
+    request<ArtifactLocalizationStatus>(`/api/projects/${projectId}/competitors/${competitorId}/analysis/${analysisId}/localizations/${locale}`),
+  requestCompetitorAnalysisLocalization: (projectId: string, competitorId: string, analysisId: string, locale: 'vi') =>
+    request<AnalysisRun>(`/api/projects/${projectId}/competitors/${competitorId}/analysis/${analysisId}/localizations/${locale}`, { method: 'POST' }),
   getOpportunities: (projectId: string, signal?: AbortSignal) =>
     request<OpportunityStatus>(`/api/projects/${projectId}/opportunities/latest`, { signal }),
   generateOpportunities: (projectId: string) =>

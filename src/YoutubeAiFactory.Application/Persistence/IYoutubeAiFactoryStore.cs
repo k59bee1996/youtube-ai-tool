@@ -5,6 +5,7 @@ using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
+using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
@@ -44,6 +45,26 @@ public interface IYoutubeAiFactoryStore
 
     Task<int> GetNextCompetitorAnalysisVersionAsync(
         Guid competitorId, CancellationToken cancellationToken) => Task.FromResult(1);
+
+    Task<CompetitorAnalysis?> GetCompetitorAnalysisAsync(Guid projectId, Guid analysisId, CancellationToken cancellationToken) =>
+        Task.FromResult<CompetitorAnalysis?>(null);
+
+    Task<ArtifactLocalization?> GetArtifactLocalizationAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, CancellationToken cancellationToken) =>
+        Task.FromResult<ArtifactLocalization?>(null);
+    Task<Job?> GetActiveArtifactLocalizationJobAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, CancellationToken cancellationToken) =>
+        Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestArtifactLocalizationJobAsync(string artifactType, Guid artifactId, int artifactVersion, string locale, CancellationToken cancellationToken) =>
+        Task.FromResult<Job?>(null);
+    Task<Job?> TryClaimNextArtifactLocalizationJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) =>
+        Task.FromResult<Job?>(null);
+    Task<Job> EnqueueArtifactLocalizationJobAsync(Job job, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Artifact localization job persistence is not configured.");
+    Task RequeueArtifactLocalizationJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Artifact localization job persistence is not configured.");
+    Task FailArtifactLocalizationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Artifact localization job persistence is not configured.");
+    void AddArtifactLocalization(ArtifactLocalization localization) =>
+        throw new NotSupportedException("Artifact localization persistence is not configured.");
 
     Task<IReadOnlyList<CurrentCompetitorAnalysis>> GetCurrentCompetitorAnalysesForProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<CurrentCompetitorAnalysis>>([]);
