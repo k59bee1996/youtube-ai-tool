@@ -267,6 +267,7 @@ test('shows the pilot insufficient-ideas state without queuing generation', asyn
     const url = String(input)
     if (url === '/api/projects') return json([project])
     if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/video-projects')) return json([])
     if (url.endsWith('/pilots/latest')) return json({ latestPilot: null, activeJobStatus: null, latestJobFailureReason: null, eligibleIdeaCount: 11, requiredIdeaCount: 12 })
     if (url.endsWith('/pilots/eligible-ideas')) return json([])
     if (url.endsWith('/pilots')) return json([])
@@ -277,6 +278,22 @@ test('shows the pilot insufficient-ideas state without queuing generation', asyn
   fireEvent.click(screen.getByRole('button', { name: 'Open pilot' }))
   expect(await screen.findByText('11 approved ideas available. At least 12 are required to create a complete pilot.')).toBeVisible()
   expect(screen.getByRole('button', { name: 'Generate 12-Video Pilot' })).toBeDisabled()
+})
+
+test('shows the Video Projects empty state', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/video-projects')) return json([])
+    throw new Error(`Unexpected request: ${url}`)
+  }))
+
+  render(<App />)
+  expect(await screen.findByText('Add a YouTube channel to begin competitor research.')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Open videos' }))
+  expect(await screen.findByText('No videos have entered production yet. Create a Video Project from an approved Pilot.')).toBeVisible()
 })
 
 test('renders an explicit empty state and unavailable channel metrics', async () => {
@@ -416,6 +433,7 @@ test('surfaces a failed pilot generation and offers a retry', async () => {
     const url = String(input)
     if (url === '/api/projects') return json([project])
     if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/video-projects')) return json([])
     if (url.endsWith('/pilots/latest')) return json({ latestPilot: null, activeJobStatus: null, latestJobFailureReason: 'Pilot output did not meet the required experiment constraints.', eligibleIdeaCount: 12, requiredIdeaCount: 12 })
     if (url.endsWith('/pilots/eligible-ideas')) return json([])
     if (url.endsWith('/pilots')) return json([])
@@ -435,6 +453,7 @@ test('lets a user regenerate a pilot and inspect preserved pilot versions', asyn
     const url = String(input); const method = init?.method ?? 'GET'
     if (url === '/api/projects') return json([project])
     if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/video-projects')) return json([])
     if (url.endsWith('/pilots/latest')) return json({ latestPilot, activeJobStatus: null, latestJobFailureReason: null, eligibleIdeaCount: 12, requiredIdeaCount: 12 })
     if (url.endsWith('/pilots/eligible-ideas')) return json([])
     if (url.endsWith('/pilots') && method === 'GET') return json([latestPilot, previousPilot])

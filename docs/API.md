@@ -60,4 +60,13 @@ All routes remain project-scoped; non-approved opportunities return a validation
 - `POST /api/projects/{projectId}/pilots/{pilotId}/slots/{sequence}:replace` replaces a draft slot with an unused approved project idea while preserving its fixed experiment block.
 - `POST /api/projects/{projectId}/pilots/{pilotId}/slots/{sequence}:move` moves a draft slot within its existing experiment block.
 
-At least 12 ideas with approved source opportunities are required. The API does not generate ideas automatically, ingest analytics, create VideoProjects, or start production.
+At least 12 ideas with approved source opportunities are required. The API does not generate ideas automatically or ingest analytics.
+
+## Video Projects
+
+- `POST /api/projects/{projectId}/pilots/{pilotId}/video-projects` creates (or idempotently returns) the Draft VideoProject for an approved pilot slot. Body: `{"pilotVideoId":"..."}`.
+- `GET /api/projects/{projectId}/video-projects` lists project execution workspaces.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}` returns its execution brief, exact lineage, experiment context, current source-review signal, and snapshot warnings.
+- `PATCH /api/projects/{projectId}/video-projects/{videoProjectId}` updates only `workingTitle` and `executionNotes`.
+
+Creation returns `400` when the Pilot is not approved or the source idea/opportunity requires review, and `404` for missing or cross-project resources. The API never accepts a status field, triggers research, queues a job, or calls an LLM in this phase.

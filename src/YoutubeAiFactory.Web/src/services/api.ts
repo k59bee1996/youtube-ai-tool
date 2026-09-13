@@ -74,6 +74,8 @@ export type PilotVideo = { id: string; sequence: number; videoIdeaId: string; op
 export type Pilot = { id: string; version: number; name: string; objective: string; status: string; createdAt: string; approvedAt: string | null; eligibleIdeaCount: number; promptKey: string; promptVersion: number; provider: string; model: string; planningAlgorithmVersion: string; assumptions: string[]; limitations: string[]; warnings: string[]; requiresReview: boolean; videos: PilotVideo[] }
 export type PilotStatus = { latestPilot: Pilot | null; activeJobStatus: string | null; latestJobFailureReason: string | null; eligibleIdeaCount: number; requiredIdeaCount: number }
 export type PilotCandidate = { videoIdeaId: string; opportunityId: string; opportunityName: string; workingTitle: string; topic: string; contentFormat: string; overallScore: number }
+export type VideoProjectListItem = { id: string; pilotVideoId: string; workingTitle: string; status: string; videoIdeaId: string; pilotSequence: number; experimentType: string; createdAt: string }
+export type VideoProject = { id: string; projectId: string; pilotId: string; pilotVersion: number; pilotVideoId: string; videoIdeaId: string; opportunityId: string; workingTitle: string; status: string; topic: string; angle: string; contentFormat: string; targetAudience: string; hookConcept: string; thumbnailConcept: string; viewerPromise: string; pilotSequence: number; experimentType: string; pilotHypothesis: string; variableBeingTested: string; primaryMetric: string; successSignal: string; opportunityName: string; ideaScore: number; executionNotes: string | null; createdAt: string; updatedAt: string; sourceRequiresReview: boolean; sourceWarnings: string[] }
 
 export type CreateProjectRequest = {
   name: string
@@ -146,4 +148,8 @@ export const api = {
   getPilotCandidates: (projectId: string) => request<PilotCandidate[]>(`/api/projects/${projectId}/pilots/eligible-ideas`),
   replacePilotSlot: (projectId: string, pilotId: string, sequence: number, videoIdeaId: string) => request<Pilot>(`/api/projects/${projectId}/pilots/${pilotId}/slots/${sequence}:replace`, { method: 'POST', body: JSON.stringify({ videoIdeaId }) }),
   movePilotSlot: (projectId: string, pilotId: string, sequence: number, direction: 'up' | 'down') => request<Pilot>(`/api/projects/${projectId}/pilots/${pilotId}/slots/${sequence}:move`, { method: 'POST', body: JSON.stringify({ direction }) }),
+  createVideoProject: (projectId: string, pilotId: string, pilotVideoId: string) => request<VideoProject>(`/api/projects/${projectId}/pilots/${pilotId}/video-projects`, { method: 'POST', body: JSON.stringify({ pilotVideoId }) }),
+  listVideoProjects: (projectId: string, signal?: AbortSignal) => request<VideoProjectListItem[]>(`/api/projects/${projectId}/video-projects`, { signal }),
+  getVideoProject: (projectId: string, videoProjectId: string, signal?: AbortSignal) => request<VideoProject>(`/api/projects/${projectId}/video-projects/${videoProjectId}`, { signal }),
+  updateVideoProject: (projectId: string, videoProjectId: string, workingTitle: string, executionNotes: string | null) => request<VideoProject>(`/api/projects/${projectId}/video-projects/${videoProjectId}`, { method: 'PATCH', body: JSON.stringify({ workingTitle, executionNotes }) }),
 }

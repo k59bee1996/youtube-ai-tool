@@ -78,3 +78,11 @@ Approved project ideas -> API (202) -> Job -> Worker -> bounded pilot context ->
 ```
 
 The context builder provides 12–40 ideas whose idea and source opportunity are both approved, and calculates topic, format, and opportunity frequency in C#. The model plans meaningful controlled variation and experiment prose only. C# enforces existing IDs/project ownership/approval, unique ideas, sequences 1–12, fixed Topic/Packaging/Storytelling blocks, and required experiment fields. `Pilot` versions are never overwritten; a source idea or source opportunity that is no longer approved makes a plan require review rather than deleting it.
+
+## Phase 7 video-project flow
+
+```text
+React -> API -> CreateVideoProjectHandler -> IYoutubeAiFactoryStore -> SQL Server
+```
+
+This is a synchronous local transaction, not a job and not an AI workflow. The handler verifies the project, approved Pilot, slot membership, and still-approved source idea/opportunity before constructing the `VideoProject` aggregate. A unique SQL Server index on `pilot_video_id` makes repeated requests idempotent. The aggregate stores relational lineage IDs plus a narrow creation-time execution snapshot; future research, outline, script, and production artifacts will attach to VideoProject rather than to Pilot or VideoIdea.

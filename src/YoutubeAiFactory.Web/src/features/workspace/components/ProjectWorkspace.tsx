@@ -4,6 +4,8 @@ import { CompetitorDetails } from "../../competitors/CompetitorDetails"
 import type { CompetitorDetails as CompetitorDetailsModel, CompetitorSummary } from "../../competitors/types"
 import { OpportunityPanel } from "../../opportunities/OpportunityPanel"
 import { PilotPanel } from "../../pilots/PilotPanel"
+import { VideoProjectPanel, VideoProjectWorkspace } from "../../videos/VideoProjectPanel"
+import type { VideoProject } from "../../../services/api"
 import type { Project } from "../../../services/api"
 
 type ProjectWorkspaceProps = {
@@ -19,6 +21,9 @@ type ProjectWorkspaceProps = {
 export function ProjectWorkspace({ project, competitors, competitor, loading, collecting, onAddCompetitor, onSelectCompetitor }: ProjectWorkspaceProps) {
   const [opportunitiesOpen, setOpportunitiesOpen] = useState(false)
   const [pilotOpen, setPilotOpen] = useState(false)
+  const [videosOpen, setVideosOpen] = useState(false)
+  const [videoProject, setVideoProject] = useState<VideoProject | null>(null)
+  if (videoProject) return <VideoProjectWorkspace project={videoProject} onBack={() => setVideoProject(null)} />
   return <>
     <section className="project-context">
       <div><span>Market</span><strong>{project.marketName}</strong></div>
@@ -39,7 +44,9 @@ export function ProjectWorkspace({ project, competitors, competitor, loading, co
     <section className="panel competitor-panel"><PanelToggle eyebrow="Research" title="Opportunities" toggleLabel="opportunities" copy="Synthesize completed competitor analyses into ranked, evidence-backed opportunities." open={opportunitiesOpen} onToggle={() => setOpportunitiesOpen((open) => !open)} /></section>
     {opportunitiesOpen && <OpportunityPanel projectId={project.id} />}
     <section className="panel competitor-panel"><PanelToggle eyebrow="Validation" title="12-Video Pilot" toggleLabel="pilot" copy="Turn approved ideas into a deliberate topic, packaging, and storytelling learning plan." open={pilotOpen} onToggle={() => setPilotOpen((open) => !open)} /></section>
-    {pilotOpen && <PilotPanel projectId={project.id} />}
+    {pilotOpen && <PilotPanel projectId={project.id} onVideoProjectCreated={setVideoProject} />}
+    <section className="panel competitor-panel"><PanelToggle eyebrow="Execution" title="Videos" toggleLabel="videos" copy="Move an approved pilot experiment into a durable production workflow." open={videosOpen} onToggle={() => setVideosOpen((open) => !open)} /></section>
+    {videosOpen && <VideoProjectPanel projectId={project.id} onOpen={setVideoProject} />}
   </>
 }
 
