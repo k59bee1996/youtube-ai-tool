@@ -53,7 +53,17 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
           <h2>Opportunities</h2>
         </div>
         {status?.latestReport && (
-          <span>Report v{status.latestReport.version}</span>
+          <div className="section-actions">
+            <span>Report v{status.latestReport.version}</span>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => void generate()}
+              disabled={running || active}
+            >
+              {running ? "Queuing report…" : "Generate new report"}
+            </button>
+          </div>
         )}
       </div>
       {loading ? (
