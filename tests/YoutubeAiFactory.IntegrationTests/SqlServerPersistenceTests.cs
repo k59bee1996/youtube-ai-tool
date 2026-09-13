@@ -8,6 +8,7 @@ using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Videos;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
 namespace YoutubeAiFactory.IntegrationTests;
@@ -144,6 +145,36 @@ public sealed class SqlServerPersistenceTests
         Assert.Equal(0, await context.IdeaGenerations.CountAsync());
         Assert.Equal(0, await context.VideoIdeas.CountAsync());
         Assert.Equal(0, await context.Pilots.CountAsync());
+    }
+
+    [SqlServerFact]
+    public async Task Migration_persists_video_project_lineage_and_unique_pilot_video_constraint()
+    {
+        var options = CreateOptions();
+        await using var context = new YoutubeAiFactoryDbContext(options);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var project = new Project("Video project", new Market("History", "English", "Global"), new AudienceProfile("History viewers"), now);
+        var report = new OpportunityReport(project.Id, 1, Guid.NewGuid(), "opportunity", 1, "Fake", "fake", "score:v1", 1, "[]", now);
+        var opportunity = new OpportunityCandidate(report.Id, "Historical Ownership Economics", "Description", "History viewers", "Economics", "Explainer", "Hidden costs", "Why", 80, 70, 40, 85, 75, 70, 80, 30, 85, 82m, "[]", "[]", now);
+        var generation = new IdeaGeneration(project.Id, opportunity.Id, report.Id, 1, 1, Guid.NewGuid(), "ideas", 1, "Fake", "fake", "score:v1", now);
+        var idea = new VideoIdea(project.Id, opportunity.Id, generation.Id, "The Economics of Owning a Medieval Castle", "Economics", "Hidden costs", "Explainer", "History viewers", "Learn", "Hook", "Thumbnail", "Promise", "Question", "Why care", "Hypothesis", 80, 80, 70, 80, 75, 85, 85, 70, 80, 30, 20, 85, 82m, 0m, "score:v1", "[]", now);
+        var pilot = new Pilot(project.Id, 1, Guid.NewGuid(), "pilot", 1, "Fake", "fake", "plan:v1", "Pilot", "Learn", "[]", "[]", "[]", 12, now);
+        pilot.Approve(now);
+        var pilotVideo = new PilotVideo(pilot.Id, idea.Id, opportunity.Id, 6, PilotExperimentType.Packaging, "Hidden-cost framing should increase click intent.", "Framing", "Comparable topics", "CTR", "CTR improves", "Rationale");
+        var videoProject = new VideoProject(project.Id, pilot.Id, pilot.Version, pilotVideo.Id, idea.Id, opportunity.Id, idea.WorkingTitle, idea.Topic, idea.Angle, idea.ContentFormat, idea.TargetAudience, idea.HookConcept, idea.ThumbnailConcept, idea.ViewerPromise, pilotVideo.ExperimentType, pilotVideo.Hypothesis, pilotVideo.VariableBeingTested, pilotVideo.PrimaryMetric, pilotVideo.SuccessSignal, "[]", now);
+        context.AddRange(project, report, opportunity, generation, idea, pilot, pilotVideo, videoProject);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var stored = await context.VideoProjects.SingleAsync();
+        Assert.Equal(videoProject.PilotVideoId, stored.PilotVideoId);
+        Assert.Equal(VideoProjectStatus.Draft, stored.Status);
+        Assert.Equal("The Economics of Owning a Medieval Castle", stored.WorkingTitle);
+
+        context.VideoProjects.Add(new VideoProject(project.Id, pilot.Id, pilot.Version, pilotVideo.Id, idea.Id, opportunity.Id, "Duplicate", idea.Topic, idea.Angle, idea.ContentFormat, idea.TargetAudience, idea.HookConcept, idea.ThumbnailConcept, idea.ViewerPromise, pilotVideo.ExperimentType, pilotVideo.Hypothesis, pilotVideo.VariableBeingTested, pilotVideo.PrimaryMetric, pilotVideo.SuccessSignal, "[]", now));
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
     }
 
     [SqlServerFact]

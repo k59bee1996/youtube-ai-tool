@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../services/api";
+import { api, type VideoProject, type VideoProjectListItem } from "../../services/api";
 import { messageFrom } from "../../lib/errors";
 import type { Pilot, PilotCandidate, PilotStatus, PilotVideo } from "./types";
 
-export function PilotPanel({ projectId }: { projectId: string }) {
+export function PilotPanel({ projectId, onVideoProjectCreated }: { projectId: string; onVideoProjectCreated: (videoProject: VideoProject) => void }) {
   const [status, setStatus] = useState<PilotStatus | null>(
     null,
   );
@@ -11,6 +11,7 @@ export function PilotPanel({ projectId }: { projectId: string }) {
     PilotCandidate[]
   >([]);
   const [pilots, setPilots] = useState<Pilot[]>([]);
+  const [videoProjects, setVideoProjects] = useState<VideoProjectListItem[]>([]);
   const [selectedPilotId, setSelectedPilotId] = useState<string | null>(null);
   const [followLatest, setFollowLatest] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -19,14 +20,16 @@ export function PilotPanel({ projectId }: { projectId: string }) {
   const active = Boolean(status?.activeJobStatus);
   const load = useCallback(async () => {
     try {
-      const [loadedStatus, loadedCandidates, loadedPilots] = await Promise.all([
+      const [loadedStatus, loadedCandidates, loadedPilots, loadedVideoProjects] = await Promise.all([
         api.getPilot(projectId),
         api.getPilotCandidates(projectId),
         api.listPilots(projectId),
+        api.listVideoProjects(projectId),
       ]);
       setStatus(loadedStatus);
       setCandidates(loadedCandidates);
       setPilots(loadedPilots);
+      setVideoProjects(loadedVideoProjects);
       setSelectedPilotId((current) =>
         followLatest ||
         !current ||
@@ -103,6 +106,17 @@ export function PilotPanel({ projectId }: { projectId: string }) {
       setBusy(false);
     }
   }
+  async function startVideo(pilotVideoId: string) {
+    if (!selectedPilotId) return;
+    setBusy(true);
+    try { onVideoProjectCreated(await api.createVideoProject(projectId, selectedPilotId, pilotVideoId)); }
+    catch (requestError) { setError(messageFrom(requestError)); }
+    finally { setBusy(false); }
+  }
+  async function openVideo(videoProjectId: string) {
+    try { onVideoProjectCreated(await api.getVideoProject(projectId, videoProjectId)); }
+    catch (requestError) { setError(messageFrom(requestError)); }
+  }
   const pilot =
     pilots.find((item) => item.id === selectedPilotId) ?? status?.latestPilot;
   const failure = status?.latestJobFailureReason;
@@ -177,6 +191,9 @@ export function PilotPanel({ projectId }: { projectId: string }) {
             onApprove={approve}
             onMove={move}
             onReplace={replace}
+            onStartVideo={startVideo}
+            onOpenVideo={openVideo}
+            videoProjects={videoProjects}
             busy={busy}
           />
         </>
@@ -254,6 +271,9 @@ function PilotView({
   onApprove,
   onMove,
   onReplace,
+  onStartVideo,
+  onOpenVideo,
+  videoProjects,
   busy,
 }: {
   pilot: Pilot;
@@ -261,6 +281,9 @@ function PilotView({
   onApprove: () => Promise<void>;
   onMove: (sequence: number, direction: "up" | "down") => Promise<void>;
   onReplace: (sequence: number, videoIdeaId: string) => Promise<void>;
+  onStartVideo: (pilotVideoId: string) => Promise<void>;
+  onOpenVideo: (videoProjectId: string) => Promise<void>;
+  videoProjects: VideoProjectListItem[];
   busy: boolean;
 }) {
   const groups: Array<[string, PilotVideo[]]> = [
@@ -311,8 +334,9 @@ function PilotView({
       {groups.map(([heading, videos]) => (
         <section className="pilot-block" key={heading}>
           <h3>{heading}</h3>
-          {videos.map((video) => (
-            <article className="pilot-card" key={video.id}>
+          {videos.map((video) => {
+            const existingVideoProject = videoProjects.find((project) => project.pilotVideoId === video.id);
+            return <article className="pilot-card" key={video.id}>
               <div className="section-heading">
                 <strong>
                   {String(video.sequence).padStart(2, "0")} {video.workingTitle}
@@ -396,8 +420,9 @@ function PilotView({
                   </label>
                 </div>
               )}
-            </article>
-          ))}
+              {pilot.status === "Approved" && !pilot.requiresReview && <div className="idea-actions">{existingVideoProject ? <button className="primary-button" type="button" onClick={() => void onOpenVideo(existingVideoProject.id)}>Open Video Project</button> : <button className="primary-button" type="button" disabled={busy} onClick={() => void onStartVideo(video.id)}>{busy ? "Starting…" : "Start Video"}</button>}</div>}
+            </article>;
+          })}
         </section>
       ))}
       {pilot.status === "Draft" && (

@@ -53,7 +53,7 @@ dotnet run --project src/YoutubeAiFactory.Worker
 
 Run the client from `src/YoutubeAiFactory.Web` with `npm install` and `npm run dev`. Vite serves port 5173 and proxies `/api` and `/health` to port 5050. Create a project in the UI, then submit a supported channel URL; submit it again to refresh metadata.
 
-For Phase 3–6 analysis, run the Worker in a separate terminal after setting `AI__ApiKey`. The UI queues work and polls job status; it never sends provider keys to the browser. The default OpenAI-compatible provider posts to the Chat Completions endpoint with JSON-mode output. No provider key is needed for routine tests.
+For Phase 3–6 analysis, run the Worker in a separate terminal after setting `AI__ApiKey`. Phase 7 VideoProject creation is synchronous and needs neither the Worker nor an AI key. The UI queues only the earlier AI workflows and never sends provider keys to the browser. The default OpenAI-compatible provider posts to the Chat Completions endpoint with JSON-mode output. No provider key is needed for routine tests.
 
 ## Validate
 

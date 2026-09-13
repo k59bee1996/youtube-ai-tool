@@ -1,6 +1,7 @@
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Pilots;
+using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
@@ -8,6 +9,7 @@ using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Application.Persistence;
 
@@ -97,6 +99,12 @@ public interface IYoutubeAiFactoryStore
     Task FailPilotGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => throw new NotSupportedException("Pilot job persistence is not configured.");
     void AddPilot(Pilot pilot) => throw new NotSupportedException("Pilot persistence is not configured.");
     void AddPilotVideo(PilotVideo pilotVideo) => throw new NotSupportedException("Pilot persistence is not configured.");
+
+    Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(null);
+    Task<VideoProject?> GetVideoProjectAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(null);
+    Task<IReadOnlyList<VideoProject>> ListVideoProjectsAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VideoProject>>([]);
+    Task<VideoProjectSource?> GetVideoProjectSourceAsync(Guid projectId, Guid pilotId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProjectSource?>(null);
+    Task<VideoProject> CreateVideoProjectIfAbsentAsync(VideoProject project, CancellationToken cancellationToken) => throw new NotSupportedException("Video project persistence is not configured.");
 
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>

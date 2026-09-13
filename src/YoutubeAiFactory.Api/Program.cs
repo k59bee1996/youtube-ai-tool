@@ -8,6 +8,7 @@ using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Projects;
+using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -58,6 +59,10 @@ builder.Services.AddScoped<ReplacePilotSlotHandler>();
 builder.Services.AddScoped<MovePilotSlotHandler>();
 builder.Services.AddScoped<PilotGenerationContextBuilder>();
 builder.Services.AddScoped<PilotGenerationJobProcessor>();
+builder.Services.AddScoped<CreateVideoProjectHandler>();
+builder.Services.AddScoped<ListVideoProjectsHandler>();
+builder.Services.AddScoped<GetVideoProjectHandler>();
+builder.Services.AddScoped<UpdateVideoProjectHandler>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"])
@@ -70,7 +75,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-6",
+    phase = "phase-7",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -90,6 +95,7 @@ app.MapCompetitorEndpoints();
 app.MapOpportunityEndpoints();
 app.MapIdeaEndpoints();
 app.MapPilotEndpoints();
+app.MapVideoProjectEndpoints();
 
 app.Run();
 
