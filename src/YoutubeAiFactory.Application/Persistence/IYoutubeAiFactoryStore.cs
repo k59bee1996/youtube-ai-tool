@@ -100,7 +100,7 @@ public interface IYoutubeAiFactoryStore
     void AddPilot(Pilot pilot) => throw new NotSupportedException("Pilot persistence is not configured.");
     void AddPilotVideo(PilotVideo pilotVideo) => throw new NotSupportedException("Pilot persistence is not configured.");
 
-    Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(null);
+    Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid projectId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(null);
     Task<VideoProject?> GetVideoProjectAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(null);
     Task<IReadOnlyList<VideoProject>> ListVideoProjectsAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VideoProject>>([]);
     Task<VideoProjectSource?> GetVideoProjectSourceAsync(Guid projectId, Guid pilotId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProjectSource?>(null);

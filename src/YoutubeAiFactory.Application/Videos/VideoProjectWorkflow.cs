@@ -18,7 +18,7 @@ public sealed class CreateVideoProjectHandler(IYoutubeAiFactoryStore store, Time
             ?? throw new ResourceNotFoundException("Pilot was not found.");
         if (pilot.Status != PilotStatus.Approved)
             throw new ApplicationValidationException("Only an approved pilot can start a video project.");
-        var existing = await store.GetVideoProjectByPilotVideoAsync(request.PilotVideoId, cancellationToken);
+        var existing = await store.GetVideoProjectByPilotVideoAsync(projectId, request.PilotVideoId, cancellationToken);
         if (existing is not null)
             return await VideoProjectDtoMapper.MapAsync(store, existing, cancellationToken);
         var source = await store.GetVideoProjectSourceAsync(projectId, pilotId, request.PilotVideoId, cancellationToken)

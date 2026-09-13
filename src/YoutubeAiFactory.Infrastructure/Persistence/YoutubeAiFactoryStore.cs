@@ -208,8 +208,8 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public void AddPilot(Pilot pilot) => dbContext.Pilots.Add(pilot);
     public void AddPilotVideo(PilotVideo pilotVideo) => dbContext.PilotVideos.Add(pilotVideo);
 
-    public Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid pilotVideoId, CancellationToken cancellationToken) =>
-        dbContext.VideoProjects.AsNoTracking().SingleOrDefaultAsync(x => x.PilotVideoId == pilotVideoId, cancellationToken);
+    public Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid projectId, Guid pilotVideoId, CancellationToken cancellationToken) =>
+        dbContext.VideoProjects.AsNoTracking().SingleOrDefaultAsync(x => x.ProjectId == projectId && x.PilotVideoId == pilotVideoId, cancellationToken);
 
     public Task<VideoProject?> GetVideoProjectAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken)
     {

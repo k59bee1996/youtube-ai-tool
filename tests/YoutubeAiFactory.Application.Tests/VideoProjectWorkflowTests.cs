@@ -42,6 +42,19 @@ public sealed class VideoProjectWorkflowTests
         await Assert.ThrowsAsync<ApplicationValidationException>(() => staleHandler.HandleAsync(staleStore.Project.Id, staleStore.Pilot.Id, new CreateVideoProjectRequest(staleStore.PilotVideo.Id), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Does_not_return_a_video_project_from_another_project_before_validating_slot_membership()
+    {
+        var store = new VideoProjectStore(PilotStatus.Approved, IdeaDecisionStatus.Approved, OpportunityDecisionStatus.Approved);
+        var foreignPilotVideoId = Guid.NewGuid();
+        store.Created.Add(new VideoProject(Guid.NewGuid(), Guid.NewGuid(), 1, foreignPilotVideoId, Guid.NewGuid(), Guid.NewGuid(),
+            "Other project's video", "Topic", "Angle", "Explainer", "Audience", "Hook", "Thumbnail", "Promise",
+            PilotExperimentType.Packaging, "Hypothesis", "Variable", "CTR", "Success", "[]", DateTimeOffset.UtcNow));
+        var handler = new CreateVideoProjectHandler(store, TimeProvider.System);
+
+        await Assert.ThrowsAsync<ResourceNotFoundException>(() => handler.HandleAsync(store.Project.Id, store.Pilot.Id, new CreateVideoProjectRequest(foreignPilotVideoId), CancellationToken.None));
+    }
+
     private sealed class VideoProjectStore : IYoutubeAiFactoryStore
     {
         public Project Project { get; }
@@ -75,7 +88,7 @@ public sealed class VideoProjectWorkflowTests
         public Task<CompetitorChannel?> FindCompetitorByYoutubeChannelIdAsync(Guid projectId, string youtubeChannelId, CancellationToken cancellationToken) => Task.FromResult<CompetitorChannel?>(null);
         public void AddCompetitor(CompetitorChannel competitor) { }
         public Task<Pilot?> GetPilotAsync(Guid projectId, Guid pilotId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult(projectId == Project.Id && pilotId == Pilot.Id ? Pilot : null);
-        public Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(Created.SingleOrDefault(item => item.PilotVideoId == pilotVideoId));
+        public Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid projectId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(Created.SingleOrDefault(item => item.ProjectId == projectId && item.PilotVideoId == pilotVideoId));
         public Task<VideoProjectSource?> GetVideoProjectSourceAsync(Guid projectId, Guid pilotId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProjectSource?>(projectId == Project.Id && pilotId == Pilot.Id && pilotVideoId == PilotVideo.Id ? new VideoProjectSource(Pilot, PilotVideo, VideoIdea, Opportunity) : null);
         public Task<VideoProject> CreateVideoProjectIfAbsentAsync(VideoProject project, CancellationToken cancellationToken) { var existing = Created.SingleOrDefault(item => item.PilotVideoId == project.PilotVideoId); if (existing is not null) return Task.FromResult(existing); Created.Add(project); return Task.FromResult(project); }
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
