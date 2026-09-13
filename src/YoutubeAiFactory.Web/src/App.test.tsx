@@ -371,6 +371,45 @@ test('lets a user generate a new opportunity report after a previous report exis
   ))
 })
 
+test('keeps the latest opportunity report visible when a regeneration fails', async () => {
+  localStorage.setItem('youtube-ai-factory:selected-project', project.id)
+  const opportunityStatus = {
+    latestReport: {
+      id: 'opportunity-report-1', version: 1, promptKey: 'opportunity-analysis', promptVersion: 2,
+      provider: 'fake', model: 'fake', scoringAlgorithmVersion: 'opportunity-score:v1',
+      createdAt: '2026-09-12T00:00:00Z', isStale: false, sources: [], limitations: [], opportunities: [],
+    },
+    activeJob: null,
+    latestJob: { id: 'opportunity-job-2', status: 'Failed', failureReason: 'The provider returned invalid output.' },
+    competitorCount: 4,
+    analyzedCompetitorCount: 4,
+  }
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    const method = init?.method ?? 'GET'
+    if (url === '/api/projects') return json([project])
+    if (url.endsWith('/competitors')) return json([])
+    if (url.endsWith('/opportunities/latest')) return json(opportunityStatus)
+    if (url.endsWith('/opportunities:generate') && method === 'POST') {
+      return json({ jobId: 'opportunity-job-3', status: 'Queued', existing: false }, 202)
+    }
+    throw new Error(`Unexpected request: ${method} ${url}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  render(<App />)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Open opportunities' }))
+  expect(await screen.findByText('Report v1')).toBeVisible()
+  expect(screen.getByRole('alert')).toHaveTextContent('The provider returned invalid output.')
+  fireEvent.click(screen.getByRole('button', { name: 'Retry opportunity generation' }))
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    `/api/projects/${project.id}/opportunities:generate`,
+    expect.objectContaining({ method: 'POST' }),
+  ))
+})
+
 test('surfaces a failed pilot generation and offers a retry', async () => {
   localStorage.setItem('youtube-ai-factory:selected-project', project.id)
   vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
