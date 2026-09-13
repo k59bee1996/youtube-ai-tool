@@ -6,9 +6,9 @@ namespace YoutubeAiFactory.Application.Competitors;
 public static class CompetitorAnalysisPrompt
 {
     public const string Key = "competitor-analysis";
-    public const int Version = 1;
+    public const int Version = 2;
 
-    public static LlmRequest Create(CompetitorAnalysisContext context, bool repair = false) => new(
+    public static LlmRequest Create(CompetitorAnalysisContext context, string? repairDiagnostic = null) => new(
         Key,
         Version,
         """
@@ -19,10 +19,13 @@ public static class CompetitorAnalysisPrompt
         Required top-level JSON: audience, topicClusters, titlePatterns, thumbnailPatterns, hookPatterns, contentFormats, performanceInsights, potentialWeaknesses, transferableFormats, evidenceNotes, confidence.
         Since thumbnail pixels and transcripts are unavailable, thumbnailPatterns and hookPatterns must explicitly say evidence is insufficient rather than infer visual or spoken details.
         Confidence fields are integer percentages from 0 through 100. Arrays may be empty where evidence is insufficient.
+        Every list field must be a JSON array, even when it has one item. Every evidence ID must be a UUID string from the supplied video IDs.
+        Exact item contracts: topicClusters={name:string,description:string,exampleVideoIds:uuid[],frequency:integer,performanceSignal:string,confidence:integer}; titlePatterns={patternName:string,description:string,template:string,exampleTitles:string[],observedFrequency:integer,performanceSignal:string,confidence:integer}; thumbnailPatterns and hookPatterns={patternName:string,observation:string,evidenceVideoIds:uuid[],confidence:integer,limitations:string[]}; contentFormats={format:string,evidenceVideoIds:uuid[],performanceSignal:string,confidence:integer}; performanceInsights={insight:string,supportingVideoIds:uuid[],confidence:integer}; potentialWeaknesses={observation:string,supportingVideoIds:uuid[],confidence:integer}; transferableFormats={format:string,whyItMayWork:string,evidenceVideoIds:uuid[],transferableMechanic:string,doNotCopy:string,confidence:integer}; evidenceNotes={note:string,videoIds:uuid[]}. audience={likelyAgeRange:string|null,likelyInterests:string[],likelyViewerIntent:string[],geographyHints:string[],confidence:integer,evidence:string[]}; confidence={overallConfidence:integer,dataQuality:string,limitations:string[]}.
         """,
-        (repair ? "The previous output was invalid. Repair it to exactly follow the required JSON contract.\n\n" : string.Empty) +
+        (repairDiagnostic is null ? string.Empty : $"The previous output was invalid: {repairDiagnostic} Repair it to exactly follow every JSON type in the contract.\n\n") +
         JsonSerializer.Serialize(context, SerializerOptions),
-        new Dictionary<string, string> { ["max_output_tokens"] = "5000" });
+        new Dictionary<string, string> { ["max_output_tokens"] = "5000" },
+        CompetitorAnalysisOutputSchema.Create());
 
     internal static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 }

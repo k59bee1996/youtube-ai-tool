@@ -19,20 +19,36 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             throw new ExternalServiceException("AI provider is not configured.", ExternalServiceFailure.Configuration);
         if (settings.TimeoutSeconds is < 5 or > 300)
             throw new ExternalServiceException("AI:TimeoutSeconds must be between 5 and 300.", ExternalServiceFailure.Configuration);
-        client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+        // HttpClient instances are pooled by IHttpClientFactory. Its Timeout property becomes
+        // immutable after the first request, so applying a per-request configuration here
+        // prevents structured-output repair attempts from using the same client.
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellation.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
         using var message = new HttpRequestMessage(HttpMethod.Post, "chat/completions");
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
+        var responseFormat = request.OutputSchema is null
+            ? new { type = "json_object" }
+            : (object)new
+            {
+                type = "json_schema",
+                json_schema = new
+                {
+                    name = $"{request.PromptKey.Replace('-', '_')}_v{request.PromptVersion}",
+                    strict = true,
+                    schema = request.OutputSchema,
+                },
+            };
         message.Content = new StringContent(JsonSerializer.Serialize(new
         {
             model = settings.Model,
-            response_format = new { type = "json_object" },
+            response_format = responseFormat,
             messages = new[] { new { role = "system", content = request.SystemInstructions }, new { role = "user", content = request.UserContent } },
             max_tokens = request.ModelConfiguration.TryGetValue("max_output_tokens", out var tokens) && int.TryParse(tokens, out var parsed) ? parsed : 5000,
         }), Encoding.UTF8, "application/json");
-        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeoutCancellation.Token);
         if (!response.IsSuccessStatusCode)
             throw new ExternalServiceException("AI provider did not complete the analysis request.", Classify(response.StatusCode));
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(timeoutCancellation.Token);
         try
         {
             using var document = JsonDocument.Parse(body);
@@ -50,7 +66,7 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
         catch (StructuredOutputException) { throw; }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            throw new StructuredOutputException("AI provider returned invalid structured output.", exception);
+            throw new StructuredOutputException($"AI provider returned invalid structured output: {exception.Message}", exception);
         }
     }
 

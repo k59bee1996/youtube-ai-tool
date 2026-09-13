@@ -5,6 +5,7 @@ using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Pilots;
+using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
@@ -13,6 +14,7 @@ using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -238,6 +240,48 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public Task FailPilotGenerationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
     public void AddPilot(Pilot pilot) => dbContext.Pilots.Add(pilot);
     public void AddPilotVideo(PilotVideo pilotVideo) => dbContext.PilotVideos.Add(pilotVideo);
+
+    public Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid projectId, Guid pilotVideoId, CancellationToken cancellationToken) =>
+        dbContext.VideoProjects.AsNoTracking().SingleOrDefaultAsync(x => x.ProjectId == projectId && x.PilotVideoId == pilotVideoId, cancellationToken);
+
+    public Task<VideoProject?> GetVideoProjectAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.VideoProjects.Where(x => x.ProjectId == projectId && x.Id == videoProjectId);
+        return (forUpdate ? query : query.AsNoTracking()).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<VideoProject>> ListVideoProjectsAsync(Guid projectId, CancellationToken cancellationToken) =>
+        await dbContext.VideoProjects.AsNoTracking().Where(x => x.ProjectId == projectId).OrderByDescending(x => x.CreatedAt).ToListAsync(cancellationToken);
+
+    public async Task<VideoProjectSource?> GetVideoProjectSourceAsync(Guid projectId, Guid pilotId, Guid pilotVideoId, CancellationToken cancellationToken)
+    {
+        var source = await dbContext.PilotVideos.AsNoTracking()
+            .Where(video => video.Id == pilotVideoId && video.PilotId == pilotId)
+            .Join(dbContext.Pilots.AsNoTracking().Where(pilot => pilot.ProjectId == projectId), video => video.PilotId, pilot => pilot.Id, (video, pilot) => new { video, pilot })
+            .Join(dbContext.VideoIdeas.AsNoTracking().Where(idea => idea.ProjectId == projectId), item => item.video.VideoIdeaId, idea => idea.Id, (item, idea) => new { item.video, item.pilot, idea })
+            .Join(
+                dbContext.OpportunityCandidates.AsNoTracking()
+                    .Join(dbContext.OpportunityReports.AsNoTracking().Where(report => report.ProjectId == projectId), candidate => candidate.ReportId, report => report.Id, (candidate, _) => candidate),
+                item => item.video.OpportunityId, opportunity => opportunity.Id,
+                (item, opportunity) => new VideoProjectSource(item.pilot, item.video, item.idea, opportunity))
+            .SingleOrDefaultAsync(cancellationToken);
+        return source;
+    }
+
+    public async Task<VideoProject> CreateVideoProjectIfAbsentAsync(VideoProject project, CancellationToken cancellationToken)
+    {
+        dbContext.VideoProjects.Add(project);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return project;
+        }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return await dbContext.VideoProjects.AsNoTracking().SingleAsync(x => x.PilotVideoId == project.PilotVideoId, cancellationToken);
+        }
+    }
 
     public Task<Job?> GetActiveCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         FindAnalysisJobAsync(projectId, competitorId, activeOnly: true, cancellationToken);

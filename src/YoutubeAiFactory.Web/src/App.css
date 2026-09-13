@@ -40,6 +40,8 @@ textarea { min-height: 92px; resize: vertical; }
 .competitor-panel { margin-bottom: 20px; }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
 .section-heading > span { color: #8290a6; font-size: .82rem; }
+.section-actions { display: flex; align-items: center; gap: 12px; }
+.section-actions > span { color: #8290a6; font-size: .82rem; }
 .competitor-form { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
 .competitor-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-top: 18px; border-top: 1px solid #26334a; }
 .competitor-tabs button { border: 1px solid #34435c; background: transparent; color: #a9b5c8; padding: 8px 11px; }

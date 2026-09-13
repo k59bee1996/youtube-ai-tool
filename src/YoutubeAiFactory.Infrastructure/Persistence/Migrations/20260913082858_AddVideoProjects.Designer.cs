@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    partial class YoutubeAiFactoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913082858_AddVideoProjects")]
+    partial class AddVideoProjects
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -621,19 +624,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("ArtifactId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("artifact_id");
-
-                    b.Property<string>("ArtifactType")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("artifact_type");
-
-                    b.Property<int?>("ArtifactVersion")
-                        .HasColumnType("int")
-                        .HasColumnName("artifact_version");
-
                     b.Property<DateTimeOffset>("AvailableAt")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("available_at");
@@ -654,11 +644,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)")
                         .HasColumnName("failure_reason");
-
-                    b.Property<string>("Locale")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)")
-                        .HasColumnName("locale");
 
                     b.Property<int>("MaxRetries")
                         .HasColumnType("int")
@@ -716,87 +701,9 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "AvailableAt");
 
-                    b.HasIndex("ArtifactType", "ArtifactId", "ArtifactVersion", "Locale")
-                        .IsUnique()
-                        .HasDatabaseName("ux_jobs_active_artifact_localization")
-                        .HasFilter("type = 'artifact-localization' AND status IN ('Queued', 'Running', 'Retrying')");
-
                     b.ToTable("jobs", "yaf", t =>
                         {
                             t.HasCheckConstraint("ck_jobs_payload_json", "ISJSON([payload]) = 1");
-                        });
-                });
-
-            modelBuilder.Entity("YoutubeAiFactory.Domain.Localization.ArtifactLocalization", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AiRunId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("ai_run_id");
-
-                    b.Property<Guid>("ArtifactId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("artifact_id");
-
-                    b.Property<string>("ArtifactType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("artifact_type");
-
-                    b.Property<int>("ArtifactVersion")
-                        .HasColumnType("int")
-                        .HasColumnName("artifact_version");
-
-                    b.Property<string>("ContentJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("content_json");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Locale")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)")
-                        .HasColumnName("locale");
-
-                    b.Property<string>("Model")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("model");
-
-                    b.Property<string>("PromptKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("prompt_key");
-
-                    b.Property<int>("PromptVersion")
-                        .HasColumnType("int")
-                        .HasColumnName("prompt_version");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("provider");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ArtifactType", "ArtifactId", "ArtifactVersion", "Locale")
-                        .IsUnique();
-
-                    b.ToTable("artifact_localizations", "yaf", t =>
-                        {
-                            t.HasCheckConstraint("ck_artifact_localizations_content_json", "ISJSON([content_json]) = 1");
                         });
                 });
 

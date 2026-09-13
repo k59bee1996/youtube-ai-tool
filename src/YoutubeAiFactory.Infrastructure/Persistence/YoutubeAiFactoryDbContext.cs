@@ -7,6 +7,7 @@ using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -34,6 +35,7 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
     public DbSet<IdeaEvidence> IdeaEvidence => Set<IdeaEvidence>();
     public DbSet<Pilot> Pilots => Set<Pilot>();
     public DbSet<PilotVideo> PilotVideos => Set<PilotVideo>();
+    public DbSet<VideoProject> VideoProjects => Set<VideoProject>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

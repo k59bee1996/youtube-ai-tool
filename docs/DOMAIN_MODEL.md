@@ -32,4 +32,10 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 ## Deferred concepts
 
-Content gaps, video projects, research reports, outlines, scripts, and production packages remain intentionally absent.
+## Video projects
+
+`VideoProject` is a durable execution aggregate, not another idea or a pilot slot. One approved `PilotVideo` can create at most one VideoProject. It preserves live relational references to `Project`, exact `Pilot` version, `PilotVideo`, `VideoIdea`, and `OpportunityCandidate`; it snapshots the initial title, topic, angle, format, audience, hook, thumbnail concept, viewer promise, and experiment brief so future upstream edits cannot silently rewrite production intent. Only working title and execution notes are editable in Phase 7.
+
+The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Phase 7 creates only `Draft`; it has no API control that can assign arbitrary states or create future artifacts.
+
+Content gaps, research reports, outlines, scripts, and production packages remain intentionally absent.

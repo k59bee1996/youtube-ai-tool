@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Opportunities;
 
@@ -31,6 +32,23 @@ public sealed class OpportunityAnalysisTests
         Assert.Throws<StructuredOutputException>(() => OpportunityAnalysisValidator.Validate(new OpportunityAnalysisResult([Candidate(["valid"]), Candidate(["valid"])], []), context, 8));
         Assert.Throws<StructuredOutputException>(() => OpportunityAnalysisValidator.Validate(new OpportunityAnalysisResult([Candidate(["valid"]) with { Description = null! }], []), context, 8));
         Assert.Throws<StructuredOutputException>(() => OpportunityAnalysisValidator.Validate(new OpportunityAnalysisResult([Candidate(["valid"]) with { Audience = null! }], []), context, 8));
+    }
+
+    [Fact]
+    public void Prompt_uses_a_strict_schema_that_requires_array_risks_and_includes_repair_diagnostic()
+    {
+        var context = new OpportunityAnalysisContext(Guid.NewGuid(), "Market", "English", "Global", "Audience", 1, [], [], []);
+
+        var request = OpportunityAnalysisPrompt.Create(context, "risks must be an array of strings");
+        var root = request.OutputSchema!.AsObject();
+        var opportunity = root["$defs"]!["opportunity"]!.AsObject();
+        var required = opportunity["required"]!.AsArray().Select(item => item!.GetValue<string>());
+
+        Assert.Equal(2, OpportunityAnalysisPrompt.Version);
+        Assert.Equal("#/$defs/stringArray", opportunity["properties"]!["risks"]!["$ref"]!.GetValue<string>());
+        Assert.Equal("array", root["$defs"]!["stringArray"]!["type"]!.GetValue<string>());
+        Assert.Contains("risks", required);
+        Assert.Contains("risks must be an array of strings", request.UserContent);
     }
 
     private static OpportunityCandidateResult Candidate(IReadOnlyList<string> evidence) => new("History economics", "Description", "Creators", "History", "Explainer", "Ownership", "Evidence-backed", 70, 70, 70, 70, 70, 40, evidence, ["Research burden"], []);

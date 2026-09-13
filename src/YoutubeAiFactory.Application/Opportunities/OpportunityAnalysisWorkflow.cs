@@ -84,11 +84,11 @@ public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store
             var context = contextBuilder.Build(project, analyses);
             run = new AiRun("OpportunityAnalysis", project.Id, "pending", "pending", OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, now);
             store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
-            LlmResult<OpportunityAnalysisResult>? answer = null; Exception? failure = null;
+            LlmResult<OpportunityAnalysisResult>? answer = null; Exception? failure = null; string? repairDiagnostic = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
             {
-                try { answer = await provider.GenerateStructuredAsync<OpportunityAnalysisResult>(OpportunityAnalysisPrompt.Create(context, attempt > 0), cancellationToken); OpportunityAnalysisValidator.Validate(answer.Value, context, options.MaxCandidates); break; }
-                catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; await store.SaveChangesAsync(cancellationToken); }
+                try { answer = await provider.GenerateStructuredAsync<OpportunityAnalysisResult>(OpportunityAnalysisPrompt.Create(context, repairDiagnostic), cancellationToken); OpportunityAnalysisValidator.Validate(answer.Value, context, options.MaxCandidates); break; }
+                catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; repairDiagnostic = ex.Message; await store.SaveChangesAsync(cancellationToken); }
                 catch (Exception ex) { failure = ex; answer = null; break; }
             }
             if (answer is null) throw failure ?? new StructuredOutputException("The provider did not return opportunity output.");
