@@ -55,5 +55,8 @@ public static class LocalizedOpportunityReportValidator
         JsonSerializer.Deserialize<string[]>(json, OpportunityReportLocalizationPrompt.SerializerOptions) ?? [];
 
     internal static IReadOnlyList<OpportunityCandidateWithEvidence> OrderedCandidates(OpportunityReportWithDetails report) =>
-        report.Candidates.OrderByDescending(item => item.Candidate.OverallScore).ToArray();
+        report.Candidates
+            .OrderByDescending(item => item.Candidate.OverallScore)
+            .ThenBy(item => item.Candidate.Id)
+            .ToArray();
 }

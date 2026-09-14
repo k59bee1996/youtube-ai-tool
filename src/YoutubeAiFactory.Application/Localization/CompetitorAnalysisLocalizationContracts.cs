@@ -1,5 +1,5 @@
-using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Common;
+using YoutubeAiFactory.Application.Competitors;
 
 namespace YoutubeAiFactory.Application.Localization;
 

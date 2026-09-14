@@ -1,5 +1,5 @@
-using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Localization;
+using YoutubeAiFactory.Application.Opportunities;
 
 namespace YoutubeAiFactory.Api.Endpoints;
 

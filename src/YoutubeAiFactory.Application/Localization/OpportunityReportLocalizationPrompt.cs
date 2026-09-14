@@ -16,7 +16,8 @@ public static class OpportunityReportLocalizationPrompt
         "Translate only the reader-facing, dynamic opportunity-analysis content into Vietnamese. Return one complete JSON object matching LocalizedOpportunityReportContent. Translate each opportunity name, including the short headline displayed at the top of each opportunity card. Never use null for a string, list, or list item. Preserve the exact list order and counts. Required shape: limitations[]; opportunities[] { name, description, audience, topic, contentFormat, angle, whyThisOpportunity, evidenceSummaries[], risks[], limitations[] }. Do not include or alter IDs, scores, metrics, confidence values, statuses, enums, versions, timestamps, URLs, evidence IDs/references, model metadata, or prompt metadata. Do not rewrite, improve, rank, or add business content. The surrounding application UI remains English; this is a Vietnamese reading aid only.",
         $"Canonical opportunity report JSON:\n{JsonSerializer.Serialize(ToSource(canonical), SerializerOptions)}" +
         (correcting ? "\nYour prior response failed structural validation. Preserve every list count and order exactly." : string.Empty),
-        new Dictionary<string, string> { ["max_output_tokens"] = "5000" });
+        new Dictionary<string, string> { ["max_output_tokens"] = "5000" },
+        OpportunityReportLocalizationOutputSchema.Create());
 
     private static OpportunityReportLocalizationSource ToSource(OpportunityReportWithDetails report) => new(
         LocalizedOpportunityReportValidator.Deserialize(report.Report.LimitationsJson),

@@ -1,9 +1,10 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Domain.Opportunities;
-using System.Text.Json;
 
 namespace YoutubeAiFactory.Application.Tests;
 
@@ -39,6 +40,28 @@ public sealed class CompetitorAnalysisLocalizationTests
     }
 
     [Fact]
+    public void Localization_prompt_supplies_a_strict_output_schema()
+    {
+        var source = new CompetitorAnalysisResult(
+            Audience: new AudienceAnalysis(null, [], [], [], 60, []),
+            TopicClusters: [],
+            TitlePatterns: [],
+            ThumbnailPatterns: [],
+            HookPatterns: [],
+            ContentFormats: [],
+            PerformanceInsights: [],
+            PotentialWeaknesses: [],
+            TransferableFormats: [],
+            EvidenceNotes: [],
+            Confidence: new AnalysisConfidence(60, "Moderate", []));
+
+        var request = CompetitorAnalysisLocalizationPrompt.Create(source, correcting: false);
+
+        Assert.NotNull(request.OutputSchema);
+        Assert.True(request.OutputSchema!.AsObject().ContainsKey("required"));
+    }
+
+    [Fact]
     public void Validator_rejects_a_translation_with_missing_confidence()
     {
         var source = new CompetitorAnalysisResult(
@@ -60,6 +83,19 @@ public sealed class CompetitorAnalysisLocalizationTests
         var localized = new LocalizedOpportunityReportContent([], [new LocalizedOpportunityCandidate(null!, "Mô tả", "Khán giả", "Chủ đề", "Định dạng", "Góc độ", "Lý do", [], [], [])]);
 
         Assert.Throws<StructuredOutputException>(() => LocalizedOpportunityReportValidator.Validate(source, localized));
+    }
+
+    [Fact]
+    public void Opportunity_localization_prompt_supplies_a_strict_output_schema()
+    {
+        var report = new OpportunityReport(Guid.NewGuid(), 1, Guid.NewGuid(), "opportunity", 1, "fake", "fake", "score:v1", 1, "[]", DateTimeOffset.UtcNow);
+        var candidate = new OpportunityCandidate(report.Id, "Canonical name", "Description", "Audience", "Topic", "Format", "Angle", "Reason", 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, "[]", "[]", DateTimeOffset.UtcNow);
+        var source = new OpportunityReportWithDetails(report, [], [new OpportunityCandidateWithEvidence(candidate, [])], []);
+
+        var request = OpportunityReportLocalizationPrompt.Create(source, correcting: false);
+
+        Assert.NotNull(request.OutputSchema);
+        Assert.True(request.OutputSchema!.AsObject().ContainsKey("required"));
     }
 
     [Theory]

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../services/api";
 import { messageFrom } from "../../lib/errors";
 import { AnalysisLanguageToggle, type AnalysisLocale } from "../localization/AnalysisLanguageToggle";
@@ -14,18 +14,39 @@ export function AnalysisPanel({ projectId, competitor }: { projectId: string; co
   const [localizedAnalysisId, setLocalizedAnalysisId] = useState<string | null>(null);
   const [localizing, setLocalizing] = useState(false);
   const [localizationError, setLocalizationError] = useState<string | null>(null);
+  const requestedLocalizationAnalysisId = useRef<string | null>(null);
   const active = status?.activeJob?.status === "Queued" || status?.activeJob?.status === "Running" || status?.activeJob?.status === "Retrying";
   const load = useCallback(async () => { try { setStatus(await api.getCompetitorAnalysis(projectId, competitor.id)); setError(null); } catch (requestError) { setError(messageFrom(requestError)); } finally { setLoading(false); } }, [projectId, competitor.id]);
   useEffect(() => { void Promise.resolve().then(load); return undefined; }, [load]);
   useEffect(() => { if (!active) return undefined; const timer = window.setInterval(() => void load(), 2000); return () => window.clearInterval(timer); }, [active, load]);
   const loadLocalization = useCallback(async (analysisId: string) => {
     const translation = await api.getCompetitorAnalysisLocalization(projectId, competitor.id, analysisId, "vi");
+    setLocalizedAnalysisId(analysisId);
     if (translation.content) { setLocalized(translation.content); setLocalizedAnalysisId(analysisId); setLocalizing(false); setLocalizationError(null); return; }
     setLocalizing(Boolean(translation.activeJob));
     if (translation.latestJob?.status === "Failed") setLocalizationError(translation.latestJob.failureReason ?? "Vietnamese analysis translation failed. English remains available.");
   }, [competitor.id, projectId]);
   useEffect(() => { const analysisId = status?.latestAnalysis?.id; if (locale !== "vi" || !analysisId || !localizing) return undefined; const timer = window.setInterval(() => void loadLocalization(analysisId), 2000); return () => window.clearInterval(timer); }, [loadLocalization, locale, localizing, status?.latestAnalysis?.id]);
-  async function changeLocale(nextLocale: AnalysisLocale) { setLocale(nextLocale); if (nextLocale === "en") return; const analysisId = status?.latestAnalysis?.id; if (!analysisId || (localizedAnalysisId === analysisId && localized)) return; setLocalizing(true); setLocalizationError(null); try { await api.requestCompetitorAnalysisLocalization(projectId, competitor.id, analysisId, "vi"); await loadLocalization(analysisId); } catch (requestError) { setLocalizing(false); setLocalizationError(messageFrom(requestError)); } }
+  useEffect(() => {
+    const analysisId = status?.latestAnalysis?.id;
+    if (locale !== "vi" || !analysisId || localizedAnalysisId === analysisId || requestedLocalizationAnalysisId.current === analysisId) return undefined;
+    requestedLocalizationAnalysisId.current = analysisId;
+    void (async () => {
+      try {
+        setLocalizedAnalysisId(analysisId);
+        setLocalized(null);
+        setLocalizing(true);
+        setLocalizationError(null);
+        await api.requestCompetitorAnalysisLocalization(projectId, competitor.id, analysisId, "vi");
+        await loadLocalization(analysisId);
+      } catch (requestError) {
+        setLocalizing(false);
+        setLocalizationError(messageFrom(requestError));
+      }
+    })();
+    return undefined;
+  }, [competitor.id, loadLocalization, locale, localizedAnalysisId, projectId, status?.latestAnalysis?.id]);
+  async function changeLocale(nextLocale: AnalysisLocale) { setLocale(nextLocale); if (nextLocale === "en") return; const analysisId = status?.latestAnalysis?.id; if (!analysisId || (localizedAnalysisId === analysisId && localized)) return; requestedLocalizationAnalysisId.current = null; setLocalizedAnalysisId(analysisId); setLocalized(null); setLocalizing(true); setLocalizationError(null); try { await api.requestCompetitorAnalysisLocalization(projectId, competitor.id, analysisId, "vi"); await loadLocalization(analysisId); } catch (requestError) { setLocalizing(false); setLocalizationError(messageFrom(requestError)); } }
   async function run() { setRunning(true); setError(null); try { await api.runCompetitorAnalysis(projectId, competitor.id); await load(); } catch (requestError) { setError(messageFrom(requestError)); } finally { setRunning(false); } }
   const currentAnalysis = status?.latestAnalysis;
   return <section className="analysis-section panel"><div className="section-heading"><div><span className="eyebrow">AI Analysis</span><h2>Competitor intelligence</h2></div>{currentAnalysis && <div className="idea-actions"><AnalysisLanguageToggle locale={locale} onChange={(next) => void changeLocale(next)} /><span>Version {currentAnalysis.version}</span></div>}</div>

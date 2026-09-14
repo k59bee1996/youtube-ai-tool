@@ -120,9 +120,13 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
                     LocalizedCompetitorAnalysisValidator.Validate(canonical, answer.Value);
                     break;
                 }
-                catch (StructuredOutputException exception) when (attempt < options.MaxStructuredOutputRetries)
+                catch (StructuredOutputException exception)
                 {
-                    run.RecordRetry(); failure = exception; await store.SaveChangesAsync(cancellationToken);
+                    answer = null;
+                    failure = exception;
+                    if (attempt >= options.MaxStructuredOutputRetries) break;
+                    run.RecordRetry();
+                    await store.SaveChangesAsync(cancellationToken);
                 }
                 catch (Exception exception) { failure = exception; break; }
             }
@@ -183,10 +187,12 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
                     LocalizedOpportunityReportValidator.Validate(report, answer.Value);
                     break;
                 }
-                catch (StructuredOutputException exception) when (attempt < options.MaxStructuredOutputRetries)
+                catch (StructuredOutputException exception)
                 {
-                    run.RecordRetry();
+                    answer = null;
                     failure = exception;
+                    if (attempt >= options.MaxStructuredOutputRetries) break;
+                    run.RecordRetry();
                     await store.SaveChangesAsync(cancellationToken);
                 }
                 catch (Exception exception)

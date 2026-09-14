@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../services/api";
 import { messageFrom } from "../../lib/errors";
 import { AnalysisLanguageToggle, type AnalysisLocale } from "../localization/AnalysisLanguageToggle";
@@ -17,6 +17,7 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
   const [localizing, setLocalizing] = useState(false);
   const [localizationActive, setLocalizationActive] = useState(false);
   const [localizationError, setLocalizationError] = useState<string | null>(null);
+  const requestedLocalizationReportId = useRef<string | null>(null);
   const active =
     status?.activeJob?.status === "Queued" ||
     status?.activeJob?.status === "Running" ||
@@ -59,11 +60,34 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
     const timer = window.setInterval(() => void loadLocalization(report.id), 2000);
     return () => window.clearInterval(timer);
   }, [locale, localizationActive, localizedReportId, loadLocalization, status?.latestReport]);
+  useEffect(() => {
+    const report = status?.latestReport;
+    if (locale !== "vi" || !report || localizedReportId === report.id || requestedLocalizationReportId.current === report.id) return undefined;
+    requestedLocalizationReportId.current = report.id;
+    void (async () => {
+      try {
+        setLocalizedReportId(report.id);
+        setLocalized(null);
+        setLocalizing(true);
+        setLocalizationError(null);
+        await api.requestOpportunityReportLocalization(projectId, report.id, "vi");
+        await loadLocalization(report.id);
+      } catch (requestError) {
+        setLocalizationError(messageFrom(requestError));
+      } finally {
+        setLocalizing(false);
+      }
+    })();
+    return undefined;
+  }, [locale, loadLocalization, localizedReportId, projectId, status?.latestReport]);
   async function changeLocale(nextLocale: AnalysisLocale) {
     setLocale(nextLocale);
     setLocalizationError(null);
     if (nextLocale === "en" || !status?.latestReport) return;
     const report = status.latestReport;
+    requestedLocalizationReportId.current = null;
+    setLocalizedReportId(report.id);
+    setLocalized(null);
     setLocalizing(true);
     try {
       await api.requestOpportunityReportLocalization(projectId, report.id, "vi");
