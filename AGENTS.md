@@ -834,6 +834,36 @@ ProductionPackage
 
 **---**
 
+**# 11A. LOCALIZATION INVARIANT (ALL PHASES)**
+
+This rule applies to every current and future analysis/content-intelligence phase, including competitor analysis, opportunities, ideas, pilots, research, outlines, scripts, and production packages.
+
+The application UI language is English. Do NOT implement frontend i18n or Vietnamese translations for navigation, buttons, menus, static headings, form labels, generic errors, or workflow-status labels unless the product explicitly changes that scope.
+
+Analysis display language is independent from the project's content target language. A creator may read Vietnamese analysis while planning English YouTube content.
+
+English is the immutable canonical artifact. Vietnamese is an optional reader-facing overlay and must never mutate, overwrite, or replace canonical production content. In particular, canonical business data must remain unchanged:
+
+\- IDs, evidence IDs/references, URLs, timestamps, versions, enums, statuses, model identifiers, prompt keys;
+
+\- scores, metrics, CTR, confidence values, rankings, and calculated outputs;
+
+\- canonical production-facing fields such as `WorkingTitle` when the target content language is English.
+
+Only dynamic human-readable explanatory fields may be localized: descriptions, reasoning, insights, risks, limitations, opportunity rationale, hook/thumbnail explanations, hypotheses, control strategies, success signals, and evidence summaries. A dynamic analysis heading or opportunity name may be translated as a reading aid, but a canonical production title must not be changed.
+
+For every localizable versioned artifact, persist the Vietnamese representation by:
+
+\`ArtifactType + ArtifactId + ArtifactVersion + Locale\`.
+
+Use lazy translation: selecting `VI` checks for a valid persisted overlay; a hit is returned directly; a miss queues one background translation job; the job validates structured output and persists the overlay. Concurrent requests must coalesce, and toggling languages must never call the LLM when a valid overlay already exists. Translation failure must leave the canonical English artifact intact and available.
+
+Every new applicable analysis/detail view must expose the reusable `EN | VI` toggle. The toggle changes only localized dynamic content and must safely fall back to canonical English until the overlay is ready or if it fails. Maintain the exact ordering/identity mapping between an overlay and its canonical artifact.
+
+Before implementing a new phase with generated reader-facing content, update `docs/AI_WORKFLOWS.md` and `docs/API.md` when its localization contract or endpoint behavior changes.
+
+**---**
+
 **# 12. VIDEO PROJECT STATE MACHINE**
 
 VideoProject should use explicit states.
