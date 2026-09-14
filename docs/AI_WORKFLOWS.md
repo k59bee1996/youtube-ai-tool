@@ -1,5 +1,20 @@
 # AI Workflows
 
+## Model profiles and responsibility matrix
+
+The application asks for an intelligence class; Infrastructure resolves the configured provider/model. Model identifiers are not selected by controllers, frontend code, or workflow business logic.
+
+| Workflow | Profile | AI responsibility |
+| --- | --- | --- |
+| Competitor Analysis | Reasoning | Pattern and bounded-evidence interpretation |
+| Opportunity Analysis | Premium | Strategic cross-competitor synthesis |
+| Idea Generation | Reasoning | Original, evidence-backed hypotheses and packaging concepts |
+| Pilot Generation | Premium | Controlled experiment and hypothesis planning |
+| Artifact Localization | Fast | Meaning-preserving reader-facing translation |
+| Structured Output Repair | Fast | Future structural correction only |
+
+Scores, rankings, ID/evidence validation, duplicate detection, versions, job state, VideoProject creation, and the Pilot 4/4/4 constraint remain deterministic C# responsibilities. A semantic validation failure reruns the originating workflow profile; a future structural repair must use `Fast` and must not add reasoning or alter business meaning. Future policy is: research query generation/evidence extraction/outline/production package use `Reasoning`; relevance classification uses `Fast`; research synthesis, contradiction resolution, and scripts use `Premium`. These future workflows are not implemented.
+
 ## Competitor analysis (`competitor-analysis:v2`)
 
 The first production AI workflow is a worker-executed, structured competitor analysis. `POST .../analysis:run` only creates a job; the worker builds a bounded context from persisted channel/video metadata and calls `ILlmProvider.GenerateStructuredAsync<CompetitorAnalysisResult>`.

@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IYoutubeAiFactoryStore, YoutubeAiFactoryStore>();
         services.Configure<YouTubeOptions>(configuration.GetSection(YouTubeOptions.SectionName));
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
+        services.AddSingleton<IAiModelResolver, ConfigurationAiModelResolver>();
         services.AddHttpClient<ILlmProvider, OpenAiLlmProvider>(client => client.BaseAddress = new Uri("https://api.openai.com/v1/"));
         services.AddHttpClient<IYouTubeClient, YouTubeClient>(client =>
         {

@@ -7,6 +7,7 @@ public static class CompetitorAnalysisPrompt
 {
     public const string Key = "competitor-analysis";
     public const int Version = 2;
+    public static AiModelProfile ModelProfile => AiWorkflowProfiles.CompetitorAnalysis;
 
     public static LlmRequest Create(CompetitorAnalysisContext context, string? repairDiagnostic = null) => new(
         Key,
@@ -25,7 +26,8 @@ public static class CompetitorAnalysisPrompt
         (repairDiagnostic is null ? string.Empty : $"The previous output was invalid: {repairDiagnostic} Repair it to exactly follow every JSON type in the contract.\n\n") +
         JsonSerializer.Serialize(context, SerializerOptions),
         new Dictionary<string, string> { ["max_output_tokens"] = "5000" },
-        CompetitorAnalysisOutputSchema.Create());
+        CompetitorAnalysisOutputSchema.Create(),
+        ModelProfile);
 
     internal static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 }

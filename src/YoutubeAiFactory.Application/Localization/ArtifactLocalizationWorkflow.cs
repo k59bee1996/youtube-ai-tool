@@ -71,7 +71,7 @@ public sealed class GetCompetitorAnalysisLocalizationHandler(IYoutubeAiFactorySt
     }
 }
 
-public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, ArtifactLocalizationOptions options, TimeProvider timeProvider, ILogger<ArtifactLocalizationJobProcessor> logger)
+public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, IAiModelResolver modelResolver, ArtifactLocalizationOptions options, TimeProvider timeProvider, ILogger<ArtifactLocalizationJobProcessor> logger)
 {
     private static readonly Action<ILogger, Guid, Exception?> LogFailed = LoggerMessage.Define<Guid>(LogLevel.Warning, new EventId(1, nameof(LogFailed)), "Artifact localization job {JobId} failed.");
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
@@ -107,7 +107,8 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             }
             var canonical = JsonSerializer.Deserialize<CompetitorAnalysisResult>(analysis.ResultJson, RequestCompetitorAnalysisHandlerJson)
                 ?? throw new InvalidOperationException("Stored competitor analysis is unreadable.");
-            run = new AiRun("ArtifactLocalization", payload.ProjectId, analysis.CompetitorChannelId, "pending", "pending", CompetitorAnalysisLocalizationPrompt.Key, CompetitorAnalysisLocalizationPrompt.Version, timeProvider.GetUtcNow());
+            var resolvedModel = modelResolver.Resolve(CompetitorAnalysisLocalizationPrompt.ModelProfile);
+            run = new AiRun("ArtifactLocalization", payload.ProjectId, analysis.CompetitorChannelId, resolvedModel.Provider, resolvedModel.Model, CompetitorAnalysisLocalizationPrompt.Key, CompetitorAnalysisLocalizationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString());
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedCompetitorAnalysisContent>? answer = null;
@@ -116,7 +117,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             {
                 try
                 {
-                    answer = await provider.GenerateStructuredAsync<LocalizedCompetitorAnalysisContent>(CompetitorAnalysisLocalizationPrompt.Create(canonical, attempt > 0), cancellationToken);
+                    answer = await provider.GenerateStructuredAsync<LocalizedCompetitorAnalysisContent>(CompetitorAnalysisLocalizationPrompt.Create(canonical, attempt > 0).WithResolvedModel(resolvedModel), cancellationToken);
                     LocalizedCompetitorAnalysisValidator.Validate(canonical, answer.Value);
                     break;
                 }
@@ -173,8 +174,9 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             }
             if (cached is not null) await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
 
-            run = new AiRun("ArtifactLocalization", payload.ProjectId, "pending", "pending", OpportunityReportLocalizationPrompt.Key,
-                OpportunityReportLocalizationPrompt.Version, timeProvider.GetUtcNow());
+            var resolvedModel = modelResolver.Resolve(OpportunityReportLocalizationPrompt.ModelProfile);
+            run = new AiRun("ArtifactLocalization", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, OpportunityReportLocalizationPrompt.Key,
+                OpportunityReportLocalizationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString());
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedOpportunityReportContent>? answer = null;
@@ -183,7 +185,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             {
                 try
                 {
-                    answer = await provider.GenerateStructuredAsync<LocalizedOpportunityReportContent>(OpportunityReportLocalizationPrompt.Create(report, attempt > 0), cancellationToken);
+                    answer = await provider.GenerateStructuredAsync<LocalizedOpportunityReportContent>(OpportunityReportLocalizationPrompt.Create(report, attempt > 0).WithResolvedModel(resolvedModel), cancellationToken);
                     LocalizedOpportunityReportValidator.Validate(report, answer.Value);
                     break;
                 }

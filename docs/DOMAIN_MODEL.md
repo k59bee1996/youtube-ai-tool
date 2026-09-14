@@ -16,7 +16,7 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 ## Operations
 
-`Job` models database-backed background work with explicit state transitions and bounded retries. Phase 3 uses it for competitor analysis. `AiRun` records provider, model, prompt version, token usage, cost, latency and failure details.
+`Job` models database-backed background work with explicit state transitions and bounded retries. Phase 3 uses it for competitor analysis. `AiRun` records the requested logical model profile separately from the resolved provider/model, plus prompt version, token usage, cost, latency and failure details. This is provenance metadata rather than a domain model-selection dependency; pre-routing records are retained as `Unspecified`.
 
 ## Opportunities
 

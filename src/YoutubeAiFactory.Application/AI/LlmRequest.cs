@@ -10,7 +10,9 @@ public sealed record LlmRequest
         string systemInstructions,
         string userContent,
         IReadOnlyDictionary<string, string>? modelConfiguration = null,
-        JsonNode? outputSchema = null)
+        JsonNode? outputSchema = null,
+        AiModelProfile modelProfile = AiModelProfile.Reasoning,
+        ResolvedAiModel? resolvedModel = null)
     {
         if (string.IsNullOrWhiteSpace(promptKey))
         {
@@ -38,6 +40,8 @@ public sealed record LlmRequest
         UserContent = userContent.Trim();
         ModelConfiguration = modelConfiguration ?? new Dictionary<string, string>();
         OutputSchema = outputSchema?.DeepClone();
+        ModelProfile = modelProfile;
+        ResolvedModel = resolvedModel;
     }
 
     public string PromptKey { get; }
@@ -52,4 +56,19 @@ public sealed record LlmRequest
 
     /// <summary>A provider-neutral JSON Schema for the structured response, when supported.</summary>
     public JsonNode? OutputSchema { get; }
+
+    /// <summary>The workflow's required intelligence class, never a frontend-selected model.</summary>
+    public AiModelProfile ModelProfile { get; }
+
+    /// <summary>Provider execution settings selected by infrastructure for this request.</summary>
+    public ResolvedAiModel? ResolvedModel { get; }
+
+    public LlmRequest WithResolvedModel(ResolvedAiModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        if (model.Profile != ModelProfile)
+            throw new ArgumentException("Resolved model profile must match the request profile.", nameof(model));
+
+        return new LlmRequest(PromptKey, PromptVersion, SystemInstructions, UserContent, ModelConfiguration, OutputSchema, ModelProfile, model);
+    }
 }

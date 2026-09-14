@@ -17,13 +17,15 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
             throw new ExternalServiceException("AI provider is not configured.", ExternalServiceFailure.Configuration);
-        if (settings.TimeoutSeconds is < 5 or > 300)
-            throw new ExternalServiceException("AI:TimeoutSeconds must be between 5 and 300.", ExternalServiceFailure.Configuration);
+        var model = request.ResolvedModel
+            ?? throw new ExternalServiceException("AI request model profile was not resolved.", ExternalServiceFailure.Configuration);
+        if (!string.Equals(model.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
+            throw new ExternalServiceException($"Unsupported AI provider '{model.Provider}'.", ExternalServiceFailure.Configuration);
         // HttpClient instances are pooled by IHttpClientFactory. Its Timeout property becomes
         // immutable after the first request, so applying a per-request configuration here
         // prevents structured-output repair attempts from using the same client.
         using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCancellation.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
+        timeoutCancellation.CancelAfter(TimeSpan.FromSeconds(model.TimeoutSeconds));
         using var message = new HttpRequestMessage(HttpMethod.Post, "chat/completions");
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
         var responseFormat = request.OutputSchema is null
@@ -40,14 +42,17 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             };
         message.Content = new StringContent(JsonSerializer.Serialize(new
         {
-            model = settings.Model,
+            model = model.Model,
             response_format = responseFormat,
-            messages = new[] { new { role = "system", content = request.SystemInstructions }, new { role = "user", content = request.UserContent } },
-            max_tokens = request.ModelConfiguration.TryGetValue("max_output_tokens", out var tokens) && int.TryParse(tokens, out var parsed) ? parsed : 5000,
+            messages = new[] { new { role = "developer", content = request.SystemInstructions }, new { role = "user", content = request.UserContent } },
+            max_completion_tokens = request.ModelConfiguration.TryGetValue("max_output_tokens", out var tokens) && int.TryParse(tokens, out var parsed) ? parsed : model.MaxOutputTokens,
         }), Encoding.UTF8, "application/json");
         using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeoutCancellation.Token);
         if (!response.IsSuccessStatusCode)
-            throw new ExternalServiceException("AI provider did not complete the analysis request.", Classify(response.StatusCode));
+        {
+            var error = await response.Content.ReadAsStringAsync(timeoutCancellation.Token);
+            throw new ExternalServiceException(CreateFailureMessage(response.StatusCode, error), Classify(response.StatusCode));
+        }
         var body = await response.Content.ReadAsStringAsync(timeoutCancellation.Token);
         try
         {
@@ -60,8 +65,8 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             var usage = root.TryGetProperty("usage", out var usageElement) ? usageElement : default;
             int? inputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("prompt_tokens", out var input) ? input.GetInt32() : null;
             int? outputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("completion_tokens", out var outputToken) ? outputToken.GetInt32() : null;
-            var model = root.TryGetProperty("model", out var responseModel) ? responseModel.GetString() ?? settings.Model : settings.Model;
-            return new LlmResult<T>(value, settings.Provider, model, inputTokens, outputTokens, output);
+            var responseModelName = root.TryGetProperty("model", out var responseModel) ? responseModel.GetString() ?? model.Model : model.Model;
+            return new LlmResult<T>(value, model.Provider, responseModelName, inputTokens, outputTokens, output);
         }
         catch (StructuredOutputException) { throw; }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
@@ -77,4 +82,40 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
         HttpStatusCode.RequestTimeout or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => ExternalServiceFailure.Transient,
         _ => ExternalServiceFailure.UnexpectedResponse,
     };
+
+    private static string CreateFailureMessage(HttpStatusCode statusCode, string errorBody)
+    {
+        var details = ReadSafeErrorDetails(errorBody);
+        return details.Count == 0
+            ? $"OpenAI API request failed with HTTP {(int)statusCode}."
+            : $"OpenAI API request failed with HTTP {(int)statusCode} ({string.Join("; ", details)}).";
+    }
+
+    private static List<string> ReadSafeErrorDetails(string errorBody)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(errorBody);
+            if (!document.RootElement.TryGetProperty("error", out var error) || error.ValueKind != JsonValueKind.Object)
+                return [];
+
+            var details = new List<string>(3);
+            AddSafeErrorDetail(error, "type", details);
+            AddSafeErrorDetail(error, "code", details);
+            AddSafeErrorDetail(error, "param", details);
+            return details;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static void AddSafeErrorDetail(JsonElement error, string propertyName, List<string> details)
+    {
+        if (error.TryGetProperty(propertyName, out var property) &&
+            property.ValueKind == JsonValueKind.String &&
+            property.GetString() is { Length: > 0 } value)
+            details.Add($"{propertyName}: {value}");
+    }
 }

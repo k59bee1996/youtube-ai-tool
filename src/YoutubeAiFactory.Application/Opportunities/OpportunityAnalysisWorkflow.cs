@@ -68,7 +68,7 @@ public sealed class SetOpportunityDecisionHandler(IYoutubeAiFactoryStore store)
     }
 }
 
-public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, OpportunityAnalysisContextBuilder contextBuilder,
+public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, IAiModelResolver modelResolver, OpportunityAnalysisContextBuilder contextBuilder,
     OpportunityAnalysisOptions options, TimeProvider timeProvider, ILogger<OpportunityAnalysisJobProcessor> logger)
 {
     private static readonly Action<ILogger, Guid, Exception?> LogFailed = LoggerMessage.Define<Guid>(LogLevel.Warning, new EventId(2, nameof(LogFailed)), "Opportunity analysis job {JobId} failed.");
@@ -85,12 +85,13 @@ public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store
             var project = await store.GetProjectAsync(payload.ProjectId, cancellationToken) ?? throw new ResourceNotFoundException("The project for this opportunity job no longer exists.");
             var analyses = await store.GetCurrentCompetitorAnalysesForProjectAsync(project.Id, cancellationToken);
             var context = contextBuilder.Build(project, analyses);
-            run = new AiRun("OpportunityAnalysis", project.Id, "pending", "pending", OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, now);
+            var resolvedModel = modelResolver.Resolve(OpportunityAnalysisPrompt.ModelProfile);
+            run = new AiRun("OpportunityAnalysis", project.Id, resolvedModel.Provider, resolvedModel.Model, OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, now, resolvedModel.Profile.ToString());
             store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
             LlmResult<OpportunityAnalysisResult>? answer = null; Exception? failure = null; string? repairDiagnostic = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
             {
-                try { answer = await provider.GenerateStructuredAsync<OpportunityAnalysisResult>(OpportunityAnalysisPrompt.Create(context, repairDiagnostic), cancellationToken); OpportunityAnalysisValidator.Validate(answer.Value, context, options.MaxCandidates); break; }
+                try { answer = await provider.GenerateStructuredAsync<OpportunityAnalysisResult>(OpportunityAnalysisPrompt.Create(context, repairDiagnostic).WithResolvedModel(resolvedModel), cancellationToken); OpportunityAnalysisValidator.Validate(answer.Value, context, options.MaxCandidates); break; }
                 catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; repairDiagnostic = ex.Message; await store.SaveChangesAsync(cancellationToken); }
                 catch (Exception ex) { failure = ex; answer = null; break; }
             }

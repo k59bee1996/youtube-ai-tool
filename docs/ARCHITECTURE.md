@@ -16,6 +16,16 @@ Web -> API -> Application -> Domain
 
 `Domain` has no framework or integration dependencies. `Application` defines use cases and external contracts. `Infrastructure` owns EF Core, SQL Server, provider adapters, and migrations. `Api` maps HTTP contracts to application use cases. `Worker` is reserved for long-running work.
 
+## AI model routing
+
+AI workflows request an application-level capability, never a concrete vendor model:
+
+```text
+Workflow -> AiModelProfile -> IAiModelResolver -> ILlmProvider -> configured provider/model
+```
+
+`Fast` is for mechanical transformation such as artifact localization and future structural repair. `Reasoning` is for bounded competitor interpretation and idea synthesis. `Premium` is reserved for high-leverage strategic synthesis and controlled experiment planning. The configuration-backed resolver is stateless and resolves each request independently; a missing or invalid required profile fails clearly and does not silently downgrade to another profile. Provider API keys remain in configuration only.
+
 ## Phase 2 collection flow
 
 ```text

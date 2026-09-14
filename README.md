@@ -23,6 +23,9 @@ $env:ConnectionStrings__DefaultConnection = "Server=localhost;Database=YoutubeAi
 dotnet ef database update --project src/YoutubeAiFactory.Infrastructure --startup-project src/YoutubeAiFactory.Infrastructure
 $env:YouTube__ApiKey = "your-google-api-key"
 $env:AI__ApiKey = "your-ai-provider-key"
+$env:AI__Models__Fast__Model = "gpt-5.6-luna"
+$env:AI__Models__Reasoning__Model = "gpt-5.6-terra"
+$env:AI__Models__Premium__Model = "gpt-5.6-sol"
 dotnet run --project src/YoutubeAiFactory.Api --urls http://localhost:5050
 ```
 
