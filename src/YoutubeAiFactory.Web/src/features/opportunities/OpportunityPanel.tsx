@@ -436,6 +436,9 @@ function IdeaBank({
         ? a.scores[sort] - b.scores[sort]
         : b.scores[sort] - a.scores[sort],
     );
+  const approvedIdeaCount = (bank?.ideas ?? []).filter(
+    (item) => item.decisionStatus === "Approved",
+  ).length;
   const detail = ideas.find((item) => item.id === selected);
   return (
     <section className="idea-bank">
@@ -467,6 +470,10 @@ function IdeaBank({
             Ideas are persisted proposals; generation is never triggered by this
             page loading.
           </p>
+          <p className="idea-approval-summary">
+            <strong>{approvedIdeaCount}</strong> of {bank?.ideas.length ?? 0} ideas
+            approved in this Idea Bank.
+          </p>
           {bank?.latestGeneration?.isStale && (
             <p className="stale-note">
               This generation is based on an older opportunity report.
@@ -497,7 +504,7 @@ function IdeaBank({
               >
                 <option value="All">All</option>
                 <option value="Candidate">Candidate</option>
-                <option value="Approved">Approved</option>
+                <option value="Approved">Approved ({approvedIdeaCount})</option>
                 <option value="Rejected">Rejected</option>
               </select>
             </label>
@@ -507,7 +514,10 @@ function IdeaBank({
           ) : (
             <div className="idea-list">
               {ideas.map((item) => (
-                <article className="idea-card" key={item.id}>
+                <article
+                  className={`idea-card idea-card--${item.decisionStatus.toLowerCase()}`}
+                  key={item.id}
+                >
                   <button
                     className="idea-title"
                     type="button"
@@ -545,7 +555,13 @@ function IdeaBank({
                     </div>
                   </div>
                   <div className="idea-actions">
-                    <strong>{item.decisionStatus}</strong>
+                    <span
+                      className={`idea-status idea-status--${item.decisionStatus.toLowerCase()}`}
+                    >
+                      {item.decisionStatus === "Approved"
+                        ? "Approved for Pilot"
+                        : item.decisionStatus}
+                    </span>
                     <button
                       className="quiet-button"
                       type="button"

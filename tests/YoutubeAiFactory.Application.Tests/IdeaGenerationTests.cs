@@ -30,6 +30,23 @@ public sealed class IdeaGenerationTests
     }
 
     [Fact]
+    public void Batch_planner_uses_one_default_request_for_fifteen_ideas_and_supports_smaller_batches()
+    {
+        Assert.Equal([15], IdeaGenerationBatchPlanner.CreateInitialBatchSizes(new IdeaGenerationOptions()));
+        Assert.Equal([5, 5, 1], IdeaGenerationBatchPlanner.CreateInitialBatchSizes(new IdeaGenerationOptions { TargetIdeaCount = 11, MinIdeaCount = 10, IdeasPerRequest = 5 }));
+    }
+
+    [Fact]
+    public void Prompt_uses_the_resolved_model_output_limit_and_a_strict_schema()
+    {
+        var request = IdeaGenerationPrompt.Create(Context(), 5);
+
+        Assert.Empty(request.ModelConfiguration);
+        Assert.NotNull(request.OutputSchema);
+        Assert.Equal("object", request.OutputSchema!["type"]!.GetValue<string>());
+    }
+
+    [Fact]
     public void Validator_rejects_missing_hypothesis_and_invalid_evidence()
     {
         var context = Context(); Assert.Throws<StructuredOutputException>(() => IdeaGenerationValidator.Validate(Candidate(context) with { Hypothesis = "" }, context));

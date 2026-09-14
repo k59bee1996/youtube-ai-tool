@@ -35,12 +35,15 @@ $env:CompetitorCollection__VideoLimit = "30" # Allowed range: 1-50
 $env:AI__ApiKey = "your-ai-provider-key"
 $env:AI__Models__Fast__Model = "gpt-5.6-luna"
 $env:AI__Models__Reasoning__Model = "gpt-5.6-terra"
+$env:AI__Models__Reasoning__TimeoutSeconds = "300" # Default: 300 seconds for structured analysis/idea generation
+$env:AI__Models__Reasoning__MaxOutputTokens = "8000" # Default: 8,000 tokens for one 15-idea generation response
 $env:AI__Models__Premium__Model = "gpt-5.6-sol"
 $env:CompetitorAnalysis__MaxVideos = "30" # Allowed range: 1-50
 $env:OpportunityAnalysis__MaxCompetitors = "8"
 $env:OpportunityAnalysis__MaxEvidenceItems = "60"
-$env:IdeaGeneration__TargetIdeaCount = "25"
-$env:IdeaGeneration__MinIdeaCount = "20"
+$env:IdeaGeneration__TargetIdeaCount = "15"
+$env:IdeaGeneration__MinIdeaCount = "15"
+$env:IdeaGeneration__IdeasPerRequest = "15"
 $env:PilotGeneration__MaxCandidateIdeas = "40" # Allowed range: 12-40
 ```
 

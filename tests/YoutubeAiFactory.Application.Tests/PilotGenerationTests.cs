@@ -83,6 +83,18 @@ public sealed class PilotGenerationTests
         Assert.Contains("videos", request.UserContent, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Prompt_explicitly_requests_json_for_the_structured_output_contract()
+    {
+        var request = PilotGenerationPrompt.Create(Context());
+
+        Assert.Equal(3, PilotGenerationPrompt.Version);
+        Assert.Contains("Return JSON only", request.SystemInstructions, StringComparison.Ordinal);
+        Assert.Contains("JSON Schema", request.SystemInstructions, StringComparison.Ordinal);
+        Assert.NotNull(request.OutputSchema);
+        Assert.Equal("string", request.OutputSchema!["$defs"]!["video"]!["properties"]!["hypothesis"]!["type"]!.GetValue<string>());
+    }
+
     private static PilotGenerationContext Context(bool sameTopic = false)
     {
         var opportunity = Guid.NewGuid(); var ideas = Enumerable.Range(1, 12).Select(index => new PilotIdeaContext(Guid.NewGuid(), opportunity, "Historical economics", $"Idea {index}", sameTopic ? "Castle" : $"Topic {index}", $"Angle {index}", index % 2 == 0 ? "Explainer" : "Case study", "History fans", $"Hook {index}", $"Thumbnail {index}", "Promise", "A testable idea hypothesis", 80 - index, 70, index <= 4 ? 60 : 80, 75, 70, IdeaDecisionStatus.Approved, OpportunityDecisionStatus.Approved, 1, 1, 12)).ToArray();

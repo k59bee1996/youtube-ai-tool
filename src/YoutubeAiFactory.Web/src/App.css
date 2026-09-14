@@ -76,10 +76,16 @@ textarea { min-height: 92px; resize: vertical; }
 .idea-bank { display: grid; gap: 16px; margin-top: 22px; padding: 18px; border: 1px solid #34435c; border-radius: 12px; background: rgba(10, 18, 33, .6); }
 .idea-list { display: grid; gap: 12px; }
 .idea-card, .idea-detail { padding: 16px; border: 1px solid #2c3a51; border-radius: 10px; background: #0b1424; }
+.idea-card--approved { border-color: #249d65; background: rgba(13, 54, 38, .38); }
+.idea-card--rejected { border-color: #70424a; opacity: .78; }
 .idea-card p, .idea-detail p { color: #c9d4e4; line-height: 1.45; }
 .idea-title { padding: 0; border: 0; background: transparent; color: #f8fafc; font-weight: 800; font-size: 1rem; text-align: left; }
 .idea-title:hover { color: #ffb19f; }
 .idea-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 13px; }
+.idea-approval-summary { margin: 0; color: #b8f2d0; font-size: .9rem; }
+.idea-status { display: inline-flex; align-items: center; border: 1px solid #50617c; border-radius: 999px; padding: 4px 8px; color: #c9d4e4; font-size: .78rem; font-weight: 750; }
+.idea-status--approved { border-color: #2abe77; background: rgba(16, 185, 129, .15); color: #b8f2d0; }
+.idea-status--rejected { border-color: #a54b57; background: rgba(185, 28, 28, .12); color: #fecaca; }
 .idea-sort { display: flex; gap: 9px; align-items: center; color: #c9d4e4; font-size: .86rem; font-weight: 650; }
 .idea-filters { display: flex; flex-wrap: wrap; gap: 14px; }
 .idea-sort select { border: 1px solid #34435c; border-radius: 8px; background: #0a1221; color: #f8fafc; padding: 8px; }
