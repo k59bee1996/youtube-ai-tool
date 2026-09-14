@@ -46,7 +46,10 @@ public sealed class GetOpportunityStatusHandler(IYoutubeAiFactoryStore store)
                     candidate.Candidate.AudienceFitSignal, candidate.Candidate.TransferabilitySignal, candidate.Candidate.EvidenceStrength, candidate.Candidate.StoryPotential,
                     candidate.Candidate.ProductionComplexity, candidate.Candidate.OverallScore), candidate.Candidate.Confidence,
                 Deserialize(candidate.Candidate.RisksJson), Deserialize(candidate.Candidate.LimitationsJson), candidate.Candidate.DecisionStatus.ToString(),
-                candidate.Evidence.Select(e => new OpportunityEvidenceDto(e.Id, e.CompetitorChannelId, e.CompetitorAnalysisId, e.CompetitorVideoId, e.EvidenceId, e.Summary)).ToArray())).OrderByDescending(item => item.Scores.OverallScore).ToArray());
+                candidate.Evidence.Select(e => new OpportunityEvidenceDto(e.Id, e.CompetitorChannelId, e.CompetitorAnalysisId, e.CompetitorVideoId, e.EvidenceId, e.Summary)).ToArray()))
+                .OrderByDescending(item => item.Scores.OverallScore)
+                .ThenBy(item => item.Id)
+                .ToArray());
     }
     internal static OpportunityJobDto? ToJob(Job? job) => job is null ? null : new OpportunityJobDto(job.Id, job.Status.ToString(), job.FailureReason);
     private static string[] Deserialize(string json) => JsonSerializer.Deserialize<string[]>(json, OpportunityAnalysisPrompt.SerializerOptions) ?? [];

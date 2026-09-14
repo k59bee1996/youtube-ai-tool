@@ -16,6 +16,10 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.CompetitorChannelId).HasColumnName("competitor_channel_id");
         builder.Property(job => job.ProjectId).HasColumnName("project_id");
         builder.Property(job => job.OpportunityId).HasColumnName("opportunity_id");
+        builder.Property(job => job.ArtifactType).HasColumnName("artifact_type").HasMaxLength(100);
+        builder.Property(job => job.ArtifactId).HasColumnName("artifact_id");
+        builder.Property(job => job.ArtifactVersion).HasColumnName("artifact_version");
+        builder.Property(job => job.Locale).HasColumnName("locale").HasMaxLength(10);
         builder.Property(job => job.Payload).HasColumnName("payload").HasColumnType("nvarchar(max)").IsRequired();
         builder.Property(job => job.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(job => job.RetryCount).HasColumnName("retry_count").IsRequired();
@@ -39,5 +43,9 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasDatabaseName("ux_jobs_active_idea_generation")
             .IsUnique()
             .HasFilter("type = 'idea-generation' AND status IN ('Queued', 'Running', 'Retrying')");
+        builder.HasIndex(job => new { job.ArtifactType, job.ArtifactId, job.ArtifactVersion, job.Locale })
+            .HasDatabaseName("ux_jobs_active_artifact_localization")
+            .IsUnique()
+            .HasFilter("type = 'artifact-localization' AND status IN ('Queued', 'Running', 'Retrying')");
     }
 }

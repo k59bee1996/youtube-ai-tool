@@ -16,7 +16,11 @@ public sealed class Job
         int maxRetries = 3,
         Guid? competitorChannelId = null,
         Guid? projectId = null,
-        Guid? opportunityId = null)
+        Guid? opportunityId = null,
+        string? artifactType = null,
+        Guid? artifactId = null,
+        int? artifactVersion = null,
+        string? locale = null)
     {
         if (maxRetries < 0)
         {
@@ -29,6 +33,12 @@ public sealed class Job
         CompetitorChannelId = competitorChannelId;
         ProjectId = projectId;
         OpportunityId = opportunityId;
+        ArtifactType = artifactType;
+        ArtifactId = artifactId;
+        ArtifactVersion = artifactVersion;
+        Locale = locale;
+        if ((artifactType is null) != (artifactId is null) || (artifactId is null) != (artifactVersion is null) || (artifactVersion is null) != (locale is null))
+            throw new DomainException("Artifact localization job identity must include type, ID, version, and locale.");
         Payload = payload;
         Status = JobStatus.Queued;
         MaxRetries = maxRetries;
@@ -45,6 +55,10 @@ public sealed class Job
     public Guid? ProjectId { get; private set; }
 
     public Guid? OpportunityId { get; private set; }
+    public string? ArtifactType { get; private set; }
+    public Guid? ArtifactId { get; private set; }
+    public int? ArtifactVersion { get; private set; }
+    public string? Locale { get; private set; }
 
     public string Payload { get; private set; } = string.Empty;
 

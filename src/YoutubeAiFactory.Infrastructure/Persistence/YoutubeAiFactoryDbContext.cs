@@ -3,6 +3,7 @@ using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
+using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
@@ -24,6 +25,7 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
     public DbSet<Job> Jobs => Set<Job>();
 
     public DbSet<AiRun> AiRuns => Set<AiRun>();
+    public DbSet<ArtifactLocalization> ArtifactLocalizations => Set<ArtifactLocalization>();
     public DbSet<OpportunityReport> OpportunityReports => Set<OpportunityReport>();
     public DbSet<OpportunityReportSource> OpportunityReportSources => Set<OpportunityReportSource>();
     public DbSet<OpportunityCandidate> OpportunityCandidates => Set<OpportunityCandidate>();

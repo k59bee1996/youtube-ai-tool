@@ -1,5 +1,6 @@
 using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Ideas;
+using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Infrastructure;
@@ -12,6 +13,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("CompetitorAnalys
 builder.Services.AddSingleton(builder.Configuration.GetSection("OpportunityAnalysis").Get<OpportunityAnalysisOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection("IdeaGeneration").Get<IdeaGenerationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection("PilotGeneration").Get<PilotGenerationOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection(ArtifactLocalizationOptions.SectionName).Get<ArtifactLocalizationOptions>() ?? new());
 builder.Services.AddScoped<CompetitorAnalysisContextBuilder>();
 builder.Services.AddScoped<CompetitorAnalysisJobProcessor>();
 builder.Services.AddScoped<OpportunityAnalysisContextBuilder>();
@@ -22,11 +24,15 @@ builder.Services.AddScoped<IdeaScoringEngine>();
 builder.Services.AddScoped<IdeaGenerationJobProcessor>();
 builder.Services.AddScoped<PilotGenerationContextBuilder>();
 builder.Services.AddScoped<PilotGenerationJobProcessor>();
+builder.Services.AddScoped<RequestCompetitorAnalysisLocalizationHandler>();
+builder.Services.AddScoped<GetCompetitorAnalysisLocalizationHandler>();
+builder.Services.AddScoped<ArtifactLocalizationJobProcessor>();
 builder.Services.AddHostedService<DatabaseHeartbeatWorker>();
 builder.Services.AddHostedService<CompetitorAnalysisWorker>();
 builder.Services.AddHostedService<OpportunityAnalysisWorker>();
 builder.Services.AddHostedService<IdeaGenerationWorker>();
 builder.Services.AddHostedService<PilotGenerationWorker>();
+builder.Services.AddHostedService<ArtifactLocalizationWorker>();
 
 var host = builder.Build();
 host.Run();

@@ -22,6 +22,9 @@ input:focus, textarea:focus { border-color: #ff6846; box-shadow: 0 0 0 3px rgba(
 textarea { min-height: 92px; resize: vertical; }
 .primary-button { border: 0; background: #ff6846; color: #160904; padding: 12px 18px; font-weight: 800; }
 .quiet-button { border: 1px solid #34435c; background: transparent; color: #dbe4f0; padding: 10px 14px; }
+.analysis-language-toggle { display: inline-flex; border: 1px solid #34435c; border-radius: 7px; overflow: hidden; }
+.analysis-language-toggle button { border: 0; border-radius: 0; background: transparent; color: #c9d4e4; padding: 7px 11px; }
+.analysis-language-toggle button.is-selected { background: #ff6846; color: #101725; font-weight: 700; }
 .error-banner { margin-bottom: 22px; border: 1px solid #7f3038; border-radius: 10px; background: rgba(127, 29, 29, .3); color: #fecaca; padding: 13px 16px; }
 
 .project-list { display: grid; gap: 10px; margin-top: 20px; }

@@ -1,1 +1,1 @@
-export type { IdeaBank, OpportunityCandidate, OpportunityReport, OpportunityStatus } from "../../api"
+export type { IdeaBank, LocalizedOpportunityReportContent, OpportunityCandidate, OpportunityReport, OpportunityStatus } from "../../api"
