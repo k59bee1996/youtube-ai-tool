@@ -117,6 +117,12 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public Task FailArtifactLocalizationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
         FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
     public void AddArtifactLocalization(ArtifactLocalization localization) => dbContext.ArtifactLocalizations.Add(localization);
+    public async Task DeleteArtifactLocalizationAsync(Guid localizationId, CancellationToken cancellationToken)
+    {
+        var localization = await dbContext.ArtifactLocalizations.SingleAsync(item => item.Id == localizationId, cancellationToken);
+        dbContext.ArtifactLocalizations.Remove(localization);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<CurrentCompetitorAnalysis>> GetCurrentCompetitorAnalysesForProjectAsync(Guid projectId, CancellationToken cancellationToken)
     {
@@ -136,6 +142,17 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         var candidates = await dbContext.OpportunityCandidates.AsNoTracking().Where(item => item.ReportId == report.Id).ToListAsync(cancellationToken);
         var candidateIds = candidates.Select(item => item.Id).ToArray();
         var evidence = await dbContext.OpportunityEvidence.AsNoTracking().Where(item => candidateIds.Contains(item.CandidateId)).ToListAsync(cancellationToken);
+        return new OpportunityReportWithDetails(report, sources, candidates.Select(item => new OpportunityCandidateWithEvidence(item, evidence.Where(e => e.CandidateId == item.Id).ToArray())).ToArray(), []);
+    }
+
+    public async Task<OpportunityReportWithDetails?> GetOpportunityReportAsync(Guid projectId, Guid reportId, CancellationToken cancellationToken)
+    {
+        var report = await dbContext.OpportunityReports.AsNoTracking().SingleOrDefaultAsync(item => item.ProjectId == projectId && item.Id == reportId, cancellationToken);
+        if (report is null) return null;
+        var sources = await dbContext.OpportunityReportSources.AsNoTracking().Where(item => item.ReportId == report.Id).ToListAsync(cancellationToken);
+        var candidates = await dbContext.OpportunityCandidates.AsNoTracking().Where(item => item.ReportId == report.Id).ToListAsync(cancellationToken);
+        var ids = candidates.Select(item => item.Id).ToArray();
+        var evidence = await dbContext.OpportunityEvidence.AsNoTracking().Where(item => ids.Contains(item.CandidateId)).ToListAsync(cancellationToken);
         return new OpportunityReportWithDetails(report, sources, candidates.Select(item => new OpportunityCandidateWithEvidence(item, evidence.Where(e => e.CandidateId == item.Id).ToArray())).ToArray(), []);
     }
 

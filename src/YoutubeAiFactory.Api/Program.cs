@@ -40,6 +40,8 @@ builder.Services.AddScoped<CompetitorAnalysisContextBuilder>();
 builder.Services.AddScoped<CompetitorAnalysisJobProcessor>();
 builder.Services.AddScoped<RequestCompetitorAnalysisLocalizationHandler>();
 builder.Services.AddScoped<GetCompetitorAnalysisLocalizationHandler>();
+builder.Services.AddScoped<RequestOpportunityReportLocalizationHandler>();
+builder.Services.AddScoped<GetOpportunityReportLocalizationHandler>();
 builder.Services.AddScoped<RunOpportunityAnalysisHandler>();
 builder.Services.AddScoped<GetOpportunityStatusHandler>();
 builder.Services.AddScoped<OpportunityAnalysisContextBuilder>();

@@ -38,6 +38,8 @@ Competitor IDs are always scoped to their route project. A competitor without co
 
 - `POST /api/projects/{projectId}/opportunities:generate` queues one project-scoped opportunity analysis and returns `202` with a job ID, status, and active-job reuse indicator.
 - `GET /api/projects/{projectId}/opportunities/latest` returns the latest immutable report, status, analyzed-competitor count, score components, sources, validated evidence, risks, limitations, and stale flag.
+- `POST /api/projects/{projectId}/opportunities/{reportId}/localizations/vi` returns a persisted Vietnamese reading aid when available, otherwise queues one translation job and returns `202`. It never changes the canonical opportunity report, including candidate names, scores, decisions, or evidence references.
+- `GET /api/projects/{projectId}/opportunities/{reportId}/localizations/vi` returns the persisted Vietnamese overlay and its job state. English continues to come from the canonical opportunity report endpoint.
 
 At least one completed competitor analysis is required. Generation may use completed analyses even when some collected competitors are not analyzed; that limitation is exposed by the response and UI.
 

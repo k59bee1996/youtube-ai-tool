@@ -5,6 +5,7 @@ using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Domain.AI;
+using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Localization;
 
@@ -18,7 +19,7 @@ public sealed class ArtifactLocalizationOptions
     public int RunningJobLeaseSeconds { get; init; } = 300;
 }
 
-public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale);
+public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale, Guid? OpportunityReportId = null);
 public sealed record ArtifactLocalizationStatusDto(LocalizedCompetitorAnalysisContent? Content, AnalysisJobDto? ActiveJob, AnalysisJobDto? LatestJob);
 public sealed record RequestArtifactLocalizationResult(Guid? JobId, string Status, bool Existing);
 
@@ -31,7 +32,11 @@ public sealed class RequestCompetitorAnalysisLocalizationHandler(IYoutubeAiFacto
             ?? throw new ResourceNotFoundException($"Analysis '{analysisId}' was not found in project '{projectId}'.");
         if (analysis.CompetitorChannelId != competitorId) throw new ResourceNotFoundException($"Analysis '{analysisId}' was not found for competitor '{competitorId}'.");
         var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, normalizedLocale, cancellationToken);
-        if (cached is not null) return new(null, "Completed", true);
+        if (cached is not null)
+        {
+            if (LocalizedCompetitorAnalysisCache.IsValid(analysis, cached)) return new(null, "Completed", true);
+            await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
+        }
         var payload = JsonSerializer.Serialize(new ArtifactLocalizationJobPayload(projectId, analysis.Id, analysis.Version, normalizedLocale), JsonOptions);
         var job = new Job("artifact-localization", payload, timeProvider.GetUtcNow(), options.MaxJobRetries, projectId: projectId,
             artifactType: LocalizableArtifactTypes.CompetitorAnalysis, artifactId: analysis.Id, artifactVersion: analysis.Version, locale: normalizedLocale);
@@ -59,8 +64,9 @@ public sealed class GetCompetitorAnalysisLocalizationHandler(IYoutubeAiFactorySt
         var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, normalizedLocale, cancellationToken);
         var active = await store.GetActiveArtifactLocalizationJobAsync(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, normalizedLocale, cancellationToken);
         var latest = active ?? await store.GetLatestArtifactLocalizationJobAsync(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, normalizedLocale, cancellationToken);
-        var content = cached is null ? null : JsonSerializer.Deserialize<LocalizedCompetitorAnalysisContent>(cached.ContentJson, RequestCompetitorAnalysisLocalizationHandler.JsonOptions)
-            ?? throw new InvalidOperationException("Stored localized analysis is unreadable.");
+        var content = cached is not null && LocalizedCompetitorAnalysisCache.IsValid(analysis, cached)
+            ? JsonSerializer.Deserialize<LocalizedCompetitorAnalysisContent>(cached.ContentJson, RequestCompetitorAnalysisLocalizationHandler.JsonOptions)
+            : null;
         return new(content, active is null ? null : new(active.Id, active.Status.ToString(), active.FailureReason), latest is null ? null : new(latest.Id, latest.Status.ToString(), latest.FailureReason));
     }
 }
@@ -78,14 +84,26 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
         {
             var payload = JsonSerializer.Deserialize<ArtifactLocalizationJobPayload>(job.Payload, RequestCompetitorAnalysisLocalizationHandler.JsonOptions)
                 ?? throw new InvalidOperationException("Artifact localization job payload is invalid.");
+            if (job.ArtifactType == LocalizableArtifactTypes.OpportunityReport)
+            {
+                await ProcessOpportunityReportAsync(job, payload, cancellationToken);
+                return true;
+            }
+            if (job.ArtifactType != LocalizableArtifactTypes.CompetitorAnalysis)
+                throw new ApplicationValidationException($"Artifact type '{job.ArtifactType}' is not supported for localization.");
             var analysis = await store.GetCompetitorAnalysisAsync(payload.ProjectId, payload.AnalysisId, cancellationToken)
                 ?? throw new ResourceNotFoundException("The analysis for this localization job no longer exists.");
             if (analysis.Version != payload.ArtifactVersion) throw new ApplicationValidationException("The requested analysis version is no longer available.");
-            if (await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, payload.Locale, cancellationToken) is not null)
+            var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, payload.Locale, cancellationToken);
+            if (cached is not null && LocalizedCompetitorAnalysisCache.IsValid(analysis, cached))
             {
                 job.Complete(timeProvider.GetUtcNow());
                 await store.SaveChangesAsync(cancellationToken);
                 return true;
+            }
+            if (cached is not null)
+            {
+                await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
             }
             var canonical = JsonSerializer.Deserialize<CompetitorAnalysisResult>(analysis.ResultJson, RequestCompetitorAnalysisHandlerJson)
                 ?? throw new InvalidOperationException("Stored competitor analysis is unreadable.");
@@ -131,5 +149,95 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
         return true;
     }
 
+    private async Task ProcessOpportunityReportAsync(Job job, ArtifactLocalizationJobPayload payload, CancellationToken cancellationToken)
+    {
+        AiRun? run = null;
+        try
+        {
+            if (payload.OpportunityReportId is not Guid reportId || reportId == Guid.Empty)
+                throw new ApplicationValidationException("Opportunity localization job payload is invalid.");
+            var report = await store.GetOpportunityReportAsync(payload.ProjectId, reportId, cancellationToken)
+                ?? throw new ResourceNotFoundException("The opportunity report for this localization job no longer exists.");
+            if (report.Report.Version != payload.ArtifactVersion)
+                throw new ApplicationValidationException("The requested opportunity report version is no longer available.");
+            var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.OpportunityReport, report.Report.Id, report.Report.Version, payload.Locale, cancellationToken);
+            if (cached is not null && LocalizedOpportunityReportCache.IsValid(report, cached))
+            {
+                job.Complete(timeProvider.GetUtcNow());
+                await store.SaveChangesAsync(cancellationToken);
+                return;
+            }
+            if (cached is not null) await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
+
+            run = new AiRun("ArtifactLocalization", payload.ProjectId, "pending", "pending", OpportunityReportLocalizationPrompt.Key,
+                OpportunityReportLocalizationPrompt.Version, timeProvider.GetUtcNow());
+            store.AddAiRun(run);
+            await store.SaveChangesAsync(cancellationToken);
+            LlmResult<LocalizedOpportunityReportContent>? answer = null;
+            Exception? failure = null;
+            for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
+            {
+                try
+                {
+                    answer = await provider.GenerateStructuredAsync<LocalizedOpportunityReportContent>(OpportunityReportLocalizationPrompt.Create(report, attempt > 0), cancellationToken);
+                    LocalizedOpportunityReportValidator.Validate(report, answer.Value);
+                    break;
+                }
+                catch (StructuredOutputException exception) when (attempt < options.MaxStructuredOutputRetries)
+                {
+                    run.RecordRetry();
+                    failure = exception;
+                    await store.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                    break;
+                }
+            }
+            if (answer is null) throw failure ?? new StructuredOutputException("The provider did not return localized opportunity content.");
+            run.RecordProvider(answer.Provider, answer.Model);
+            store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.OpportunityReport, report.Report.Id, report.Report.Version, payload.Locale,
+                JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id, OpportunityReportLocalizationPrompt.Key,
+                OpportunityReportLocalizationPrompt.Version, answer.Provider, answer.Model, timeProvider.GetUtcNow()));
+            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            job.Complete(timeProvider.GetUtcNow());
+            await store.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var failedAt = timeProvider.GetUtcNow();
+            var retryable = exception is ExternalServiceException { Failure: ExternalServiceFailure.QuotaExceeded or ExternalServiceFailure.Transient };
+            await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
+                exception is YoutubeAiFactoryException ? exception.Message : "Opportunity translation could not be completed. Try again later.",
+                retryable, failedAt, retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null, CancellationToken.None);
+            LogFailed(logger, job.Id, exception);
+        }
+    }
+
     private static readonly JsonSerializerOptions RequestCompetitorAnalysisHandlerJson = new(JsonSerializerDefaults.Web);
+}
+
+internal static class LocalizedCompetitorAnalysisCache
+{
+    public static bool IsValid(CompetitorAnalysis analysis, ArtifactLocalization localization)
+    {
+        try
+        {
+            var canonical = JsonSerializer.Deserialize<CompetitorAnalysisResult>(analysis.ResultJson, RequestCompetitorAnalysisLocalizationHandler.JsonOptions)
+                ?? throw new InvalidOperationException("Stored competitor analysis is unreadable.");
+            var localized = JsonSerializer.Deserialize<LocalizedCompetitorAnalysisContent>(localization.ContentJson, RequestCompetitorAnalysisLocalizationHandler.JsonOptions)
+                ?? throw new StructuredOutputException("Stored localized analysis is empty.");
+            LocalizedCompetitorAnalysisValidator.Validate(canonical, localized);
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or StructuredOutputException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
 }

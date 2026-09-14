@@ -67,11 +67,15 @@ public interface IYoutubeAiFactoryStore
         throw new NotSupportedException("Artifact localization job persistence is not configured.");
     void AddArtifactLocalization(ArtifactLocalization localization) =>
         throw new NotSupportedException("Artifact localization persistence is not configured.");
+    Task DeleteArtifactLocalizationAsync(Guid localizationId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Artifact localization persistence is not configured.");
 
     Task<IReadOnlyList<CurrentCompetitorAnalysis>> GetCurrentCompetitorAnalysesForProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<CurrentCompetitorAnalysis>>([]);
 
     Task<OpportunityReportWithDetails?> GetLatestOpportunityReportAsync(Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult<OpportunityReportWithDetails?>(null);
+    Task<OpportunityReportWithDetails?> GetOpportunityReportAsync(Guid projectId, Guid reportId, CancellationToken cancellationToken) =>
         Task.FromResult<OpportunityReportWithDetails?>(null);
 
     Task<int> GetNextOpportunityReportVersionAsync(Guid projectId, CancellationToken cancellationToken) => Task.FromResult(1);

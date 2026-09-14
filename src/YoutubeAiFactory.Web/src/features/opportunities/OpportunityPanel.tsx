@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../services/api";
 import { messageFrom } from "../../lib/errors";
-import type { OpportunityCandidate, OpportunityReport, OpportunityStatus, IdeaBank } from "./types";
+import { AnalysisLanguageToggle, type AnalysisLocale } from "../localization/AnalysisLanguageToggle";
+import type { OpportunityCandidate, OpportunityReport, OpportunityStatus, IdeaBank, LocalizedOpportunityReportContent } from "./types";
 
 export function OpportunityPanel({ projectId }: { projectId: string }) {
   const [status, setStatus] = useState<
@@ -10,6 +11,12 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locale, setLocale] = useState<AnalysisLocale>("en");
+  const [localized, setLocalized] = useState<LocalizedOpportunityReportContent | null>(null);
+  const [localizedReportId, setLocalizedReportId] = useState<string | null>(null);
+  const [localizing, setLocalizing] = useState(false);
+  const [localizationActive, setLocalizationActive] = useState(false);
+  const [localizationError, setLocalizationError] = useState<string | null>(null);
   const active =
     status?.activeJob?.status === "Queued" ||
     status?.activeJob?.status === "Running" ||
@@ -33,6 +40,40 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
     const timer = window.setInterval(() => void load(), 2000);
     return () => window.clearInterval(timer);
   }, [active, load]);
+  const loadLocalization = useCallback(async (reportId: string) => {
+    try {
+      const result = await api.getOpportunityReportLocalization(projectId, reportId, "vi");
+      setLocalized(result.content);
+      setLocalizedReportId(reportId);
+      setLocalizationActive(result.activeJob?.status === "Queued" || result.activeJob?.status === "Running" || result.activeJob?.status === "Retrying");
+      setLocalizationError(result.latestJob?.status === "Failed" ? result.latestJob.failureReason ?? "Vietnamese reading aid could not be generated." : null);
+      return result;
+    } catch (requestError) {
+      setLocalizationError(messageFrom(requestError));
+      return null;
+    }
+  }, [projectId]);
+  useEffect(() => {
+    const report = status?.latestReport;
+    if (locale !== "vi" || !report || !localizationActive || localizedReportId !== report.id) return undefined;
+    const timer = window.setInterval(() => void loadLocalization(report.id), 2000);
+    return () => window.clearInterval(timer);
+  }, [locale, localizationActive, localizedReportId, loadLocalization, status?.latestReport]);
+  async function changeLocale(nextLocale: AnalysisLocale) {
+    setLocale(nextLocale);
+    setLocalizationError(null);
+    if (nextLocale === "en" || !status?.latestReport) return;
+    const report = status.latestReport;
+    setLocalizing(true);
+    try {
+      await api.requestOpportunityReportLocalization(projectId, report.id, "vi");
+      await loadLocalization(report.id);
+    } catch (requestError) {
+      setLocalizationError(messageFrom(requestError));
+    } finally {
+      setLocalizing(false);
+    }
+  }
   async function generate() {
     setRunning(true);
     setError(null);
@@ -54,6 +95,7 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
         </div>
         {status?.latestReport && (
           <div className="section-actions">
+            <AnalysisLanguageToggle locale={locale} onChange={(nextLocale) => void changeLocale(nextLocale)} disabled={localizing} />
             <span>Report v{status.latestReport.version}</span>
             <button
               className="primary-button"
@@ -97,6 +139,8 @@ export function OpportunityPanel({ projectId }: { projectId: string }) {
             projectId={projectId}
             report={status.latestReport}
             onChanged={load}
+            localized={locale === "vi" && localizedReportId === status.latestReport.id ? localized : null}
+            localizationError={locale === "vi" ? localizationError : null}
           />
         </>
       ) : status?.latestJob?.status === "Failed" ? (
@@ -156,10 +200,14 @@ function OpportunityReportView({
   projectId,
   report,
   onChanged,
+  localized,
+  localizationError,
 }: {
   projectId: string;
   report: OpportunityReport;
   onChanged: () => Promise<void>;
+  localized: LocalizedOpportunityReportContent | null;
+  localizationError: string | null;
 }) {
   return (
     <div className="analysis-report">
@@ -169,28 +217,31 @@ function OpportunityReportView({
           newer version.
         </p>
       )}
-      {report.limitations.map((item) => (
+      {localizationError && <p className="error-copy" role="alert">{localizationError}</p>}
+      {report.limitations.map((item, index) => (
         <p className="stale-note" key={item}>
-          {item}
+          {localized?.limitations?.[index] ?? item}
         </p>
       ))}
-      {report.opportunities.map((item, index) => (
+      {report.opportunities.map((item, index) => {
+        const translated = localized?.opportunities?.[index];
+        return (
         <article className="analysis-block" key={item.id}>
           <div className="section-heading">
             <h3>
-              #{index + 1} {item.name}
+              #{index + 1} {translated?.name ?? item.name}
             </h3>
             <strong>{item.scores.overallScore}/100</strong>
           </div>
-          <p>{item.description}</p>
+          <p>{translated?.description ?? item.description}</p>
           <p>
-            <strong>Audience:</strong> {item.audience} · <strong>Topic:</strong>{" "}
-            {item.topic} · <strong>Format:</strong> {item.contentFormat}
+            <strong>Audience:</strong> {translated?.audience ?? item.audience} · <strong>Topic:</strong>{" "}
+            {translated?.topic ?? item.topic} · <strong>Format:</strong> {translated?.contentFormat ?? item.contentFormat}
           </p>
           <p>
-            <strong>Angle:</strong> {item.angle}
+            <strong>Angle:</strong> {translated?.angle ?? item.angle}
           </p>
-          <p>{item.whyThisOpportunity}</p>
+          <p>{translated?.whyThisOpportunity ?? item.whyThisOpportunity}</p>
           <div className="confidence-grid">
             <div>
               <span>Observed demand</span>
@@ -219,16 +270,16 @@ function OpportunityReportView({
           </div>
           <p>
             <strong>Evidence:</strong>{" "}
-            {item.evidence.map((evidence) => evidence.summary).join(" · ")}
+            {item.evidence.map((evidence, evidenceIndex) => translated?.evidenceSummaries?.[evidenceIndex] ?? evidence.summary).join(" · ")}
           </p>
           {item.risks.length > 0 && (
             <p>
-              <strong>Risks:</strong> {item.risks.join(" · ")}
+              <strong>Risks:</strong> {item.risks.map((risk, riskIndex) => translated?.risks?.[riskIndex] ?? risk).join(" · ")}
             </p>
           )}
           {item.limitations.length > 0 && (
             <p>
-              <strong>Limitations:</strong> {item.limitations.join(" · ")}
+              <strong>Limitations:</strong> {item.limitations.map((limitation, limitationIndex) => translated?.limitations?.[limitationIndex] ?? limitation).join(" · ")}
             </p>
           )}
           <OpportunityActions
@@ -240,7 +291,8 @@ function OpportunityReportView({
             <IdeaBank projectId={projectId} opportunityId={item.id} />
           )}
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
