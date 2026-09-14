@@ -59,7 +59,7 @@ public sealed class GetIdeaGenerationHandler(IYoutubeAiFactoryStore store)
     }
 }
 
-public sealed class IdeaGenerationJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, IdeaGenerationContextBuilder contextBuilder, IdeaGenerationOptions options, IdeaScoringEngine scoringEngine, TimeProvider timeProvider, ILogger<IdeaGenerationJobProcessor> logger)
+public sealed class IdeaGenerationJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, IAiModelResolver modelResolver, IdeaGenerationContextBuilder contextBuilder, IdeaGenerationOptions options, IdeaScoringEngine scoringEngine, TimeProvider timeProvider, ILogger<IdeaGenerationJobProcessor> logger)
 {
     private static readonly Action<ILogger, Guid, Guid, int, int, Exception?> LogCompleted = LoggerMessage.Define<Guid, Guid, int, int>(LogLevel.Information, new EventId(1, nameof(LogCompleted)), "Idea generation completed for project {ProjectId}, opportunity {OpportunityId}; accepted {AcceptedCount} of {GeneratedCount} candidates.");
     private static readonly Action<ILogger, Guid, Exception?> LogFailed = LoggerMessage.Define<Guid>(LogLevel.Warning, new EventId(2, nameof(LogFailed)), "Idea generation job {JobId} failed.");
@@ -72,18 +72,21 @@ public sealed class IdeaGenerationJobProcessor(IYoutubeAiFactoryStore store, ILl
             var project = await store.GetProjectAsync(payload.ProjectId, cancellationToken) ?? throw new ResourceNotFoundException("The project for this idea job no longer exists.");
             var opportunity = await store.GetOpportunityWithEvidenceAsync(payload.ProjectId, payload.OpportunityId, false, cancellationToken) ?? throw new ResourceNotFoundException("Approved opportunity was not found.");
             var existing = await store.ListExistingIdeaContextAsync(payload.ProjectId, cancellationToken); var titles = await store.ListCompetitorTitlesAsync(payload.ProjectId, cancellationToken); var context = contextBuilder.Build(project, opportunity, existing, titles);
-            run = new AiRun("IdeaGeneration", payload.ProjectId, "pending", "pending", IdeaGenerationPrompt.Key, IdeaGenerationPrompt.Version, now); store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
+            var resolvedModel = modelResolver.Resolve(IdeaGenerationPrompt.ModelProfile);
+            run = new AiRun("IdeaGeneration", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, IdeaGenerationPrompt.Key, IdeaGenerationPrompt.Version, now, resolvedModel.Profile.ToString()); store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
             var accepted = new List<VideoIdeaCandidateResult>(); var generatedCount = 0; var totalInputTokens = 0; var totalOutputTokens = 0; var hasInputTokens = false; var hasOutputTokens = false;
-            for (var replacement = 0; replacement <= options.MaxReplacementAttempts && accepted.Count < options.MinIdeaCount; replacement++)
+            var initialBatches = IdeaGenerationBatchPlanner.CreateInitialBatchSizes(options);
+            for (var batch = 0; batch < initialBatches.Count + options.MaxReplacementAttempts && (batch < initialBatches.Count || accepted.Count < options.MinIdeaCount); batch++)
             {
-                var requestCount = replacement == 0 ? options.TargetIdeaCount : options.MinIdeaCount - accepted.Count;
+                var isReplacement = batch >= initialBatches.Count;
+                var requestCount = isReplacement ? Math.Min(options.IdeasPerRequest, options.MinIdeaCount - accepted.Count) : initialBatches[batch];
                 LlmResult<IdeaGenerationResult>? answer = null; Exception? failure = null;
                 for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
-                { try { answer = await provider.GenerateStructuredAsync<IdeaGenerationResult>(IdeaGenerationPrompt.Create(context, requestCount, attempt > 0, replacement > 0 ? accepted : null), cancellationToken); break; } catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; } catch (Exception ex) { failure = ex; break; } }
+                { try { answer = await provider.GenerateStructuredAsync<IdeaGenerationResult>(IdeaGenerationPrompt.Create(context, requestCount, attempt > 0, accepted.Count > 0 ? accepted : null).WithResolvedModel(resolvedModel), cancellationToken); break; } catch (StructuredOutputException ex) when (attempt < options.MaxStructuredOutputRetries) { run.RecordRetry(); failure = ex; } catch (Exception ex) { failure = ex; break; } }
                 if (answer is null) throw failure ?? new StructuredOutputException("The provider did not return idea output.");
                 run.RecordProvider(answer.Provider, answer.Model); if (answer.InputTokens is { } inputTokens) { totalInputTokens += inputTokens; hasInputTokens = true; }
                 if (answer.OutputTokens is { } outputTokens) { totalOutputTokens += outputTokens; hasOutputTokens = true; }
-                if (answer.Value.Ideas is null || answer.Value.Ideas.Count > options.MaxGeneratedCandidates) throw new StructuredOutputException("The provider returned an invalid number of idea candidates."); generatedCount += answer.Value.Ideas.Count;
+                if (answer.Value.Ideas is null || answer.Value.Ideas.Count != requestCount) throw new StructuredOutputException("The provider returned an invalid number of idea candidates."); generatedCount += answer.Value.Ideas.Count;
                 foreach (var candidate in answer.Value.Ideas)
                 {
                     try { IdeaGenerationValidator.Validate(candidate, context); } catch (StructuredOutputException) { continue; }

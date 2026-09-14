@@ -15,8 +15,9 @@ public sealed class AiRun
         string model,
         string promptKey,
         int promptVersion,
-        DateTimeOffset startedAt)
-        : this(workflow, projectId, null, provider, model, promptKey, promptVersion, startedAt)
+        DateTimeOffset startedAt,
+        string modelProfile = "Reasoning")
+        : this(workflow, projectId, null, provider, model, promptKey, promptVersion, startedAt, modelProfile)
     {
     }
 
@@ -28,7 +29,8 @@ public sealed class AiRun
         string model,
         string promptKey,
         int promptVersion,
-        DateTimeOffset startedAt)
+        DateTimeOffset startedAt,
+        string modelProfile = "Reasoning")
     {
         if (promptVersion < 1)
         {
@@ -41,6 +43,7 @@ public sealed class AiRun
         CompetitorId = competitorId;
         Provider = Guard.Required(provider, nameof(provider), 100);
         Model = Guard.Required(model, nameof(model), 100);
+        ModelProfile = Guard.Required(modelProfile, nameof(modelProfile), 30);
         PromptKey = Guard.Required(promptKey, nameof(promptKey), 100);
         PromptVersion = promptVersion;
         Status = AiRunStatus.Running;
@@ -58,6 +61,9 @@ public sealed class AiRun
     public string Provider { get; private set; } = string.Empty;
 
     public string Model { get; private set; } = string.Empty;
+
+    /// <summary>Logical quality class requested by the workflow at execution time.</summary>
+    public string ModelProfile { get; private set; } = string.Empty;
 
     public string PromptKey { get; private set; } = string.Empty;
 

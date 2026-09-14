@@ -17,15 +17,19 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
             throw new ExternalServiceException("AI provider is not configured.", ExternalServiceFailure.Configuration);
-        if (settings.TimeoutSeconds is < 5 or > 300)
-            throw new ExternalServiceException("AI:TimeoutSeconds must be between 5 and 300.", ExternalServiceFailure.Configuration);
+        var model = request.ResolvedModel
+            ?? throw new ExternalServiceException("AI request model profile was not resolved.", ExternalServiceFailure.Configuration);
+        if (!string.Equals(model.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
+            throw new ExternalServiceException($"Unsupported AI provider '{model.Provider}'.", ExternalServiceFailure.Configuration);
         // HttpClient instances are pooled by IHttpClientFactory. Its Timeout property becomes
         // immutable after the first request, so applying a per-request configuration here
         // prevents structured-output repair attempts from using the same client.
         using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCancellation.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
+        timeoutCancellation.CancelAfter(TimeSpan.FromSeconds(model.TimeoutSeconds));
         using var message = new HttpRequestMessage(HttpMethod.Post, "chat/completions");
+        var clientRequestId = Guid.NewGuid().ToString("D");
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
+        message.Headers.Add("X-Client-Request-Id", clientRequestId);
         var responseFormat = request.OutputSchema is null
             ? new { type = "json_object" }
             : (object)new
@@ -40,28 +44,41 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             };
         message.Content = new StringContent(JsonSerializer.Serialize(new
         {
-            model = settings.Model,
+            model = model.Model,
             response_format = responseFormat,
-            messages = new[] { new { role = "system", content = request.SystemInstructions }, new { role = "user", content = request.UserContent } },
-            max_tokens = request.ModelConfiguration.TryGetValue("max_output_tokens", out var tokens) && int.TryParse(tokens, out var parsed) ? parsed : 5000,
+            messages = new[] { new { role = "developer", content = request.SystemInstructions }, new { role = "user", content = request.UserContent } },
+            max_completion_tokens = request.ModelConfiguration.TryGetValue("max_output_tokens", out var tokens) && int.TryParse(tokens, out var parsed) ? parsed : model.MaxOutputTokens,
         }), Encoding.UTF8, "application/json");
-        using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeoutCancellation.Token);
-        if (!response.IsSuccessStatusCode)
-            throw new ExternalServiceException("AI provider did not complete the analysis request.", Classify(response.StatusCode));
-        var body = await response.Content.ReadAsStringAsync(timeoutCancellation.Token);
         try
         {
+            using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeoutCancellation.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync(timeoutCancellation.Token);
+                throw new ExternalServiceException(CreateFailureMessage(response.StatusCode, error, clientRequestId, ResponseHeader(response, "x-request-id"), model.Model), Classify(response.StatusCode));
+            }
+            var body = await response.Content.ReadAsStringAsync(timeoutCancellation.Token);
             using var document = JsonDocument.Parse(body);
             var root = document.RootElement;
-            var output = root.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-            if (string.IsNullOrWhiteSpace(output)) throw new StructuredOutputException("AI provider returned an empty structured response.");
+            var choice = root.GetProperty("choices")[0];
+            var assistantMessage = choice.GetProperty("message");
+            var output = assistantMessage.GetProperty("content").GetString();
+            if (string.IsNullOrWhiteSpace(output))
+                throw EmptyStructuredResponse(root, choice, assistantMessage, clientRequestId, ResponseHeader(response, "x-request-id"));
             var value = JsonSerializer.Deserialize<T>(output, SerializerOptions)
                 ?? throw new StructuredOutputException("AI provider returned an empty structured response.");
             var usage = root.TryGetProperty("usage", out var usageElement) ? usageElement : default;
             int? inputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("prompt_tokens", out var input) ? input.GetInt32() : null;
             int? outputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("completion_tokens", out var outputToken) ? outputToken.GetInt32() : null;
-            var model = root.TryGetProperty("model", out var responseModel) ? responseModel.GetString() ?? settings.Model : settings.Model;
-            return new LlmResult<T>(value, settings.Provider, model, inputTokens, outputTokens, output);
+            var responseModelName = root.TryGetProperty("model", out var responseModel) ? responseModel.GetString() ?? model.Model : model.Model;
+            return new LlmResult<T>(value, model.Provider, responseModelName, inputTokens, outputTokens, output);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            var reason = timeoutCancellation.IsCancellationRequested
+                ? $"OpenAI API request timed out after {model.TimeoutSeconds} seconds (client_request_id: {clientRequestId})."
+                : $"OpenAI API request was cancelled before a response was received (client_request_id: {clientRequestId}).";
+            throw new ExternalServiceException(reason, ExternalServiceFailure.Transient, exception);
         }
         catch (StructuredOutputException) { throw; }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
@@ -77,4 +94,108 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
         HttpStatusCode.RequestTimeout or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => ExternalServiceFailure.Transient,
         _ => ExternalServiceFailure.UnexpectedResponse,
     };
+
+    private static StructuredOutputException EmptyStructuredResponse(
+        JsonElement root,
+        JsonElement choice,
+        JsonElement assistantMessage,
+        string clientRequestId,
+        string? requestId)
+    {
+        var details = new List<string>
+        {
+            $"client_request_id: {clientRequestId}",
+        };
+        AddResponseValue(root, "id", "response_id", details);
+        AddResponseValue(choice, "finish_reason", "finish_reason", details);
+        if (!string.IsNullOrWhiteSpace(requestId)) details.Add($"request_id: {requestId}");
+        if (assistantMessage.TryGetProperty("refusal", out var refusal) && refusal.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(refusal.GetString()))
+            details.Add("model_refusal: true");
+        return new StructuredOutputException($"AI provider returned an empty structured response ({string.Join("; ", details)}).");
+    }
+
+    private static string CreateFailureMessage(HttpStatusCode statusCode, string errorBody, string clientRequestId, string? requestId, string model)
+    {
+        var details = ReadSafeErrorDetails(errorBody);
+        var diagnostic = ReadSafeErrorDiagnostic(errorBody);
+        if (diagnostic is not null) details.Add($"diagnostic: {diagnostic}");
+        details.Add($"model: {model}");
+        details.Add($"client_request_id: {clientRequestId}");
+        if (!string.IsNullOrWhiteSpace(requestId)) details.Add($"request_id: {requestId}");
+        return details.Count == 0
+            ? $"OpenAI API request failed with HTTP {(int)statusCode}."
+            : $"OpenAI API request failed with HTTP {(int)statusCode} ({string.Join("; ", details)}).";
+    }
+
+    private static string? ResponseHeader(HttpResponseMessage response, string name) =>
+        response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault() : null;
+
+    private static void AddResponseValue(JsonElement source, string propertyName, string label, List<string> details)
+    {
+        if (source.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 } text)
+            details.Add($"{label}: {text}");
+    }
+
+    private static List<string> ReadSafeErrorDetails(string errorBody)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(errorBody);
+            if (!document.RootElement.TryGetProperty("error", out var error) || error.ValueKind != JsonValueKind.Object)
+                return [];
+
+            var details = new List<string>(3);
+            AddSafeErrorDetail(error, "type", details);
+            AddSafeErrorDetail(error, "code", details);
+            AddSafeErrorDetail(error, "param", details);
+            return details;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static void AddSafeErrorDetail(JsonElement error, string propertyName, List<string> details)
+    {
+        if (error.TryGetProperty(propertyName, out var property) &&
+            property.ValueKind == JsonValueKind.String &&
+            property.GetString() is { Length: > 0 } value)
+            details.Add($"{propertyName}: {value}");
+    }
+
+    private static string? ReadSafeErrorDiagnostic(string errorBody)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(errorBody);
+            if (!document.RootElement.TryGetProperty("error", out var error) ||
+                error.ValueKind != JsonValueKind.Object ||
+                !error.TryGetProperty("message", out var message) ||
+                message.ValueKind != JsonValueKind.String)
+                return null;
+
+            var text = message.GetString();
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            if (ContainsAny(text, "context length", "context window", "too many tokens", "token limit", "too long"))
+                return "context_limit";
+            if ((ContainsAny(text, "developer", "system") && ContainsAny(text, "role", "supported values", "not supported")) ||
+                ContainsAny(text, "developer role", "system role", "role 'developer'", "role \"developer\""))
+                return "unsupported_message_role";
+            if (ContainsAny(text, "messages[", "message content", "content must be"))
+                return "invalid_message_content";
+            if (ContainsAny(text, "message", "messages"))
+                return "message_validation";
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static bool ContainsAny(string text, params string[] values) =>
+        values.Any(value => text.Contains(value, StringComparison.OrdinalIgnoreCase));
 }

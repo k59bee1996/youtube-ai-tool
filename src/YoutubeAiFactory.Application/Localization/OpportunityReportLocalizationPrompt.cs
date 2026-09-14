@@ -8,6 +8,7 @@ public static class OpportunityReportLocalizationPrompt
 {
     public const string Key = "opportunity-report-localization";
     public const int Version = 1;
+    public static AiModelProfile ModelProfile => AiWorkflowProfiles.ArtifactLocalization;
     internal static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
     public static LlmRequest Create(OpportunityReportWithDetails canonical, bool correcting) => new(
@@ -17,7 +18,8 @@ public static class OpportunityReportLocalizationPrompt
         $"Canonical opportunity report JSON:\n{JsonSerializer.Serialize(ToSource(canonical), SerializerOptions)}" +
         (correcting ? "\nYour prior response failed structural validation. Preserve every list count and order exactly." : string.Empty),
         new Dictionary<string, string> { ["max_output_tokens"] = "5000" },
-        OpportunityReportLocalizationOutputSchema.Create());
+        OpportunityReportLocalizationOutputSchema.Create(),
+        ModelProfile);
 
     private static OpportunityReportLocalizationSource ToSource(OpportunityReportWithDetails report) => new(
         LocalizedOpportunityReportValidator.Deserialize(report.Report.LimitationsJson),

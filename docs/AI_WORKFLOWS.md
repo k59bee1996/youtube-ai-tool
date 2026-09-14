@@ -1,5 +1,20 @@
 # AI Workflows
 
+## Model profiles and responsibility matrix
+
+The application asks for an intelligence class; Infrastructure resolves the configured provider/model. Model identifiers are not selected by controllers, frontend code, or workflow business logic.
+
+| Workflow | Profile | AI responsibility |
+| --- | --- | --- |
+| Competitor Analysis | Reasoning | Pattern and bounded-evidence interpretation |
+| Opportunity Analysis | Premium | Strategic cross-competitor synthesis |
+| Idea Generation | Reasoning | Original, evidence-backed hypotheses and packaging concepts |
+| Pilot Generation | Premium | Controlled experiment and hypothesis planning |
+| Artifact Localization | Fast | Meaning-preserving reader-facing translation |
+| Structured Output Repair | Fast | Future structural correction only |
+
+Scores, rankings, ID/evidence validation, duplicate detection, versions, job state, VideoProject creation, and the Pilot 4/4/4 constraint remain deterministic C# responsibilities. A semantic validation failure reruns the originating workflow profile; a future structural repair must use `Fast` and must not add reasoning or alter business meaning. Future policy is: research query generation/evidence extraction/outline/production package use `Reasoning`; relevance classification uses `Fast`; research synthesis, contradiction resolution, and scripts use `Premium`. These future workflows are not implemented.
+
 ## Competitor analysis (`competitor-analysis:v2`)
 
 The first production AI workflow is a worker-executed, structured competitor analysis. `POST .../analysis:run` only creates a job; the worker builds a bounded context from persisted channel/video metadata and calls `ILlmProvider.GenerateStructuredAsync<CompetitorAnalysisResult>`.
@@ -22,15 +37,15 @@ Opportunity reports use the same immutable artifact-localization mechanism. The 
 
 The worker consumes only current persisted competitor analyses and sends a bounded context of high-confidence audience, topic, format, and transferable-mechanic evidence. Backend-issued evidence IDs are validated before persistence. The LLM assesses coherent adjacent opportunities, novelty, audience fit, transferability, story potential, complexity, confidence, risks, and limitations; it cannot claim global demand or provide a final score. `opportunity-analysis:v2` sends a strict JSON Schema to supported providers: all list fields, including `evidenceIds`, `risks`, and `limitations`, must be arrays of strings. An invalid response is retried once with its parse or validation diagnostic. C# calculates observed dataset demand, evidence strength, competitor diversity/competition risk, production ease, and the final `opportunity-score:v1` result. Reports preserve source-analysis versions and can be flagged stale after a newer analysis exists.
 
-## Idea generation (`idea-generation:v1`)
+## Idea generation (`idea-generation:v3`)
 
 Only an approved opportunity can start this worker-backed workflow. The bounded context includes project settings, the approved opportunity, its persisted evidence, up to 50 prior active ideas, and collected competitor titles. The structured candidate contract contains title, topic, angle, format, audience, viewer intent, hook and thumbnail concepts, viewer promise, core question, rationale, explicit hypothesis, risks, confidence, evidence IDs, and bounded subjective features.
 
-The model must create original concepts and cannot copy competitor titles or scripts. Evidence IDs are validated; duplicate evidence IDs and out-of-context IDs are rejected. Jaccard token similarity and normalized topic/angle/format identity reject near duplicates within a batch, across active prior ideas, and against competitor titles. The worker makes at most two replacement requests and fails rather than calling a below-minimum result complete. `idea-score:v1` is calculated in C# from inherited opportunity fit/demand, AI-assessed novelty, title/thumbnail/story/audience potential and risks, deterministic evidence strength/production ease, and explicit risk penalties.
+The model must create original concepts and cannot copy competitor titles or scripts. It must make every candidate in a response meaningfully distinct. `idea-generation:v3` submits a strict JSON Schema, so the provider must return every persisted field with its required JSON type. Evidence IDs are validated; duplicate evidence IDs and out-of-context IDs are rejected. Jaccard token similarity and normalized topic/angle/format identity reject near duplicates within a batch, across active prior ideas, and against competitor titles. The default generation is one bounded request for 15 candidates, using the resolved model output limit; it fails rather than completing a below-minimum result. `idea-score:v1` is calculated in C# from inherited opportunity fit/demand, AI-assessed novelty, title/thumbnail/story/audience potential and risks, deterministic evidence strength/production ease, and explicit risk penalties.
 
-## Pilot generation (`pilot-generation:v1`)
+## Pilot generation (`pilot-generation:v3`)
 
-The worker sends a bounded, structured set of ideas whose idea and source opportunity are both approved to the model. The model selects coherent learning experiments and explains their hypothesis, variable, control, planned metric, success signal, and rationale. It cannot invent idea or opportunity IDs, create new ideas, write scripts, or report analytics. C# validates exactly 12 unique existing approved ideas, fixed 4/4/4 experiment distribution and sequences, ownership, required top-level fields, and bounded slot text. One correction attempt is permitted for invalid structured output; semantic failures provide the prior candidate and validator failure to the retry. Soft balance analysis evaluates sequence blocks and warns about topic, opportunity, packaging, or early production-complexity concentration; it does not reject an otherwise valid plan.
+The worker sends a bounded, structured set of ideas whose idea and source opportunity are both approved to the model. The model selects coherent learning experiments and explains their hypothesis, variable, control, planned metric, success signal, and rationale. `pilot-generation:v3` sends a strict JSON Schema for the complete Pilot result: every text field (including `hypothesis`) is a string, optional notes are explicitly nullable, and the C# experiment enum is represented by the integers Topic=0, Packaging=1, Storytelling=2. It cannot invent idea or opportunity IDs, create new ideas, write scripts, or report analytics. C# validates exactly 12 unique existing approved ideas, fixed 4/4/4 experiment distribution and sequences, ownership, required top-level fields, and bounded slot text. One correction attempt is permitted for invalid structured output; semantic failures provide the prior candidate and validator failure to the retry. Soft balance analysis evaluates sequence blocks and warns about topic, opportunity, packaging, or early production-complexity concentration; it does not reject an otherwise valid plan.
 
 ## Video project creation (no AI workflow)
 

@@ -34,7 +34,7 @@ public sealed class CompetitorAnalysisWorkflowTests
             new CompetitorAnalysisJobPayload(competitor.ProjectId, competitor.Id), WebJson), DateTimeOffset.UtcNow, 0);
         store.Job = job;
         var provider = new SequencedProvider(InvalidResult(), ValidResult(competitor.Videos.First().Id));
-        var processor = new CompetitorAnalysisJobProcessor(store, provider,
+        var processor = new CompetitorAnalysisJobProcessor(store, provider, new FakeModelResolver(),
             new CompetitorAnalysisContextBuilder(new CompetitorAnalysisOptions()),
             new CompetitorAnalysisOptions { MaxStructuredOutputRetries = 1 },
             TimeProvider.System, NullLogger<CompetitorAnalysisJobProcessor>.Instance);
@@ -46,6 +46,9 @@ public sealed class CompetitorAnalysisWorkflowTests
         Assert.Equal(CompetitorAnalysisPrompt.Version, analysis.PromptVersion);
         Assert.Equal(1, Assert.Single(store.Runs).RetryCount);
         Assert.Equal(AiRunStatus.Succeeded, store.Runs.Single().Status);
+        Assert.Equal("Reasoning", store.Runs.Single().ModelProfile);
+        Assert.All(provider.Requests, request => Assert.Equal(AiModelProfile.Reasoning, request.ModelProfile));
+        Assert.All(provider.Requests, request => Assert.Equal("Reasoning-model", request.ResolvedModel!.Model));
         Assert.Equal(JobStatus.Completed, job.Status);
         Assert.Contains("Analysis references a video that was not included", provider.Requests[1].UserContent);
     }
@@ -104,7 +107,7 @@ public sealed class CompetitorAnalysisWorkflowTests
         var store = new AnalysisStore(competitor);
         store.Job = new Job("competitor-analysis", System.Text.Json.JsonSerializer.Serialize(
             new CompetitorAnalysisJobPayload(competitor.ProjectId, competitor.Id), WebJson), DateTimeOffset.UtcNow, maxRetries: 1, competitor.Id);
-        var processor = new CompetitorAnalysisJobProcessor(store, new FailingProvider(),
+        var processor = new CompetitorAnalysisJobProcessor(store, new FailingProvider(), new FakeModelResolver(),
             new CompetitorAnalysisContextBuilder(new CompetitorAnalysisOptions()), new CompetitorAnalysisOptions(),
             TimeProvider.System, NullLogger<CompetitorAnalysisJobProcessor>.Instance);
 
@@ -169,6 +172,11 @@ public sealed class CompetitorAnalysisWorkflowTests
     {
         public Task<LlmResult<T>> GenerateStructuredAsync<T>(LlmRequest request, CancellationToken cancellationToken) =>
             throw new ExternalServiceException("Provider is temporarily unavailable.", ExternalServiceFailure.Transient);
+    }
+
+    private sealed class FakeModelResolver : IAiModelResolver
+    {
+        public ResolvedAiModel Resolve(AiModelProfile profile) => new(profile, "Fake", $"{profile}-model", 60, 5_000);
     }
 
     private sealed class AnalysisStore(CompetitorChannel competitor) : IYoutubeAiFactoryStore

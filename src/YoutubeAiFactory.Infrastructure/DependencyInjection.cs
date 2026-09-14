@@ -29,7 +29,14 @@ public static class DependencyInjection
         services.AddScoped<IYoutubeAiFactoryStore, YoutubeAiFactoryStore>();
         services.Configure<YouTubeOptions>(configuration.GetSection(YouTubeOptions.SectionName));
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
-        services.AddHttpClient<ILlmProvider, OpenAiLlmProvider>(client => client.BaseAddress = new Uri("https://api.openai.com/v1/"));
+        services.AddSingleton<IAiModelResolver, ConfigurationAiModelResolver>();
+        services.AddHttpClient<ILlmProvider, OpenAiLlmProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.openai.com/v1/");
+            // OpenAiLlmProvider enforces the resolved model's timeout per request.
+            // The HttpClient default (100 seconds) would otherwise cancel longer workflows first.
+            client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+        });
         services.AddHttpClient<IYouTubeClient, YouTubeClient>(client =>
         {
             client.BaseAddress = new Uri("https://www.googleapis.com/youtube/v3/");

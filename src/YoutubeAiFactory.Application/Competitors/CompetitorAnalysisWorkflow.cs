@@ -54,6 +54,7 @@ public sealed class GetCompetitorAnalysisStatusHandler(IYoutubeAiFactoryStore st
 public sealed class CompetitorAnalysisJobProcessor(
     IYoutubeAiFactoryStore store,
     ILlmProvider provider,
+    IAiModelResolver modelResolver,
     CompetitorAnalysisContextBuilder contextBuilder,
     CompetitorAnalysisOptions options,
     TimeProvider timeProvider,
@@ -81,7 +82,8 @@ public sealed class CompetitorAnalysisJobProcessor(
             var competitor = await store.GetCompetitorAsync(payload.ProjectId, payload.CompetitorId, false, cancellationToken)
                 ?? throw new ResourceNotFoundException("The competitor for this analysis job no longer exists.");
             var context = contextBuilder.Build(competitor);
-            run = new AiRun("CompetitorAnalysis", payload.ProjectId, payload.CompetitorId, "pending", "pending", CompetitorAnalysisPrompt.Key, CompetitorAnalysisPrompt.Version, timeProvider.GetUtcNow());
+            var resolvedModel = modelResolver.Resolve(CompetitorAnalysisPrompt.ModelProfile);
+            run = new AiRun("CompetitorAnalysis", payload.ProjectId, payload.CompetitorId, resolvedModel.Provider, resolvedModel.Model, CompetitorAnalysisPrompt.Key, CompetitorAnalysisPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString());
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<CompetitorAnalysisResult>? answer = null;
@@ -91,7 +93,7 @@ public sealed class CompetitorAnalysisJobProcessor(
             {
                 try
                 {
-                    answer = await provider.GenerateStructuredAsync<CompetitorAnalysisResult>(CompetitorAnalysisPrompt.Create(context, repairDiagnostic), cancellationToken);
+                    answer = await provider.GenerateStructuredAsync<CompetitorAnalysisResult>(CompetitorAnalysisPrompt.Create(context, repairDiagnostic).WithResolvedModel(resolvedModel), cancellationToken);
                     CompetitorAnalysisValidator.Validate(answer.Value, context);
                     break;
                 }

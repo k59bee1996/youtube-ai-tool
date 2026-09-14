@@ -116,7 +116,7 @@ public sealed class MovePilotSlotHandler(IYoutubeAiFactoryStore store)
     }
 }
 
-public sealed class PilotGenerationJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, PilotGenerationContextBuilder contextBuilder,
+public sealed class PilotGenerationJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider, IAiModelResolver modelResolver, PilotGenerationContextBuilder contextBuilder,
     PilotGenerationOptions options, TimeProvider timeProvider, ILogger<PilotGenerationJobProcessor> logger)
 {
     private static readonly Action<ILogger, Guid, Guid, int, Exception?> LogCompleted = LoggerMessage.Define<Guid, Guid, int>(LogLevel.Information, new EventId(1, nameof(LogCompleted)), "Pilot generation completed for project {ProjectId}, pilot {PilotId}, eligible ideas {EligibleIdeaCount}.");
@@ -129,13 +129,14 @@ public sealed class PilotGenerationJobProcessor(IYoutubeAiFactoryStore store, IL
             var payload = JsonSerializer.Deserialize<PilotGenerationJobPayload>(job.Payload, PilotGenerationPrompt.SerializerOptions) ?? throw new ApplicationValidationException("Pilot generation job payload is invalid.");
             var project = await store.GetProjectAsync(payload.ProjectId, cancellationToken) ?? throw new ResourceNotFoundException("The project for this pilot job no longer exists.");
             var context = contextBuilder.Build(project, await store.ListApprovedPilotIdeasAsync(payload.ProjectId, cancellationToken));
-            run = new AiRun("PilotGeneration", payload.ProjectId, "pending", "pending", PilotGenerationPrompt.Key, PilotGenerationPrompt.Version, now); store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
+            var resolvedModel = modelResolver.Resolve(PilotGenerationPrompt.ModelProfile);
+            run = new AiRun("PilotGeneration", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, PilotGenerationPrompt.Key, PilotGenerationPrompt.Version, now, resolvedModel.Profile.ToString()); store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
             LlmResult<PilotPlanResult>? answer = null; Exception? failure = null; PilotOutputCorrection? correction = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
             {
                 try
                 {
-                    var candidate = await provider.GenerateStructuredAsync<PilotPlanResult>(PilotGenerationPrompt.Create(context, correction), cancellationToken);
+                    var candidate = await provider.GenerateStructuredAsync<PilotPlanResult>(PilotGenerationPrompt.Create(context, correction).WithResolvedModel(resolvedModel), cancellationToken);
                     run.RecordProvider(candidate.Provider, candidate.Model);
                     try { PilotPlanValidator.Validate(candidate.Value, context); }
                     catch (StructuredOutputException ex) { correction = new PilotOutputCorrection(ex.Message, candidate.RawOutput); throw; }

@@ -47,6 +47,7 @@ public sealed class SqlServerPersistenceTests
         Assert.Equal(competitor.Id, stored.CompetitorChannelId);
         Assert.Equal(run.Id, stored.AiRunId);
         Assert.Equal(competitor.Id, storedRun.CompetitorId);
+        Assert.Equal("Reasoning", storedRun.ModelProfile);
         Assert.Equal(resultJson, stored.ResultJson);
         Assert.Equal(0.123456m, storedRun.EstimatedCost);
     }

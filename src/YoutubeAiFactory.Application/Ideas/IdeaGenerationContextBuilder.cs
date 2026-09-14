@@ -9,7 +9,7 @@ public sealed class IdeaGenerationContextBuilder(IdeaGenerationOptions options)
     public IdeaGenerationContext Build(Project project, ApprovedOpportunityWithEvidence opportunity, IReadOnlyList<ExistingIdeaContext> existingIdeas, IReadOnlyList<string> competitorTitles)
     {
         if (opportunity.Candidate.DecisionStatus != OpportunityDecisionStatus.Approved) throw new ApplicationValidationException("Ideas can be generated only from an approved opportunity.");
-        if (options.MinIdeaCount is < 1 or > 30 || options.TargetIdeaCount < options.MinIdeaCount || options.TargetIdeaCount > options.MaxGeneratedCandidates || options.MaxGeneratedCandidates > 30 || options.MaxEvidenceItemsForIdeaGeneration is < 1 or > 100 || options.MaxExistingIdeasForDedupContext is < 0 or > 200)
+        if (options.MinIdeaCount is < 1 or > 30 || options.TargetIdeaCount < options.MinIdeaCount || options.TargetIdeaCount > options.MaxGeneratedCandidates || options.MaxGeneratedCandidates > 30 || options.IdeasPerRequest < 1 || options.IdeasPerRequest > options.TargetIdeaCount || options.MaxEvidenceItemsForIdeaGeneration is < 1 or > 100 || options.MaxExistingIdeasForDedupContext is < 0 or > 200)
             throw new ApplicationValidationException("Idea generation limits are outside the supported range.");
         var evidence = opportunity.Evidence.OrderBy(x => x.Id).Take(options.MaxEvidenceItemsForIdeaGeneration).Select(x => new IdeaEvidenceContext(x.Id, x.Summary)).ToArray();
         if (evidence.Length == 0) throw new ApplicationValidationException("The approved opportunity has no supporting evidence.");

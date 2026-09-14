@@ -24,5 +24,6 @@ public sealed class AiRunTests
         Assert.Equal(1, run.RetryCount);
         Assert.Equal(750, run.LatencyMilliseconds);
         Assert.Equal(0.0123m, run.EstimatedCost);
+        Assert.Equal("Reasoning", run.ModelProfile);
     }
 }

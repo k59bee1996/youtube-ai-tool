@@ -31,4 +31,14 @@ public sealed class LlmRequestTests
 
         Assert.Equal("0.2", request.ModelConfiguration["temperature"]);
     }
+
+    [Fact]
+    public void Request_preserves_the_workflow_profile_and_requires_a_matching_resolution()
+    {
+        var request = new LlmRequest("opportunity-analysis", 1, "Return JSON.", "Inputs.", modelProfile: AiModelProfile.Premium);
+        var resolved = new ResolvedAiModel(AiModelProfile.Premium, "Fake", "premium", 60, 5_000);
+
+        Assert.Equal(AiModelProfile.Premium, request.WithResolvedModel(resolved).ModelProfile);
+        Assert.Throws<ArgumentException>(() => request.WithResolvedModel(resolved with { Profile = AiModelProfile.Fast }));
+    }
 }

@@ -17,6 +17,7 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
         builder.Property(run => run.CompetitorId).HasColumnName("competitor_channel_id");
         builder.Property(run => run.Provider).HasColumnName("provider").HasMaxLength(100).IsRequired();
         builder.Property(run => run.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
+        builder.Property(run => run.ModelProfile).HasColumnName("model_profile").HasMaxLength(30).IsRequired();
         builder.Property(run => run.PromptKey).HasColumnName("prompt_key").HasMaxLength(100).IsRequired();
         builder.Property(run => run.PromptVersion).HasColumnName("prompt_version").IsRequired();
         builder.Property(run => run.InputTokens).HasColumnName("input_tokens");

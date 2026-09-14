@@ -8,6 +8,7 @@ public static class OpportunityAnalysisPrompt
 {
     public const string Key = "opportunity-analysis";
     public const int Version = 2;
+    public static AiModelProfile ModelProfile => AiWorkflowProfiles.OpportunityAnalysis;
     internal static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     public static LlmRequest Create(OpportunityAnalysisContext context, string? repairDiagnostic = null) => new(Key, Version,
         """
@@ -17,5 +18,6 @@ public static class OpportunityAnalysisPrompt
         Every list field, including evidenceIds, risks, and limitations, must be a JSON array of strings even when it has zero or one item. Never return a scalar string for a list field.
         """, (repairDiagnostic is null ? string.Empty : $"The previous output was invalid: {repairDiagnostic} Repair it to exactly follow every JSON type in the contract.\n\n") + JsonSerializer.Serialize(context, SerializerOptions),
         new Dictionary<string, string> { ["max_output_tokens"] = "5000" },
-        OpportunityAnalysisOutputSchema.Create());
+        OpportunityAnalysisOutputSchema.Create(),
+        ModelProfile);
 }
