@@ -11,6 +11,11 @@ The application asks for an intelligence class; Infrastructure resolves the conf
 | Idea Generation | Reasoning | Original, evidence-backed hypotheses and packaging concepts |
 | Pilot Generation | Premium | Controlled experiment and hypothesis planning |
 | Artifact Localization | Fast | Meaning-preserving reader-facing translation |
+| Research Query Planning | Reasoning | Bounded research questions and diverse search queries |
+| Research Source Relevance | Fast | Relevance classification of untrusted retrieved text |
+| Research Evidence Extraction | Reasoning | Source-bound fact and excerpt extraction |
+| Research Contradiction Analysis | Premium | Cross-source disagreement interpretation |
+| Research Synthesis | Premium | Evidence-limited report synthesis |
 | Structured Output Repair | Fast | Future structural correction only |
 
 Scores, rankings, ID/evidence validation, duplicate detection, versions, job state, VideoProject creation, and the Pilot 4/4/4 constraint remain deterministic C# responsibilities. A semantic validation failure reruns the originating workflow profile; a future structural repair must use `Fast` and must not add reasoning or alter business meaning. Future policy is: research query generation/evidence extraction/outline/production package use `Reasoning`; relevance classification uses `Fast`; research synthesis, contradiction resolution, and scripts use `Premium`. These future workflows are not implemented.
@@ -49,4 +54,12 @@ The worker sends a bounded, structured set of ideas whose idea and source opport
 
 ## Video project creation (no AI workflow)
 
-Phase 7 deliberately performs zero LLM calls and creates no `AiRun` or background Job. It converts already persisted, approved strategy into a local execution object. Research remains a future workflow and must begin from a Draft VideoProject rather than inferring that strategic pilot evidence is video-specific research.
+Phase 7 deliberately performs zero LLM calls and creates no `AiRun` or background Job. It converts already persisted, approved strategy into a local execution object. Research begins from that specific execution brief rather than inferring strategic pilot evidence is video-specific research.
+
+## Evidence-backed research (`research-engine:v1`)
+
+Research is a worker workflow, not an LLM request from a controller. `research-query-plan:v1` uses Reasoning to make a bounded plan in the content target language. Provider-neutral search discovers URLs; snippets are never evidence. The fetcher treats source content as untrusted, applies redirect-aware SSRF protection and content limits, and retains no complete webpage by default. `research-source-relevance:v1` uses Fast; `research-evidence-extraction:v1` uses Reasoning and must emit an exact, short source excerpt.
+
+C# validates every AI-issued ID and calculates claim support. `research-contradiction-analysis:v1` and `research-synthesis:v1` use Premium over bounded evidence/claim representations only. Synthesis cannot create factual claims, sources, evidence IDs, or citation IDs and is rejected if its references do not exist in the current run. A successful report requires at least one relevant source and one source-bound evidence item.
+
+`research-report-localization:v1` is a Fast, lazy `EN | VI` overlay. It translates only the executive summary, finding/gap explanations, warnings, and limitations. Claims, excerpts, source metadata/URLs, numbers/dates, IDs, support statuses, versions, and metrics remain canonical. Toggling reading language never re-runs research or changes source selection.

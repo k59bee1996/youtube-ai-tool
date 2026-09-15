@@ -92,6 +92,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
 
+                    b.Property<Guid?>("ResearchRunId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_run_id");
+
                     b.Property<int>("RetryCount")
                         .HasColumnType("int")
                         .HasColumnName("retry_count");
@@ -106,6 +110,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(30)")
                         .HasColumnName("status");
 
+                    b.Property<Guid?>("VideoProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("video_project_id");
+
                     b.Property<string>("Workflow")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -117,6 +125,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.HasIndex("CompetitorId", "StartedAt");
 
                     b.HasIndex("ProjectId", "StartedAt");
+
+                    b.HasIndex("ResearchRunId", "StartedAt");
+
+                    b.HasIndex("VideoProjectId", "StartedAt");
 
                     b.ToTable("ai_runs", "yaf");
                 });
@@ -703,6 +715,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("type");
 
+                    b.Property<Guid?>("VideoProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("video_project_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CompetitorChannelId")
@@ -714,6 +730,11 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_jobs_active_idea_generation")
                         .HasFilter("type = 'idea-generation' AND status IN ('Queued', 'Running', 'Retrying')");
+
+                    b.HasIndex("VideoProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_jobs_active_video_project_research")
+                        .HasFilter("type = 'video-research' AND status IN ('Queued', 'Running', 'Retrying')");
 
                     b.HasIndex("ProjectId", "Type")
                         .IsUnique()
@@ -1312,6 +1333,430 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.ToTable("projects", "yaf");
                 });
 
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Confidence")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsCritical")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_critical");
+
+                    b.Property<Guid>("ResearchReportId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_report_id");
+
+                    b.Property<string>("Statement")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("statement");
+
+                    b.Property<string>("SupportStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("support_status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("claim_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResearchReportId", "SupportStatus");
+
+                    b.ToTable("research_claims", "yaf");
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchClaimEvidence", b =>
+                {
+                    b.Property<Guid>("ResearchClaimId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_claim_id");
+
+                    b.Property<Guid>("ResearchEvidenceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_evidence_id");
+
+                    b.Property<string>("Stance")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("stance");
+
+                    b.HasKey("ResearchClaimId", "ResearchEvidenceId", "Stance");
+
+                    b.HasIndex("ResearchEvidenceId");
+
+                    b.ToTable("research_claim_evidence", "yaf");
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchConflict", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ContradictingEvidenceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("contradicting_evidence_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Explanation")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("explanation");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_resolved");
+
+                    b.Property<Guid>("ResearchClaimId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_claim_id");
+
+                    b.Property<Guid>("ResearchReportId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_report_id");
+
+                    b.Property<Guid>("SupportingEvidenceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("supporting_evidence_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContradictingEvidenceId");
+
+                    b.HasIndex("SupportingEvidenceId");
+
+                    b.HasIndex("ResearchReportId", "ResearchClaimId");
+
+                    b.HasIndex("ResearchClaimId", "SupportingEvidenceId", "ContradictingEvidenceId")
+                        .IsUnique();
+
+                    b.ToTable("research_conflicts", "yaf");
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Confidence")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Fact")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("fact");
+
+                    b.Property<Guid>("ResearchRunId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_run_id");
+
+                    b.Property<Guid>("ResearchSourceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_source_id");
+
+                    b.Property<string>("SourceLocator")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("source_locator");
+
+                    b.Property<string>("SupportingExcerpt")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("supporting_excerpt");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("evidence_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResearchSourceId");
+
+                    b.HasIndex("ResearchRunId", "ResearchSourceId");
+
+                    b.ToTable("research_evidence", "yaf");
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("InputFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("input_fingerprint");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ResearchAlgorithmVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("research_algorithm_version");
+
+                    b.Property<Guid>("ResearchRunId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_run_id");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("result_json");
+
+                    b.Property<Guid?>("SynthesisAiRunId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("synthesis_ai_run_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int")
+                        .HasColumnName("version");
+
+                    b.Property<Guid>("VideoProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("video_project_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("ResearchRunId")
+                        .IsUnique();
+
+                    b.HasIndex("VideoProjectId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("research_reports", "yaf", t =>
+                        {
+                            t.HasCheckConstraint("ck_research_reports_result_json", "ISJSON([result_json]) = 1");
+                        });
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ClaimCount")
+                        .HasColumnType("int")
+                        .HasColumnName("claim_count");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("ConflictCount")
+                        .HasColumnType("int")
+                        .HasColumnName("conflict_count");
+
+                    b.Property<int>("EvidenceCount")
+                        .HasColumnType("int")
+                        .HasColumnName("evidence_count");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<int>("FetchFailureCount")
+                        .HasColumnType("int")
+                        .HasColumnName("fetch_failure_count");
+
+                    b.Property<int>("FetchedSourceCount")
+                        .HasColumnType("int")
+                        .HasColumnName("fetched_source_count");
+
+                    b.Property<string>("InputFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("input_fingerprint");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTimeOffset>("QueuedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("queued_at");
+
+                    b.Property<int>("RelevantSourceCount")
+                        .HasColumnType("int")
+                        .HasColumnName("relevant_source_count");
+
+                    b.Property<string>("ResearchAlgorithmVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("research_algorithm_version");
+
+                    b.Property<Guid?>("ResearchReportId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_report_id");
+
+                    b.Property<int>("SearchFailureCount")
+                        .HasColumnType("int")
+                        .HasColumnName("search_failure_count");
+
+                    b.Property<int>("SearchQueryCount")
+                        .HasColumnType("int")
+                        .HasColumnName("search_query_count");
+
+                    b.Property<int>("SearchResultCount")
+                        .HasColumnType("int")
+                        .HasColumnName("search_result_count");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("VideoProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("video_project_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Status");
+
+                    b.HasIndex("VideoProjectId", "QueuedAt");
+
+                    b.ToTable("research_runs", "yaf");
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CanonicalUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("canonical_url");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("source_category");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("domain");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("FetchStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("fetch_status");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Publisher")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("publisher");
+
+                    b.Property<string>("QualityNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("quality_notes");
+
+                    b.Property<Guid>("ResearchRunId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("research_run_id");
+
+                    b.Property<DateTimeOffset>("RetrievedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("retrieved_at");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResearchRunId", "CanonicalUrl")
+                        .IsUnique();
+
+                    b.HasIndex("ResearchRunId", "Domain");
+
+                    b.ToTable("research_sources", "yaf");
+                });
+
             modelBuilder.Entity("YoutubeAiFactory.Domain.Videos.VideoProject", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1463,6 +1908,16 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchRun", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchRunId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("YoutubeAiFactory.Domain.Videos.VideoProject", null)
+                        .WithMany()
+                        .HasForeignKey("VideoProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("YoutubeAiFactory.Domain.Competitors.CompetitorAnalysis", b =>
@@ -1700,6 +2155,117 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Market")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchClaim", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchReport", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchClaimEvidence", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchClaim", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchClaimId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchEvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchConflict", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("ContradictingEvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchClaim", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchClaimId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchReport", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("SupportingEvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchEvidence", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchRun", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchSource", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchReport", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchRun", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Videos.VideoProject", null)
+                        .WithMany()
+                        .HasForeignKey("VideoProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchRun", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("YoutubeAiFactory.Domain.Videos.VideoProject", null)
+                        .WithMany()
+                        .HasForeignKey("VideoProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("YoutubeAiFactory.Domain.Research.ResearchSource", b =>
+                {
+                    b.HasOne("YoutubeAiFactory.Domain.Research.ResearchRun", null)
+                        .WithMany()
+                        .HasForeignKey("ResearchRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

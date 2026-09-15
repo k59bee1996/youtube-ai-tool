@@ -38,6 +38,7 @@ $env:AI__Models__Reasoning__Model = "gpt-5.6-terra"
 $env:AI__Models__Reasoning__TimeoutSeconds = "300" # Default: 300 seconds for structured analysis/idea generation
 $env:AI__Models__Reasoning__MaxOutputTokens = "8000" # Default: 8,000 tokens for one 15-idea generation response
 $env:AI__Models__Premium__Model = "gpt-5.6-sol"
+$env:ResearchSearch__ApiKey = "your-bing-web-search-key"
 $env:CompetitorAnalysis__MaxVideos = "30" # Allowed range: 1-50
 $env:OpportunityAnalysis__MaxCompetitors = "8"
 $env:OpportunityAnalysis__MaxEvidenceItems = "60"
@@ -58,7 +59,9 @@ dotnet run --project src/YoutubeAiFactory.Worker
 
 Run the client from `src/YoutubeAiFactory.Web` with `npm install` and `npm run dev`. Vite serves port 5173 and proxies `/api` and `/health` to port 5050. Create a project in the UI, then submit a supported channel URL; submit it again to refresh metadata.
 
-For Phase 3–6 analysis, run the Worker in a separate terminal after setting `AI__ApiKey`. Phase 7 VideoProject creation is synchronous and needs neither the Worker nor an AI key. The UI queues only the earlier AI workflows and never sends provider keys to the browser. The default OpenAI-compatible provider posts to the Chat Completions endpoint with JSON-mode output. No provider key is needed for routine tests.
+For Phase 3–6 analysis and Phase 8 research, run the Worker in a separate terminal after setting `AI__ApiKey`. Research additionally requires server-side `ResearchSearch__ApiKey`; it is never sent to the browser. Phase 7 VideoProject creation is synchronous and needs neither service. The default OpenAI-compatible provider posts to the Chat Completions endpoint with JSON-mode output. No provider key is needed for routine tests.
+
+`Research` provides bounded query/result/source/evidence/claim limits. `ResearchFetch` controls request timeout, redirect count, response bytes, and normalized source characters. `ResearchSearch` controls the Bing endpoint and timeout. Keep real keys in environment variables or User Secrets; normal tests use fakes and do not call live search, web pages, or paid models.
 
 `AI:Models:Fast`, `AI:Models:Reasoning`, and `AI:Models:Premium` each require `Provider`, `Model`, `TimeoutSeconds`, and `MaxOutputTokens`. Environment variables such as `AI__Models__Premium__Model` may map profiles differently by environment, or intentionally map all profiles to one local-development model. Missing profiles fail clearly; routing never silently downgrades a Premium workload.
 

@@ -46,7 +46,7 @@ Only fully resolved competitors may be persisted: channel identity, title, and c
 
 `/health/live` checks the process. `/health/ready` checks SQL Server and YouTube configuration. Structured collection logs include project, outcome, competitor/channel when resolved, video count, and elapsed time; API keys and response bodies are excluded. Job claiming and dispatch remain deferred.
 
-See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), [ADR-003](adr/ADR-003-synchronous-competitor-collection.md), and [ADR-004](adr/ADR-004-sql-server-persistence.md).
+See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), [ADR-003](adr/ADR-003-synchronous-competitor-collection.md), [ADR-004](adr/ADR-004-sql-server-persistence.md), and [ADR-005](adr/ADR-005-evidence-backed-research.md).
 
 ## Phase 3 competitor-analysis flow
 
@@ -96,3 +96,18 @@ React -> API -> CreateVideoProjectHandler -> IYoutubeAiFactoryStore -> SQL Serve
 ```
 
 This is a synchronous local transaction, not a job and not an AI workflow. The handler verifies the project, approved Pilot, slot membership, and still-approved source idea/opportunity before constructing the `VideoProject` aggregate. A unique SQL Server index on `pilot_video_id` makes repeated requests idempotent. The aggregate stores relational lineage IDs plus a narrow creation-time execution snapshot; future research, outline, script, and production artifacts will attach to VideoProject rather than to Pilot or VideoIdea.
+
+## Phase 8 evidence-backed research flow
+
+```text
+React -> API (202) -> Job + ResearchRun -> Worker
+                                        -> ResearchBrief -> Reasoning query plan
+                                        -> provider-neutral search -> SSRF-safe source fetch
+                                        -> Fast relevance -> Reasoning evidence extraction
+                                        -> deterministic claim support -> Premium contradiction/synthesis
+                                        -> immutable ResearchReport -> ResearchReady
+```
+
+Search snippets are discovery only; evidence is extracted only from successfully retrieved source content. `IResearchSearchClient` and `IResearchContentFetcher` are Application contracts. The Bing search adapter and HTTP/HTML fetcher live in Infrastructure. The fetcher permits only public HTTP(S) destinations, validates every redirect target, blocks local/private/link-local IPv4 and IPv6 addresses plus metadata hosts, limits redirects/bytes/extracted characters, and never renders fetched HTML.
+
+`ResearchRun` records every execution attempt, including failures. A completed `ResearchReport` is a separate immutable version and exists only after usable source/evidence and synthesis-reference validation pass. `ResearchQueued -> Researching -> ResearchReady` is centralized by `VideoProject`; terminal failure uses `ResearchFailed`, which can explicitly queue another run. Premium stages receive only bounded source metadata, source-bound evidence, claims, gaps, and conflicts; full fetched pages never reach Premium.

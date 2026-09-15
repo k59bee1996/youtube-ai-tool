@@ -49,6 +49,20 @@ public sealed class VideoProjectTests
         Assert.Equal("Production note", project.ExecutionNotes);
     }
 
+    [Fact]
+    public void Research_failure_is_explicit_and_allows_a_new_research_run()
+    {
+        var project = Create();
+        var now = DateTimeOffset.UtcNow;
+
+        project.TransitionTo(VideoProjectStatus.ResearchQueued, now);
+        project.TransitionTo(VideoProjectStatus.Researching, now);
+        project.TransitionTo(VideoProjectStatus.ResearchFailed, now);
+        project.TransitionTo(VideoProjectStatus.ResearchQueued, now);
+
+        Assert.Equal(VideoProjectStatus.ResearchQueued, project.Status);
+    }
+
     private static VideoProject Create() => new(Guid.NewGuid(), Guid.NewGuid(), 1, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
         "The Economics of Owning a Medieval Castle", "Historical economics", "Hidden costs", "Explainer", "History viewers",
         "Reveal the cost before the title card", "Castle against a ledger", "Understand the real ownership cost",
