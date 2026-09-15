@@ -329,9 +329,20 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     }
 
     public Task<Job?> TryClaimNextVideoResearchJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) =>
-        TryClaimJobAsync("video-research", now, staleRunningBefore, cancellationToken);
+        TryClaimJobAsync("video-research", now, staleRunningBefore, cancellationToken, RotateStaleResearchRunAsync);
 
-    public Task RequeueVideoResearchJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
+    public async Task RequeueVideoResearchJobAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        dbContext.ChangeTracker.Clear();
+        var job = await dbContext.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
+        if (job.Status == JobStatus.Running)
+        {
+            var now = DateTimeOffset.UtcNow;
+            await RotateResearchRunForRetryAsync(job, "Research worker stopped before this attempt completed.", now, cancellationToken);
+            job.Requeue(now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
 
     public async Task FailVideoResearchJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
         DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken)
@@ -346,19 +357,21 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
             if (aiRun?.Status == AiRunStatus.Running) aiRun.Fail(reason, failedAt);
         }
 
-        var willRetry = retryable && job.RetryCount < job.MaxRetries;
+        var researchRun = await dbContext.ResearchRuns.SingleOrDefaultAsync(candidate => candidate.Id == payload.ResearchRunId && candidate.ProjectId == payload.ProjectId && candidate.VideoProjectId == payload.VideoProjectId, cancellationToken);
+        if (researchRun is not null && researchRun.Status is ResearchRunStatus.Queued or ResearchRunStatus.Running)
+            researchRun.Fail(reason, ToResearchRunMetrics(researchRun), failedAt);
+
+        var willRetry = retryable && job.RetryCount < job.MaxRetries && researchRun is not null;
+        if (willRetry && researchRun is not null)
+            CreateFreshResearchRunForRetry(job, payload, researchRun, failedAt);
         if (!willRetry)
         {
-            var run = await dbContext.ResearchRuns.SingleOrDefaultAsync(candidate => candidate.Id == payload.ResearchRunId && candidate.ProjectId == payload.ProjectId && candidate.VideoProjectId == payload.VideoProjectId, cancellationToken);
-            if (run is not null && run.Status is ResearchRunStatus.Queued or ResearchRunStatus.Running)
-                run.Fail(reason, new ResearchRunMetrics(run.SearchQueryCount, run.SearchResultCount, run.FetchedSourceCount,
-                    run.RelevantSourceCount, run.EvidenceCount, run.ClaimCount, run.ConflictCount, run.SearchFailureCount, run.FetchFailureCount), failedAt);
             var videoProject = await dbContext.VideoProjects.SingleOrDefaultAsync(candidate => candidate.Id == payload.VideoProjectId && candidate.ProjectId == payload.ProjectId, cancellationToken);
             if (videoProject?.Status is VideoProjectStatus.ResearchQueued or VideoProjectStatus.Researching)
                 videoProject.TransitionTo(VideoProjectStatus.ResearchFailed, failedAt);
         }
 
-        if (job.Status == JobStatus.Running) job.Fail(reason, retryable, failedAt, retryAt);
+        if (job.Status == JobStatus.Running) job.Fail(reason, willRetry, failedAt, retryAt);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -412,6 +425,34 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public void AddResearchClaim(ResearchClaim claim) => dbContext.ResearchClaims.Add(claim);
     public void AddResearchClaimEvidence(ResearchClaimEvidence claimEvidence) => dbContext.ResearchClaimEvidence.Add(claimEvidence);
     public void AddResearchConflict(ResearchConflict conflict) => dbContext.ResearchConflicts.Add(conflict);
+
+    private async Task RotateStaleResearchRunAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await RotateResearchRunForRetryAsync(job, "Research worker lease expired before this attempt completed.", now, cancellationToken);
+        job.Requeue(now);
+    }
+
+    private async Task RotateResearchRunForRetryAsync(Job job, string reason, DateTimeOffset queuedAt, CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<ResearchJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
+            ?? throw new InvalidOperationException("Video research job payload is invalid.");
+        var run = await dbContext.ResearchRuns.SingleOrDefaultAsync(candidate => candidate.Id == payload.ResearchRunId && candidate.ProjectId == payload.ProjectId && candidate.VideoProjectId == payload.VideoProjectId, cancellationToken)
+            ?? throw new InvalidOperationException("Video research job references a missing research run.");
+        if (run.Status is ResearchRunStatus.Queued or ResearchRunStatus.Running)
+            run.Fail(reason, ToResearchRunMetrics(run), queuedAt);
+        CreateFreshResearchRunForRetry(job, payload, run, queuedAt);
+    }
+
+    private void CreateFreshResearchRunForRetry(Job job, ResearchJobPayload payload, ResearchRun previousRun, DateTimeOffset queuedAt)
+    {
+        var retryRun = new ResearchRun(payload.ProjectId, payload.VideoProjectId, previousRun.ResearchAlgorithmVersion, previousRun.InputFingerprint, queuedAt);
+        dbContext.ResearchRuns.Add(retryRun);
+        job.ReplacePayloadForRetry(JsonSerializer.Serialize(new ResearchJobPayload(payload.ProjectId, payload.VideoProjectId, retryRun.Id), ResearchPayloadSerializerOptions));
+    }
+
+    private static ResearchRunMetrics ToResearchRunMetrics(ResearchRun run) => new(run.SearchQueryCount, run.SearchResultCount,
+        run.FetchedSourceCount, run.RelevantSourceCount, run.EvidenceCount, run.ClaimCount, run.ConflictCount,
+        run.SearchFailureCount, run.FetchFailureCount);
 
     public Task<Job?> GetActiveCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         FindAnalysisJobAsync(projectId, competitorId, activeOnly: true, cancellationToken);
@@ -550,7 +591,8 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<Job?> TryClaimJobAsync(string type, DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken)
+    private async Task<Job?> TryClaimJobAsync(string type, DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken,
+        Func<Job, DateTimeOffset, CancellationToken, Task>? recoverStaleJob = null)
     {
         var strategy = dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -571,7 +613,8 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
 
             if (job.Status == JobStatus.Running)
             {
-                job.Requeue(now);
+                if (recoverStaleJob is null) job.Requeue(now);
+                else await recoverStaleJob(job, now, cancellationToken);
             }
 
             job.Start(now);

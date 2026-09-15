@@ -46,9 +46,14 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://www.googleapis.com/youtube/v3/");
             client.Timeout = TimeSpan.FromSeconds(30);
         });
-        services.AddHttpClient<IResearchSearchClient, BingResearchSearchClient>(client => client.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddHttpClient<IResearchSearchClient, TavilyResearchSearchClient>(client => client.Timeout = Timeout.InfiniteTimeSpan);
         services.AddHttpClient<IResearchContentFetcher, HttpResearchContentFetcher>(client => client.Timeout = Timeout.InfiniteTimeSpan)
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseProxy = false,
+                ConnectCallback = ResearchUrlSafetyPolicy.ConnectAsync,
+            });
 
         return services;
     }

@@ -37,6 +37,13 @@ public sealed class ResearchSupportAnalyzerTests
         Assert.Equal(ResearchClaimSupportStatus.Supported, ResearchSupportAnalyzer.GetStatus([new ResearchClaimEvidence(claim, first.Id, ResearchEvidenceStance.Support), new ResearchClaimEvidence(claim, second.Id, ResearchEvidenceStance.Support)], evidence, sources));
     }
 
+    [Theory]
+    [InlineData("中文研究证据", "中文研究证据")]
+    [InlineData("Исследование: доказательство", "исследование доказательство")]
+    [InlineData("日本語の事実 2026", "日本語の事実 2026")]
+    public void Normalizes_non_latin_claim_text_without_discarding_it(string input, string expected) =>
+        Assert.Equal(expected, ResearchSupportAnalyzer.NormalizeStatement(input));
+
     private static ResearchSource Source(Guid runId, string url, string domain, string hash) => new(runId, url, url, domain, "Source", domain, null, DateTimeOffset.UtcNow, ResearchSourceCategory.Institutional, ResearchSourceFetchStatus.Fetched, hash, null, null);
     private static ResearchEvidence Evidence(Guid runId, Guid sourceId, string fact) => new(runId, sourceId, ResearchEvidenceType.Fact, fact, fact, "body", 80, DateTimeOffset.UtcNow);
 }

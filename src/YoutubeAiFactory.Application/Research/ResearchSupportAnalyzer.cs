@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.RegularExpressions;
 using YoutubeAiFactory.Domain.Research;
 
 namespace YoutubeAiFactory.Application.Research;
@@ -23,5 +22,24 @@ public sealed class ResearchSupportAnalyzer
         return independent >= 2 ? ResearchClaimSupportStatus.Corroborated : ResearchClaimSupportStatus.Supported;
     }
 
-    public static string NormalizeStatement(string value) => Regex.Replace(value.ToLowerInvariant(), "[^a-z0-9]+", " ").Trim();
+    public static string NormalizeStatement(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormKC);
+        var builder = new StringBuilder(normalized.Length);
+        var needsSpace = false;
+        foreach (var rune in normalized.EnumerateRunes())
+        {
+            if (Rune.IsLetterOrDigit(rune))
+            {
+                if (needsSpace && builder.Length > 0) builder.Append(' ');
+                builder.Append(rune);
+                needsSpace = false;
+            }
+            else
+            {
+                needsSpace = true;
+            }
+        }
+        return builder.ToString().ToLowerInvariant();
+    }
 }
