@@ -2,8 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Projects;
-using YoutubeAiFactory.Domain.Research;
-using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence.Configurations;
 
@@ -17,8 +15,6 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
         builder.Property(run => run.Workflow).HasColumnName("workflow").HasMaxLength(100).IsRequired();
         builder.Property(run => run.ProjectId).HasColumnName("project_id");
         builder.Property(run => run.CompetitorId).HasColumnName("competitor_channel_id");
-        builder.Property(run => run.VideoProjectId).HasColumnName("video_project_id");
-        builder.Property(run => run.ResearchRunId).HasColumnName("research_run_id");
         builder.Property(run => run.Provider).HasColumnName("provider").HasMaxLength(100).IsRequired();
         builder.Property(run => run.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(run => run.ModelProfile).HasColumnName("model_profile").HasMaxLength(30).IsRequired();
@@ -38,18 +34,8 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
             .WithMany()
             .HasForeignKey(run => run.ProjectId)
             .OnDelete(DeleteBehavior.SetNull);
-        builder.HasOne<VideoProject>()
-            .WithMany()
-            .HasForeignKey(run => run.VideoProjectId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ResearchRun>()
-            .WithMany()
-            .HasForeignKey(run => run.ResearchRunId)
-            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(run => new { run.ProjectId, run.StartedAt });
         builder.HasIndex(run => new { run.CompetitorId, run.StartedAt });
-        builder.HasIndex(run => new { run.VideoProjectId, run.StartedAt });
-        builder.HasIndex(run => new { run.ResearchRunId, run.StartedAt });
     }
 }

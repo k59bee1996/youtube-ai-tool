@@ -36,12 +36,6 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 `VideoProject` is a durable execution aggregate, not another idea or a pilot slot. One approved `PilotVideo` can create at most one VideoProject. It preserves live relational references to `Project`, exact `Pilot` version, `PilotVideo`, `VideoIdea`, and `OpportunityCandidate`; it snapshots the initial title, topic, angle, format, audience, hook, thumbnail concept, viewer promise, and experiment brief so future upstream edits cannot silently rewrite production intent. Only working title and execution notes are editable in Phase 7.
 
-The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchFailed`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Research failure is explicit so a worker failure cannot leave a VideoProject reporting `Researching` forever; `ResearchFailed` can explicitly queue another run.
+The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Phase 7 creates only `Draft`; it has no API control that can assign arbitrary states or create future artifacts.
 
-## Research
-
-`ResearchRun` is a project/video-project execution attempt. It records `research-engine:v1`, a deterministic execution-brief fingerprint, timestamps, source/evidence/claim/conflict counts, external failure counts, status, and a safe failure reason. A failed run never pretends to be a completed report.
-
-`ResearchReport` is an immutable successful artifact with a per-VideoProject version, exact input fingerprint, algorithm version, synthesis provenance, and structured presentation JSON. It owns relational `ResearchClaim` records, explicit `ResearchClaimEvidence` support/contradiction links, and `ResearchConflict` records. `ResearchSource` and `ResearchEvidence` belong to the run so retrieval remains observable even for failed attempts. Evidence is source-bound and retains only an extracted fact, short source excerpt, locator, type, and confidence.
-
-Support describes the retained research dataset, not universal truth: no supporting link is `Unsupported`; one independent support source is `Supported`; two or more independent source keys are `Corroborated`; any valid contradiction link is `Conflicted`. V1 uses source domain plus content hash/canonical URL as conservative independence signals.
+Content gaps, research reports, outlines, scripts, and production packages remain intentionally absent.

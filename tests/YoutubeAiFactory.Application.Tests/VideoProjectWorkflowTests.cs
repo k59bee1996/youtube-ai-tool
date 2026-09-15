@@ -1,14 +1,11 @@
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Persistence;
-using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
-using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
-using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Application.Tests;
@@ -58,26 +55,6 @@ public sealed class VideoProjectWorkflowTests
         await Assert.ThrowsAsync<ResourceNotFoundException>(() => handler.HandleAsync(store.Project.Id, store.Pilot.Id, new CreateVideoProjectRequest(foreignPilotVideoId), CancellationToken.None));
     }
 
-    [Fact]
-    public async Task Queues_one_idempotent_research_run_and_transitions_the_video_project()
-    {
-        var store = new VideoProjectStore(PilotStatus.Approved, IdeaDecisionStatus.Approved, OpportunityDecisionStatus.Approved);
-        var videoProject = await new CreateVideoProjectHandler(store, TimeProvider.System).HandleAsync(
-            store.Project.Id, store.Pilot.Id, new CreateVideoProjectRequest(store.PilotVideo.Id), CancellationToken.None);
-        var handler = new RunVideoResearchHandler(store, new ResearchOptions(), TimeProvider.System);
-
-        var first = await handler.HandleAsync(store.Project.Id, videoProject.Id, CancellationToken.None);
-        var second = await handler.HandleAsync(store.Project.Id, videoProject.Id, CancellationToken.None);
-
-        Assert.False(first.Existing);
-        Assert.True(second.Existing);
-        Assert.Equal(first.JobId, second.JobId);
-        Assert.Equal(VideoProjectStatus.ResearchQueued, store.Created.Single().Status);
-        Assert.Single(store.ResearchRuns);
-        Assert.Equal("research-engine:v1", store.ResearchRuns.Single().ResearchAlgorithmVersion);
-        Assert.Equal(JobStatus.Queued, store.ResearchJob!.Status);
-    }
-
     private sealed class VideoProjectStore : IYoutubeAiFactoryStore
     {
         public Project Project { get; }
@@ -86,8 +63,6 @@ public sealed class VideoProjectWorkflowTests
         public VideoIdea VideoIdea { get; }
         public OpportunityCandidate Opportunity { get; }
         public List<VideoProject> Created { get; } = [];
-        public List<ResearchRun> ResearchRuns { get; } = [];
-        public Job? ResearchJob { get; private set; }
 
         public VideoProjectStore(PilotStatus pilotStatus, IdeaDecisionStatus ideaStatus, OpportunityDecisionStatus opportunityStatus)
         {
@@ -114,17 +89,8 @@ public sealed class VideoProjectWorkflowTests
         public void AddCompetitor(CompetitorChannel competitor) { }
         public Task<Pilot?> GetPilotAsync(Guid projectId, Guid pilotId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult(projectId == Project.Id && pilotId == Pilot.Id ? Pilot : null);
         public Task<VideoProject?> GetVideoProjectByPilotVideoAsync(Guid projectId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(Created.SingleOrDefault(item => item.ProjectId == projectId && item.PilotVideoId == pilotVideoId));
-        public Task<VideoProject?> GetVideoProjectAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoProject?>(Created.SingleOrDefault(item => item.ProjectId == projectId && item.Id == videoProjectId));
         public Task<VideoProjectSource?> GetVideoProjectSourceAsync(Guid projectId, Guid pilotId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProjectSource?>(projectId == Project.Id && pilotId == Pilot.Id && pilotVideoId == PilotVideo.Id ? new VideoProjectSource(Pilot, PilotVideo, VideoIdea, Opportunity) : null);
         public Task<VideoProject> CreateVideoProjectIfAbsentAsync(VideoProject project, CancellationToken cancellationToken) { var existing = Created.SingleOrDefault(item => item.PilotVideoId == project.PilotVideoId); if (existing is not null) return Task.FromResult(existing); Created.Add(project); return Task.FromResult(project); }
-        public Task<Job?> GetActiveVideoResearchJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(ResearchJob is { Status: JobStatus.Queued or JobStatus.Running or JobStatus.Retrying } && ResearchJob.ProjectId == projectId && ResearchJob.VideoProjectId == videoProjectId ? ResearchJob : null);
-        public Task<Job> EnqueueVideoResearchJobAsync(Job job, ResearchRun run, CancellationToken cancellationToken)
-        {
-            if (ResearchJob is { Status: JobStatus.Queued or JobStatus.Running or JobStatus.Retrying }) return Task.FromResult(ResearchJob);
-            ResearchJob = job;
-            ResearchRuns.Add(run);
-            return Task.FromResult(job);
-        }
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

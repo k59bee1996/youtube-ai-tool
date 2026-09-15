@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using YoutubeAiFactory.Application.Common;
@@ -6,7 +5,6 @@ using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Pilots;
-using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
@@ -16,7 +14,6 @@ using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
-using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
@@ -24,7 +21,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence;
 internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     : IYoutubeAiFactoryStore
 {
-    private static readonly JsonSerializerOptions ResearchPayloadSerializerOptions = new(JsonSerializerDefaults.Web);
     public Task<bool> ProjectExistsAsync(Guid projectId, CancellationToken cancellationToken) =>
         dbContext.Projects.AnyAsync(project => project.Id == projectId, cancellationToken);
 
@@ -304,156 +300,6 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         }
     }
 
-    public Task<Job?> GetActiveVideoResearchJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        FindVideoResearchJobAsync(projectId, videoProjectId, true, cancellationToken);
-
-    public Task<Job?> GetLatestVideoResearchJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        FindVideoResearchJobAsync(projectId, videoProjectId, false, cancellationToken);
-
-    public async Task<Job> EnqueueVideoResearchJobAsync(Job job, ResearchRun run, CancellationToken cancellationToken)
-    {
-        dbContext.Jobs.Add(job);
-        dbContext.ResearchRuns.Add(run);
-        try
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return job;
-        }
-        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
-        {
-            dbContext.ChangeTracker.Clear();
-            return await dbContext.Jobs.AsNoTracking().SingleAsync(candidate =>
-                candidate.Type == "video-research" && candidate.VideoProjectId == job.VideoProjectId &&
-                (candidate.Status == JobStatus.Queued || candidate.Status == JobStatus.Running || candidate.Status == JobStatus.Retrying), cancellationToken);
-        }
-    }
-
-    public Task<Job?> TryClaimNextVideoResearchJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) =>
-        TryClaimJobAsync("video-research", now, staleRunningBefore, cancellationToken, RotateStaleResearchRunAsync);
-
-    public async Task RequeueVideoResearchJobAsync(Guid jobId, CancellationToken cancellationToken)
-    {
-        dbContext.ChangeTracker.Clear();
-        var job = await dbContext.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
-        if (job.Status == JobStatus.Running)
-        {
-            var now = DateTimeOffset.UtcNow;
-            await RotateResearchRunForRetryAsync(job, "Research worker stopped before this attempt completed.", now, cancellationToken);
-            job.Requeue(now);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    public async Task FailVideoResearchJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
-        DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken)
-    {
-        dbContext.ChangeTracker.Clear();
-        var job = await dbContext.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
-        var payload = JsonSerializer.Deserialize<ResearchJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
-            ?? throw new InvalidOperationException("Video research job payload is invalid.");
-        if (aiRunId is { } aiRunIdValue)
-        {
-            var aiRun = await dbContext.AiRuns.SingleOrDefaultAsync(candidate => candidate.Id == aiRunIdValue, cancellationToken);
-            if (aiRun?.Status == AiRunStatus.Running) aiRun.Fail(reason, failedAt);
-        }
-
-        var researchRun = await dbContext.ResearchRuns.SingleOrDefaultAsync(candidate => candidate.Id == payload.ResearchRunId && candidate.ProjectId == payload.ProjectId && candidate.VideoProjectId == payload.VideoProjectId, cancellationToken);
-        if (researchRun is not null && researchRun.Status is ResearchRunStatus.Queued or ResearchRunStatus.Running)
-            researchRun.Fail(reason, ToResearchRunMetrics(researchRun), failedAt);
-
-        var willRetry = retryable && job.RetryCount < job.MaxRetries && researchRun is not null;
-        if (willRetry && researchRun is not null)
-            CreateFreshResearchRunForRetry(job, payload, researchRun, failedAt);
-        if (!willRetry)
-        {
-            var videoProject = await dbContext.VideoProjects.SingleOrDefaultAsync(candidate => candidate.Id == payload.VideoProjectId && candidate.ProjectId == payload.ProjectId, cancellationToken);
-            if (videoProject?.Status is VideoProjectStatus.ResearchQueued or VideoProjectStatus.Researching)
-                videoProject.TransitionTo(VideoProjectStatus.ResearchFailed, failedAt);
-        }
-
-        if (job.Status == JobStatus.Running) job.Fail(reason, willRetry, failedAt, retryAt);
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public Task<ResearchRun?> GetResearchRunAsync(Guid projectId, Guid videoProjectId, Guid researchRunId, bool forUpdate, CancellationToken cancellationToken)
-    {
-        var query = dbContext.ResearchRuns.Where(x => x.Id == researchRunId && x.ProjectId == projectId && x.VideoProjectId == videoProjectId);
-        return (forUpdate ? query : query.AsNoTracking()).SingleOrDefaultAsync(cancellationToken);
-    }
-
-    public Task<ResearchRun?> GetLatestResearchRunAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        dbContext.ResearchRuns.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId)
-            .OrderByDescending(x => x.QueuedAt).FirstOrDefaultAsync(cancellationToken);
-
-    public async Task<IReadOnlyList<ResearchRun>> ListResearchRunsAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        await dbContext.ResearchRuns.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId)
-            .OrderByDescending(x => x.QueuedAt).ToListAsync(cancellationToken);
-
-    public async Task<int> GetNextResearchReportVersionAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        (await dbContext.ResearchReports.Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId)
-            .Select(x => (int?)x.Version).MaxAsync(cancellationToken) ?? 0) + 1;
-
-    public Task<ResearchReportWithDetails?> GetLatestResearchReportAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        GetResearchReportInternalAsync(dbContext.ResearchReports.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId)
-            .OrderByDescending(x => x.Version).Select(x => x.Id), cancellationToken);
-
-    public Task<ResearchReportWithDetails?> GetResearchReportAsync(Guid projectId, Guid videoProjectId, Guid reportId, CancellationToken cancellationToken) =>
-        GetResearchReportInternalAsync(dbContext.ResearchReports.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId && x.Id == reportId)
-            .Select(x => x.Id), cancellationToken);
-
-    public async Task<IReadOnlyList<ResearchReport>> ListResearchReportsAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
-        await dbContext.ResearchReports.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId)
-            .OrderByDescending(x => x.Version).ToListAsync(cancellationToken);
-
-    private async Task<ResearchReportWithDetails?> GetResearchReportInternalAsync(IQueryable<Guid> reportIds, CancellationToken cancellationToken)
-    {
-        var reportId = await reportIds.FirstOrDefaultAsync(cancellationToken);
-        if (reportId == Guid.Empty) return null;
-        var report = await dbContext.ResearchReports.AsNoTracking().SingleAsync(x => x.Id == reportId, cancellationToken);
-        var sources = await dbContext.ResearchSources.AsNoTracking().Where(x => x.ResearchRunId == report.ResearchRunId).ToListAsync(cancellationToken);
-        var evidence = await dbContext.ResearchEvidence.AsNoTracking().Where(x => x.ResearchRunId == report.ResearchRunId).ToListAsync(cancellationToken);
-        var claims = await dbContext.ResearchClaims.AsNoTracking().Where(x => x.ResearchReportId == report.Id).ToListAsync(cancellationToken);
-        var claimIds = claims.Select(x => x.Id).ToArray();
-        var links = await dbContext.ResearchClaimEvidence.AsNoTracking().Where(x => claimIds.Contains(x.ResearchClaimId)).ToListAsync(cancellationToken);
-        var conflicts = await dbContext.ResearchConflicts.AsNoTracking().Where(x => x.ResearchReportId == report.Id).ToListAsync(cancellationToken);
-        return new ResearchReportWithDetails(report, sources, evidence, claims, links, conflicts);
-    }
-
-    public void AddResearchSource(ResearchSource source) => dbContext.ResearchSources.Add(source);
-    public void AddResearchEvidence(ResearchEvidence evidence) => dbContext.ResearchEvidence.Add(evidence);
-    public void AddResearchReport(ResearchReport report) => dbContext.ResearchReports.Add(report);
-    public void AddResearchClaim(ResearchClaim claim) => dbContext.ResearchClaims.Add(claim);
-    public void AddResearchClaimEvidence(ResearchClaimEvidence claimEvidence) => dbContext.ResearchClaimEvidence.Add(claimEvidence);
-    public void AddResearchConflict(ResearchConflict conflict) => dbContext.ResearchConflicts.Add(conflict);
-
-    private async Task RotateStaleResearchRunAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        await RotateResearchRunForRetryAsync(job, "Research worker lease expired before this attempt completed.", now, cancellationToken);
-        job.Requeue(now);
-    }
-
-    private async Task RotateResearchRunForRetryAsync(Job job, string reason, DateTimeOffset queuedAt, CancellationToken cancellationToken)
-    {
-        var payload = JsonSerializer.Deserialize<ResearchJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
-            ?? throw new InvalidOperationException("Video research job payload is invalid.");
-        var run = await dbContext.ResearchRuns.SingleOrDefaultAsync(candidate => candidate.Id == payload.ResearchRunId && candidate.ProjectId == payload.ProjectId && candidate.VideoProjectId == payload.VideoProjectId, cancellationToken)
-            ?? throw new InvalidOperationException("Video research job references a missing research run.");
-        if (run.Status is ResearchRunStatus.Queued or ResearchRunStatus.Running)
-            run.Fail(reason, ToResearchRunMetrics(run), queuedAt);
-        CreateFreshResearchRunForRetry(job, payload, run, queuedAt);
-    }
-
-    private void CreateFreshResearchRunForRetry(Job job, ResearchJobPayload payload, ResearchRun previousRun, DateTimeOffset queuedAt)
-    {
-        var retryRun = new ResearchRun(payload.ProjectId, payload.VideoProjectId, previousRun.ResearchAlgorithmVersion, previousRun.InputFingerprint, queuedAt);
-        dbContext.ResearchRuns.Add(retryRun);
-        job.ReplacePayloadForRetry(JsonSerializer.Serialize(new ResearchJobPayload(payload.ProjectId, payload.VideoProjectId, retryRun.Id), ResearchPayloadSerializerOptions));
-    }
-
-    private static ResearchRunMetrics ToResearchRunMetrics(ResearchRun run) => new(run.SearchQueryCount, run.SearchResultCount,
-        run.FetchedSourceCount, run.RelevantSourceCount, run.EvidenceCount, run.ClaimCount, run.ConflictCount,
-        run.SearchFailureCount, run.FetchFailureCount);
-
     public Task<Job?> GetActiveCompetitorAnalysisJobAsync(Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         FindAnalysisJobAsync(projectId, competitorId, activeOnly: true, cancellationToken);
 
@@ -583,16 +429,8 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "idea-generation" && job.ProjectId == projectId && job.OpportunityId == opportunityId);
         if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying); return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
-    private Task<Job?> FindVideoResearchJobAsync(Guid projectId, Guid videoProjectId, bool activeOnly, CancellationToken cancellationToken)
-    {
-        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "video-research" && job.VideoProjectId == videoProjectId &&
-            dbContext.VideoProjects.Any(videoProject => videoProject.Id == videoProjectId && videoProject.ProjectId == projectId));
-        if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
-        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
-    }
 
-    private async Task<Job?> TryClaimJobAsync(string type, DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken,
-        Func<Job, DateTimeOffset, CancellationToken, Task>? recoverStaleJob = null)
+    private async Task<Job?> TryClaimJobAsync(string type, DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken)
     {
         var strategy = dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -613,8 +451,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
 
             if (job.Status == JobStatus.Running)
             {
-                if (recoverStaleJob is null) job.Requeue(now);
-                else await recoverStaleJob(job, now, cancellationToken);
+                job.Requeue(now);
             }
 
             job.Start(now);

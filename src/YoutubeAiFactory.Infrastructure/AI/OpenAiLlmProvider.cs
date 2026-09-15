@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using YoutubeAiFactory.Application.AI;
 using YoutubeAiFactory.Application.Common;
@@ -12,10 +11,7 @@ namespace YoutubeAiFactory.Infrastructure.AI;
 /// <summary>Small OpenAI-compatible adapter; business workflows retain provider-neutral contracts.</summary>
 internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> options) : ILlmProvider
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() },
-    };
+    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     public async Task<LlmResult<T>> GenerateStructuredAsync<T>(LlmRequest request, CancellationToken cancellationToken)
     {
         var settings = options.Value;
