@@ -9,7 +9,6 @@ using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Projects;
-using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Infrastructure;
 
@@ -29,7 +28,6 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("OpportunityAnaly
 builder.Services.AddSingleton(builder.Configuration.GetSection("IdeaGeneration").Get<IdeaGenerationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection("PilotGeneration").Get<PilotGenerationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(ArtifactLocalizationOptions.SectionName).Get<ArtifactLocalizationOptions>() ?? new());
-builder.Services.AddSingleton(builder.Configuration.GetSection(ResearchOptions.SectionName).Get<ResearchOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -71,13 +69,6 @@ builder.Services.AddScoped<CreateVideoProjectHandler>();
 builder.Services.AddScoped<ListVideoProjectsHandler>();
 builder.Services.AddScoped<GetVideoProjectHandler>();
 builder.Services.AddScoped<UpdateVideoProjectHandler>();
-builder.Services.AddScoped<RunVideoResearchHandler>();
-builder.Services.AddScoped<GetVideoResearchStatusHandler>();
-builder.Services.AddScoped<GetVideoResearchReportHandler>();
-builder.Services.AddScoped<ListVideoResearchReportsHandler>();
-builder.Services.AddScoped<RequestResearchReportLocalizationHandler>();
-builder.Services.AddScoped<GetResearchReportLocalizationHandler>();
-builder.Services.AddScoped<VideoResearchJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"])
@@ -90,7 +81,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-8",
+    phase = "phase-7",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

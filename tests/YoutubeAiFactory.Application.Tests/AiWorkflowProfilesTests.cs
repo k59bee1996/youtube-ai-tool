@@ -18,11 +18,6 @@ public sealed class AiWorkflowProfilesTests
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.PilotGeneration);
         Assert.Equal(AiModelProfile.Fast, AiWorkflowProfiles.ArtifactLocalization);
         Assert.Equal(AiModelProfile.Fast, AiWorkflowProfiles.StructuredOutputRepair);
-        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ResearchQueryPlanning);
-        Assert.Equal(AiModelProfile.Fast, AiWorkflowProfiles.ResearchSourceRelevance);
-        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ResearchEvidenceExtraction);
-        Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ResearchContradictionAnalysis);
-        Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ResearchSynthesis);
     }
 
     [Fact]

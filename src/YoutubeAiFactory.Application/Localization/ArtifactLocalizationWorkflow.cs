@@ -19,7 +19,7 @@ public sealed class ArtifactLocalizationOptions
     public int RunningJobLeaseSeconds { get; init; } = 300;
 }
 
-public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale, Guid? OpportunityReportId = null, Guid? ResearchReportId = null);
+public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale, Guid? OpportunityReportId = null);
 public sealed record ArtifactLocalizationStatusDto(LocalizedCompetitorAnalysisContent? Content, AnalysisJobDto? ActiveJob, AnalysisJobDto? LatestJob);
 public sealed record RequestArtifactLocalizationResult(Guid? JobId, string Status, bool Existing);
 
@@ -87,11 +87,6 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             if (job.ArtifactType == LocalizableArtifactTypes.OpportunityReport)
             {
                 await ProcessOpportunityReportAsync(job, payload, cancellationToken);
-                return true;
-            }
-            if (job.ArtifactType == LocalizableArtifactTypes.ResearchReport)
-            {
-                await ProcessResearchReportAsync(job, payload, cancellationToken);
                 return true;
             }
             if (job.ArtifactType != LocalizableArtifactTypes.CompetitorAnalysis)
@@ -227,65 +222,6 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             var retryable = exception is ExternalServiceException { Failure: ExternalServiceFailure.QuotaExceeded or ExternalServiceFailure.Transient };
             await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
                 exception is YoutubeAiFactoryException ? exception.Message : "Opportunity translation could not be completed. Try again later.",
-                retryable, failedAt, retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null, CancellationToken.None);
-            LogFailed(logger, job.Id, exception);
-        }
-    }
-
-    private async Task ProcessResearchReportAsync(Job job, ArtifactLocalizationJobPayload payload, CancellationToken cancellationToken)
-    {
-        AiRun? run = null;
-        try
-        {
-            if (payload.ResearchReportId is not Guid reportId || reportId == Guid.Empty)
-                throw new ApplicationValidationException("Research report localization job payload is invalid.");
-            var report = await store.GetResearchReportAsync(payload.ProjectId, job.VideoProjectId ?? Guid.Empty, reportId, cancellationToken)
-                ?? throw new ResourceNotFoundException("Research report for this localization job was not found.");
-            if (report.Report.Version != payload.ArtifactVersion) throw new ApplicationValidationException("The requested research report version is no longer available.");
-            var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.ResearchReport, report.Report.Id, report.Report.Version, payload.Locale, cancellationToken);
-            if (cached is not null && LocalizedResearchReportCache.IsValid(report, cached))
-            {
-                job.Complete(timeProvider.GetUtcNow()); await store.SaveChangesAsync(cancellationToken); return;
-            }
-            if (cached is not null) await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
-            var resolvedModel = modelResolver.Resolve(ResearchReportLocalizationPrompt.ModelProfile);
-            run = new AiRun("ArtifactLocalization", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model,
-                ResearchReportLocalizationPrompt.Key, ResearchReportLocalizationPrompt.Version, timeProvider.GetUtcNow(),
-                resolvedModel.Profile.ToString(), report.Report.VideoProjectId, report.Report.ResearchRunId);
-            store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
-            LlmResult<LocalizedResearchReportContent>? answer = null;
-            Exception? failure = null;
-            for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
-            {
-                try
-                {
-                    answer = await provider.GenerateStructuredAsync<LocalizedResearchReportContent>(ResearchReportLocalizationPrompt.Create(report, attempt > 0).WithResolvedModel(resolvedModel), cancellationToken);
-                    LocalizedResearchReportValidator.Validate(report, answer.Value);
-                    break;
-                }
-                catch (StructuredOutputException exception)
-                {
-                    failure = exception;
-                    if (attempt == options.MaxStructuredOutputRetries) break;
-                    run.RecordRetry(); await store.SaveChangesAsync(cancellationToken);
-                }
-                catch (Exception exception) { failure = exception; break; }
-            }
-            if (answer is null) throw failure ?? new StructuredOutputException("The provider did not return localized research content.");
-            run.RecordProvider(answer.Provider, answer.Model);
-            store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.ResearchReport, report.Report.Id, report.Report.Version,
-                payload.Locale, JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id,
-                ResearchReportLocalizationPrompt.Key, ResearchReportLocalizationPrompt.Version, answer.Provider, answer.Model, timeProvider.GetUtcNow()));
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow()); job.Complete(timeProvider.GetUtcNow());
-            await store.SaveChangesAsync(cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (Exception exception)
-        {
-            var failedAt = timeProvider.GetUtcNow();
-            var retryable = exception is ExternalServiceException { Failure: ExternalServiceFailure.QuotaExceeded or ExternalServiceFailure.Transient };
-            await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
-                exception is YoutubeAiFactoryException ? exception.Message : "Research report translation could not be completed. Try again later.",
                 retryable, failedAt, retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null, CancellationToken.None);
             LogFailed(logger, job.Id, exception);
         }

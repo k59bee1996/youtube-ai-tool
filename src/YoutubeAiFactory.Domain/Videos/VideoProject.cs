@@ -75,9 +75,8 @@ public sealed class VideoProject
         new Dictionary<VideoProjectStatus, VideoProjectStatus[]>
         {
             [VideoProjectStatus.Draft] = [VideoProjectStatus.ResearchQueued],
-            [VideoProjectStatus.ResearchQueued] = [VideoProjectStatus.Researching, VideoProjectStatus.ResearchFailed],
-            [VideoProjectStatus.Researching] = [VideoProjectStatus.ResearchReady, VideoProjectStatus.ResearchFailed],
-            [VideoProjectStatus.ResearchFailed] = [VideoProjectStatus.ResearchQueued],
+            [VideoProjectStatus.ResearchQueued] = [VideoProjectStatus.Researching, VideoProjectStatus.Draft],
+            [VideoProjectStatus.Researching] = [VideoProjectStatus.ResearchReady],
             [VideoProjectStatus.ResearchReady] = [VideoProjectStatus.ResearchQueued, VideoProjectStatus.OutlineGenerating],
             [VideoProjectStatus.OutlineGenerating] = [VideoProjectStatus.OutlineReady],
             [VideoProjectStatus.OutlineReady] = [VideoProjectStatus.OutlineGenerating, VideoProjectStatus.OutlineApproved],

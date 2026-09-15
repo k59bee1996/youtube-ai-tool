@@ -4,7 +4,7 @@
 
 YouTube AI Factory converts market and competitor evidence into structured, reusable content intelligence. V1 will guide creators from market research through ideas, pilots, research, scripts, and production packages; it will not create or upload complete videos.
 
-## Current delivery: Phase 8
+## Current delivery: Phase 7
 
 The repository provides the foundation plus the first end-to-end business slice:
 
@@ -21,13 +21,10 @@ The repository provides the foundation plus the first end-to-end business slice:
 
 An approved PilotVideo can now be explicitly started as one idempotent Draft VideoProject. The execution workspace preserves immutable project/pilot/slot/idea/opportunity lineage and a creation-time execution brief; it allows only a working title and execution notes to change.
 
-- a bounded, worker-backed research engine for a Draft/ResearchReady/ResearchFailed VideoProject. It creates a `ResearchRun` attempt, discovers public sources through a provider-neutral search client, retrieves only SSRF-safe bounded HTML, preserves short source-bound evidence, derives claim support deterministically, retains conflicts and gaps, and creates immutable successful `ResearchReport` versions.
-- a Research workspace report with source links, claim/evidence inspection, conflicts, gaps, staleness indication, retry, report history API, and a lazy Vietnamese reading overlay for explanatory synthesis only.
-
 ## Explicitly deferred
 
-Project update/delete, competitor deletion, background collection, outlines, scripts, production packages, authentication, and alternate LLM providers remain future phases. Full video generation, uploads, billing, teams, microservices, and distributed infrastructure remain outside V1.
+Project update/delete, competitor deletion, background collection, research, outlines, scripts, production packages, authentication, and alternate LLM providers remain future phases. Full video generation, uploads, billing, teams, microservices, and distributed infrastructure remain outside V1.
 
 ## Next product milestone
 
-Phase 9 can consume one immutable ResearchReport, its claims/evidence/conflicts/gaps, and the VideoProject execution brief to generate an Outline without rediscovering web sources.
+Phase 8 can attach research to a Draft VideoProject and transition it through `ResearchQueued`, `Researching`, and `ResearchReady`; research generation itself is intentionally not implemented yet.

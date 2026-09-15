@@ -17,7 +17,6 @@ public sealed class Job
         Guid? competitorChannelId = null,
         Guid? projectId = null,
         Guid? opportunityId = null,
-        Guid? videoProjectId = null,
         string? artifactType = null,
         Guid? artifactId = null,
         int? artifactVersion = null,
@@ -34,7 +33,6 @@ public sealed class Job
         CompetitorChannelId = competitorChannelId;
         ProjectId = projectId;
         OpportunityId = opportunityId;
-        VideoProjectId = videoProjectId;
         ArtifactType = artifactType;
         ArtifactId = artifactId;
         ArtifactVersion = artifactVersion;
@@ -57,7 +55,6 @@ public sealed class Job
     public Guid? ProjectId { get; private set; }
 
     public Guid? OpportunityId { get; private set; }
-    public Guid? VideoProjectId { get; private set; }
     public string? ArtifactType { get; private set; }
     public Guid? ArtifactId { get; private set; }
     public int? ArtifactVersion { get; private set; }
@@ -112,14 +109,6 @@ public sealed class Job
         AvailableAt = availableAt;
         StartedAt = null;
         FailureReason = "Recovered after worker interruption.";
-    }
-
-    /// <summary>Replaces an attempt-specific payload while the same bounded job is being retried.</summary>
-    public void ReplacePayloadForRetry(string payload)
-    {
-        EnsureRunning();
-        ValidateJson(payload);
-        Payload = payload;
     }
 
     public void Fail(
