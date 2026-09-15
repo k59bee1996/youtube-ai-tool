@@ -1,6 +1,7 @@
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Pilots;
+using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
@@ -10,6 +11,7 @@ using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Application.Persistence;
@@ -131,6 +133,26 @@ public interface IYoutubeAiFactoryStore
     Task<VideoProjectSource?> GetVideoProjectSourceAsync(Guid projectId, Guid pilotId, Guid pilotVideoId, CancellationToken cancellationToken) => Task.FromResult<VideoProjectSource?>(null);
     Task<VideoProject> CreateVideoProjectIfAbsentAsync(VideoProject project, CancellationToken cancellationToken) => throw new NotSupportedException("Video project persistence is not configured.");
 
+    Task<Job?> GetActiveVideoResearchJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestVideoResearchJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job> EnqueueVideoResearchJobAsync(Job job, ResearchRun run, CancellationToken cancellationToken) => throw new NotSupportedException("Video research job persistence is not configured.");
+    Task<Job?> TryClaimNextVideoResearchJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task RequeueVideoResearchJobAsync(Guid jobId, CancellationToken cancellationToken) => throw new NotSupportedException("Video research job persistence is not configured.");
+    Task FailVideoResearchJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => throw new NotSupportedException("Video research job persistence is not configured.");
+    Task<ResearchRun?> GetResearchRunAsync(Guid projectId, Guid videoProjectId, Guid researchRunId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<ResearchRun?>(null);
+    Task<ResearchRun?> GetLatestResearchRunAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<ResearchRun?>(null);
+    Task<IReadOnlyList<ResearchRun>> ListResearchRunsAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResearchRun>>([]);
+    Task<int> GetNextResearchReportVersionAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<ResearchReportWithDetails?> GetLatestResearchReportAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<ResearchReportWithDetails?>(null);
+    Task<ResearchReportWithDetails?> GetResearchReportAsync(Guid projectId, Guid videoProjectId, Guid reportId, CancellationToken cancellationToken) => Task.FromResult<ResearchReportWithDetails?>(null);
+    Task<IReadOnlyList<ResearchReport>> ListResearchReportsAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResearchReport>>([]);
+    void AddResearchSource(ResearchSource source) => throw new NotSupportedException("Research persistence is not configured.");
+    void AddResearchEvidence(ResearchEvidence evidence) => throw new NotSupportedException("Research persistence is not configured.");
+    void AddResearchReport(ResearchReport report) => throw new NotSupportedException("Research persistence is not configured.");
+    void AddResearchClaim(ResearchClaim claim) => throw new NotSupportedException("Research persistence is not configured.");
+    void AddResearchClaimEvidence(ResearchClaimEvidence claimEvidence) => throw new NotSupportedException("Research persistence is not configured.");
+    void AddResearchConflict(ResearchConflict conflict) => throw new NotSupportedException("Research persistence is not configured.");
+
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         Task.FromResult<Job?>(null);
@@ -166,4 +188,9 @@ public interface IYoutubeAiFactoryStore
     void AddJob(Job job) => throw new NotSupportedException("Job persistence is not configured.");
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
+}
+
+public interface IVideoResearchJobLeaseRenewer
+{
+    Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt, CancellationToken cancellationToken);
 }

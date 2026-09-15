@@ -5,6 +5,7 @@ public enum VideoProjectStatus
     Draft,
     ResearchQueued,
     Researching,
+    ResearchFailed,
     ResearchReady,
     OutlineGenerating,
     OutlineReady,

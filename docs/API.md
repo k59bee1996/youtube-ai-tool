@@ -73,4 +73,13 @@ At least 12 ideas with approved source opportunities are required. The API does 
 - `GET /api/projects/{projectId}/video-projects/{videoProjectId}` returns its execution brief, exact lineage, experiment context, current source-review signal, and snapshot warnings.
 - `PATCH /api/projects/{projectId}/video-projects/{videoProjectId}` updates only `workingTitle` and `executionNotes`.
 
-Creation returns `400` when the Pilot is not approved or the source idea/opportunity requires review, and `404` for missing or cross-project resources. The API never accepts a status field, triggers research, queues a job, or calls an LLM in this phase.
+Creation returns `400` when the Pilot is not approved or the source idea/opportunity requires review, and `404` for missing or cross-project resources. The API never accepts a status field.
+
+## Video Project Research
+
+- `POST /api/projects/{projectId}/video-projects/{videoProjectId}/research:run` queues evidence-backed research and returns `202 Accepted` with `jobId`, `status`, and `existing`. Calls while an active job exists reuse it.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/research/latest` returns the latest report, active/latest job, and latest run status for polling; it does not generate research.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/research` lists immutable report versions; `GET .../research/{reportId}` returns a structured report and run history.
+- `POST` / `GET .../research/{reportId}/localizations/vi` lazily creates or reads the Vietnamese reading overlay. It changes only reader-facing synthesis text, never sources, claims, evidence, or report version.
+
+Research is valid from `Draft`, `ResearchReady`, or `ResearchFailed`. A bad state is a validation problem; missing or cross-project video projects/reports return `404`. Search/fetch/AI failure is persisted on the job/run and returns a safe actionable message through polling. A failed run creates no report version.

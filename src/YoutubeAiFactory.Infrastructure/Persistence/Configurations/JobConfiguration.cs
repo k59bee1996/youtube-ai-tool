@@ -16,6 +16,7 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.CompetitorChannelId).HasColumnName("competitor_channel_id");
         builder.Property(job => job.ProjectId).HasColumnName("project_id");
         builder.Property(job => job.OpportunityId).HasColumnName("opportunity_id");
+        builder.Property(job => job.VideoProjectId).HasColumnName("video_project_id");
         builder.Property(job => job.ArtifactType).HasColumnName("artifact_type").HasMaxLength(100);
         builder.Property(job => job.ArtifactId).HasColumnName("artifact_id");
         builder.Property(job => job.ArtifactVersion).HasColumnName("artifact_version");
@@ -27,6 +28,7 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(job => job.AvailableAt).HasColumnName("available_at").IsRequired();
         builder.Property(job => job.StartedAt).HasColumnName("started_at");
+        builder.Property(job => job.LeaseId).HasColumnName("lease_id");
         builder.Property(job => job.CompletedAt).HasColumnName("completed_at");
         builder.Property(job => job.FailureReason).HasColumnName("failure_reason").HasMaxLength(2_000);
 
@@ -43,6 +45,10 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasDatabaseName("ux_jobs_active_idea_generation")
             .IsUnique()
             .HasFilter("type = 'idea-generation' AND status IN ('Queued', 'Running', 'Retrying')");
+        builder.HasIndex(job => job.VideoProjectId)
+            .HasDatabaseName("ux_jobs_active_video_project_research")
+            .IsUnique()
+            .HasFilter("type = 'video-research' AND status IN ('Queued', 'Running', 'Retrying')");
         builder.HasIndex(job => new { job.ArtifactType, job.ArtifactId, job.ArtifactVersion, job.Locale })
             .HasDatabaseName("ux_jobs_active_artifact_localization")
             .IsUnique()
