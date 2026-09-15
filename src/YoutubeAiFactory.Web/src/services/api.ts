@@ -81,6 +81,18 @@ export type PilotStatus = { latestPilot: Pilot | null; activeJobStatus: string |
 export type PilotCandidate = { videoIdeaId: string; opportunityId: string; opportunityName: string; workingTitle: string; topic: string; contentFormat: string; overallScore: number }
 export type VideoProjectListItem = { id: string; pilotVideoId: string; workingTitle: string; status: string; videoIdeaId: string; pilotSequence: number; experimentType: string; createdAt: string }
 export type VideoProject = { id: string; projectId: string; pilotId: string; pilotVersion: number; pilotVideoId: string; videoIdeaId: string; opportunityId: string; workingTitle: string; status: string; topic: string; angle: string; contentFormat: string; targetAudience: string; hookConcept: string; thumbnailConcept: string; viewerPromise: string; pilotSequence: number; experimentType: string; pilotHypothesis: string; variableBeingTested: string; primaryMetric: string; successSignal: string; opportunityName: string; ideaScore: number; executionNotes: string | null; createdAt: string; updatedAt: string; sourceRequiresReview: boolean; sourceWarnings: string[] }
+export type ResearchJob = { id: string; status: string; failureReason: string | null }
+export type ResearchEvidence = { id: string; sourceId: string; type: string; fact: string; supportingExcerpt: string; sourceLocator: string; confidence: number }
+export type ResearchSource = { id: string; url: string; canonicalUrl: string; domain: string; title: string | null; publisher: string | null; publishedAt: string | null; retrievedAt: string; category: string; fetchStatus: string }
+export type ResearchClaim = { id: string; statement: string; type: string; supportStatus: string; confidence: number; isCritical: boolean; evidence: { evidenceId: string; stance: string }[] }
+export type ResearchConflict = { id: string; claimId: string; supportingEvidenceId: string; contradictingEvidenceId: string; explanation: string; isResolved: boolean }
+export type ResearchFinding = { summary: string; category: string; claimIds: string[]; evidenceIds: string[] }
+export type ResearchGap = { description: string; claimIds: string[] }
+export type ResearchReport = { id: string; version: number; researchAlgorithmVersion: string; createdAt: string; isStale: boolean; synthesis: { executiveSummary: string; keyFindings: ResearchFinding[]; gaps: ResearchGap[]; warnings: string[]; limitations: string[] }; confidence: { level: string; sourceCount: number; relevantSourceCount: number; claimCount: number; corroboratedClaimCount: number; singleSourceClaimCount: number; conflictedClaimCount: number; unsupportedCriticalClaimCount: number }; metrics: { queryCount: number; searchResultCount: number; fetchedSourceCount: number; relevantSourceCount: number; uniqueDomainCount: number; evidenceCount: number; claimCount: number; corroboratedClaimCount: number; singleSourceClaimCount: number; conflictedClaimCount: number; unsupportedClaimCount: number; conflictCount: number; searchFailureCount: number; fetchFailureCount: number }; sources: ResearchSource[]; evidence: ResearchEvidence[]; claims: ResearchClaim[]; conflicts: ResearchConflict[] }
+export type ResearchStatus = { latestReport: ResearchReport | null; activeJob: ResearchJob | null; latestJob: ResearchJob | null; latestRunStatus: string | null; latestRunFailureReason: string | null }
+export type ResearchRun = { jobId: string; status: string; existing: boolean }
+export type LocalizedResearchReportContent = { executiveSummary: string; keyFindings: { summary: string; category: string }[]; gaps: { description: string }[]; warnings: string[]; limitations: string[] }
+export type ResearchLocalizationStatus = { content: LocalizedResearchReportContent | null; activeJob: ResearchJob | null; latestJob: ResearchJob | null }
 
 export type CreateProjectRequest = {
   name: string
@@ -165,4 +177,8 @@ export const api = {
   listVideoProjects: (projectId: string, signal?: AbortSignal) => request<VideoProjectListItem[]>(`/api/projects/${projectId}/video-projects`, { signal }),
   getVideoProject: (projectId: string, videoProjectId: string, signal?: AbortSignal) => request<VideoProject>(`/api/projects/${projectId}/video-projects/${videoProjectId}`, { signal }),
   updateVideoProject: (projectId: string, videoProjectId: string, workingTitle: string, executionNotes: string | null) => request<VideoProject>(`/api/projects/${projectId}/video-projects/${videoProjectId}`, { method: 'PATCH', body: JSON.stringify({ workingTitle, executionNotes }) }),
+  getResearchStatus: (projectId: string, videoProjectId: string, signal?: AbortSignal) => request<ResearchStatus>(`/api/projects/${projectId}/video-projects/${videoProjectId}/research/latest`, { signal }),
+  runResearch: (projectId: string, videoProjectId: string) => request<ResearchRun>(`/api/projects/${projectId}/video-projects/${videoProjectId}/research:run`, { method: 'POST' }),
+  getResearchLocalization: (projectId: string, videoProjectId: string, reportId: string, locale: 'vi') => request<ResearchLocalizationStatus>(`/api/projects/${projectId}/video-projects/${videoProjectId}/research/${reportId}/localizations/${locale}`),
+  requestResearchLocalization: (projectId: string, videoProjectId: string, reportId: string, locale: 'vi') => request<AnalysisRun>(`/api/projects/${projectId}/video-projects/${videoProjectId}/research/${reportId}/localizations/${locale}`, { method: 'POST' }),
 }

@@ -9,4 +9,9 @@ public static class AiWorkflowProfiles
     public static AiModelProfile PilotGeneration => AiModelProfile.Premium;
     public static AiModelProfile ArtifactLocalization => AiModelProfile.Fast;
     public static AiModelProfile StructuredOutputRepair => AiModelProfile.Fast;
+    public static AiModelProfile ResearchQueryPlanning => AiModelProfile.Reasoning;
+    public static AiModelProfile ResearchSourceRelevance => AiModelProfile.Fast;
+    public static AiModelProfile ResearchEvidenceExtraction => AiModelProfile.Reasoning;
+    public static AiModelProfile ResearchContradictionAnalysis => AiModelProfile.Premium;
+    public static AiModelProfile ResearchSynthesis => AiModelProfile.Premium;
 }
