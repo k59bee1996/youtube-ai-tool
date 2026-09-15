@@ -311,7 +311,7 @@ public sealed class VideoResearchJobProcessor(
     private async Task<SearchOutcome> DiscoverAsync(ResearchPlan plan, string language, CancellationToken cancellationToken)
     {
         var results = new List<ResearchSearchResult>();
-        var failures = 0;
+        var failures = new List<ExternalServiceException>();
         foreach (var query in plan.Queries.Take(options.MaxResearchQueries))
         {
             try
@@ -319,7 +319,7 @@ public sealed class VideoResearchJobProcessor(
                 var response = await searchClient.SearchAsync(new ResearchSearchRequest(query.Query, language, options.MaxSearchResultsPerQuery), cancellationToken);
                 results.AddRange(response.Results.Take(options.MaxSearchResultsPerQuery));
             }
-            catch (ExternalServiceException) { failures++; }
+            catch (ExternalServiceException exception) { failures.Add(exception); }
         }
         var unique = new List<ResearchSearchResult>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -331,8 +331,13 @@ public sealed class VideoResearchJobProcessor(
             }
             catch (ArgumentException) { }
         }
-        if (unique.Count == 0) throw new ApplicationValidationException("Research search returned no usable public source URLs.");
-        return new SearchOutcome(unique, results.Count, failures);
+        if (unique.Count == 0)
+        {
+            var retryable = ResearchSearchFailurePolicy.GetRetryableNoResultsFailure(failures);
+            if (retryable is not null) throw retryable;
+            throw new ApplicationValidationException("Research search returned no usable public source URLs.");
+        }
+        return new SearchOutcome(unique, results.Count, failures.Count);
     }
 
     private async Task<FetchOutcome> FetchSourcesAsync(IReadOnlyList<ResearchSearchResult> results, Guid researchRunId, CancellationToken cancellationToken)

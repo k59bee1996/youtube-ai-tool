@@ -114,6 +114,14 @@ public sealed class Job
         FailureReason = "Recovered after worker interruption.";
     }
 
+    /// <summary>Replaces an attempt-specific payload while the same bounded job is being retried.</summary>
+    public void ReplacePayloadForRetry(string payload)
+    {
+        EnsureRunning();
+        ValidateJson(payload);
+        Payload = payload;
+    }
+
     public void Fail(
         string reason,
         bool retryable,

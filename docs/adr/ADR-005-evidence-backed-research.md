@@ -12,7 +12,7 @@ Video research needs public-source discovery, untrusted-content retrieval, struc
 - Queue research as a database-backed `video-research` Job and execute it only in the Worker.
 - Persist a `ResearchRun` for every attempt and create an immutable, versioned `ResearchReport` only after a successful run.
 - Retain source metadata and bounded source-bound evidence, but not complete fetched pages. Search snippets remain discovery metadata, never evidence.
-- Keep search and fetch behind Application interfaces. Infrastructure supplies the Bing adapter and a redirect-aware, public-HTTP(S)-only HTML fetcher.
+- Keep search and fetch behind Application interfaces. Infrastructure supplies the Tavily adapter and a redirect-aware, public-HTTP(S)-only HTML fetcher.
 - Use structured AI outputs for query planning, relevance, evidence extraction, contradiction analysis, and synthesis. C# validates identifiers and excerpts, derives claim support, manages states, and rejects unsupported references.
 - Treat `ResearchFailed` as an explicit VideoProject state. A new attempt remains separate from both failed runs and completed report versions.
 

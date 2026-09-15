@@ -73,28 +73,45 @@ function ResearchReportView({ projectId, videoProjectId, report, onRerun, busy }
   const [locale, setLocale] = useState<AnalysisLocale>("en")
   const [localized, setLocalized] = useState<ResearchLocalizationStatus | null>(null)
   const [localizationBusy, setLocalizationBusy] = useState(false)
+  const [localizationError, setLocalizationError] = useState<string | null>(null)
   const presentation = locale === "vi" ? localized?.content : null
+  const localizedFindings = useMemo(() => new Map(presentation?.keyFindings.map((finding) => [finding.index, finding])), [presentation])
+  const localizedGaps = useMemo(() => new Map(presentation?.gaps.map((gap) => [gap.index, gap])), [presentation])
+  const warnings = presentation?.warnings.map((warning) => warning.text) ?? report.synthesis.warnings
+  const limitations = presentation?.limitations.map((limitation) => limitation.text) ?? report.synthesis.limitations
+  const loadLocalization = useCallback(async () => {
+    const status = await api.getResearchLocalization(projectId, videoProjectId, report.id, "vi")
+    setLocalized(status)
+    if (status.content) { setLocalizationBusy(false); setLocalizationError(null); return }
+    setLocalizationBusy(Boolean(status.activeJob))
+    if (status.latestJob?.status === "Failed") setLocalizationError(status.latestJob.failureReason ?? "Vietnamese research translation failed. English remains available.")
+  }, [projectId, report.id, videoProjectId])
+  useEffect(() => {
+    if (locale !== "vi" || !localizationBusy) return undefined
+    const timer = window.setInterval(() => void loadLocalization(), 2000)
+    return () => window.clearInterval(timer)
+  }, [loadLocalization, locale, localizationBusy])
   async function selectLocale(nextLocale: AnalysisLocale) {
     setLocale(nextLocale)
     if (nextLocale === "en") return
     setLocalizationBusy(true)
+    setLocalizationError(null)
     try {
       const status = await api.getResearchLocalization(projectId, videoProjectId, report.id, "vi")
-      if (status.content) { setLocalized(status); return }
+      if (status.content) { setLocalized(status); setLocalizationBusy(false); return }
       await api.requestResearchLocalization(projectId, videoProjectId, report.id, "vi")
-      setLocalized(await api.getResearchLocalization(projectId, videoProjectId, report.id, "vi"))
-    } catch { setLocalized(null) }
-    finally { setLocalizationBusy(false) }
+      await loadLocalization()
+    } catch (requestError) { setLocalized(null); setLocalizationBusy(false); setLocalizationError(messageFrom(requestError)) }
   }
   return <div className="analysis-report"><div className="section-heading"><div><p className="eyebrow">Research report v{report.version}</p><p className="section-copy">{report.isStale ? "Research may be outdated because the video research brief changed." : "Research reflects the current video brief."}</p></div><div><AnalysisLanguageToggle locale={locale} onChange={(next) => void selectLocale(next)} disabled={localizationBusy} /><button className="quiet-button" type="button" disabled={busy} onClick={() => void onRerun()}>{busy ? "Queuing..." : "Run refreshed research"}</button></div></div>
-    {locale === "vi" && !presentation ? <p className="section-copy">Vietnamese reading aid is being prepared. Canonical English evidence remains available.</p> : null}<p>{presentation?.executiveSummary ?? report.synthesis.executiveSummary}</p>
-    {(presentation?.warnings ?? report.synthesis.warnings).map((warning) => <p className="stale-note" key={warning}>{warning}</p>)}
+    {locale === "vi" && !presentation && localizationBusy ? <p className="section-copy">Vietnamese reading aid is being prepared. Canonical English evidence remains available.</p> : null}{locale === "vi" && localizationError ? <p className="error-copy" role="alert">{localizationError}</p> : null}<p>{presentation?.executiveSummary ?? report.synthesis.executiveSummary}</p>
+    {warnings.map((warning, index) => <p className="stale-note" key={`${warning}-${index}`}>{warning}</p>)}
     <div className="confidence-grid"><div><span>Confidence</span><strong>{report.confidence.level}</strong></div><div><span>Sources</span><strong>{report.metrics.relevantSourceCount}</strong></div><div><span>Evidence</span><strong>{report.metrics.evidenceCount}</strong></div><div><span>Claims</span><strong>{report.metrics.claimCount}</strong></div><div><span>Conflicts</span><strong>{report.metrics.conflictCount}</strong></div></div>
-    <ResearchSection title="Key findings">{report.synthesis.keyFindings.map((finding, index) => <article className="pilot-card" key={`${finding.summary}-${index}`}><strong>{presentation?.keyFindings[index]?.category ?? finding.category}</strong><p>{presentation?.keyFindings[index]?.summary ?? finding.summary}</p><p className="section-copy">Claims: {finding.claimIds.length} · Evidence: {finding.evidenceIds.length}</p></article>)}</ResearchSection>
+    <ResearchSection title="Key findings">{report.synthesis.keyFindings.map((finding, index) => <article className="pilot-card" key={`${finding.summary}-${index}`}><strong>{localizedFindings.get(index)?.category ?? finding.category}</strong><p>{localizedFindings.get(index)?.summary ?? finding.summary}</p><p className="section-copy">Claims: {finding.claimIds.length} · Evidence: {finding.evidenceIds.length}</p></article>)}</ResearchSection>
     <ResearchSection title="Claims & evidence">{report.claims.map((claim) => <article className="pilot-card" key={claim.id}><div className="section-heading"><strong>{claim.supportStatus}</strong>{claim.isCritical ? <span className="eyebrow">Critical</span> : null}</div><p>{claim.statement}</p>{claim.evidence.map((link) => { const item = evidence.get(link.evidenceId); const source = item ? sources.get(item.sourceId) : undefined; return <details key={`${claim.id}-${link.evidenceId}`}><summary>{link.stance}: {source?.title ?? source?.domain ?? "Unavailable source"}</summary>{item ? <><p>{item.supportingExcerpt}</p><p className="section-copy">{item.type} · {item.sourceLocator}</p>{source ? <SourceLink source={source.url} label="Open source" /> : null}</> : null}</details> })}</article>)}</ResearchSection>
     {report.conflicts.length > 0 ? <ResearchSection title="Conflicting evidence">{report.conflicts.map((conflict) => <article className="pilot-card" key={conflict.id}><p>{conflict.explanation}</p><p className="section-copy">{conflict.isResolved ? "Contextualized; retain the source distinction." : "Unresolved; do not present one definitive value."}</p></article>)}</ResearchSection> : null}
-    {report.synthesis.gaps.length > 0 ? <ResearchSection title="Research gaps">{report.synthesis.gaps.map((gap, index) => <p className="stale-note" key={`${gap.description}-${index}`}>{presentation?.gaps[index]?.description ?? gap.description}</p>)}</ResearchSection> : null}
-    {report.synthesis.limitations.length > 0 ? <ResearchSection title="Limitations">{(presentation?.limitations ?? report.synthesis.limitations).map((limitation) => <p className="section-copy" key={limitation}>{limitation}</p>)}</ResearchSection> : null}
+    {report.synthesis.gaps.length > 0 ? <ResearchSection title="Research gaps">{report.synthesis.gaps.map((gap, index) => <p className="stale-note" key={`${gap.description}-${index}`}>{localizedGaps.get(index)?.description ?? gap.description}</p>)}</ResearchSection> : null}
+    {report.synthesis.limitations.length > 0 ? <ResearchSection title="Limitations">{limitations.map((limitation, index) => <p className="section-copy" key={`${limitation}-${index}`}>{limitation}</p>)}</ResearchSection> : null}
     <ResearchSection title="Sources">{report.sources.map((source) => <article className="pilot-card" key={source.id}><strong>{source.title ?? source.domain}</strong><p>{source.publisher ?? source.domain} · {source.category} · {source.fetchStatus}</p><p className="section-copy">Retrieved {new Date(source.retrievedAt).toLocaleDateString()}</p><SourceLink source={source.url} label="Open external source" /></article>)}</ResearchSection>
   </div>
 }

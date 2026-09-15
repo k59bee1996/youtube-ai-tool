@@ -10,10 +10,11 @@ using YoutubeAiFactory.Domain.Localization;
 
 namespace YoutubeAiFactory.Application.Localization;
 
-public sealed record LocalizedResearchFinding(string Summary, string Category);
-public sealed record LocalizedResearchGap(string Description);
+public sealed record LocalizedResearchFinding(int Index, string Summary, string Category);
+public sealed record LocalizedResearchGap(int Index, string Description);
+public sealed record LocalizedResearchText(int Index, string Text);
 public sealed record LocalizedResearchReportContent(string ExecutiveSummary, IReadOnlyList<LocalizedResearchFinding> KeyFindings,
-    IReadOnlyList<LocalizedResearchGap> Gaps, IReadOnlyList<string> Warnings, IReadOnlyList<string> Limitations);
+    IReadOnlyList<LocalizedResearchGap> Gaps, IReadOnlyList<LocalizedResearchText> Warnings, IReadOnlyList<LocalizedResearchText> Limitations);
 public sealed record ResearchReportLocalizationStatusDto(LocalizedResearchReportContent? Content, AnalysisJobDto? ActiveJob, AnalysisJobDto? LatestJob);
 
 public sealed class RequestResearchReportLocalizationHandler(IYoutubeAiFactoryStore store, ArtifactLocalizationOptions options, TimeProvider timeProvider)
@@ -62,38 +63,43 @@ public static class ResearchReportLocalizationPrompt
     public const int Version = 1;
     public static AiModelProfile ModelProfile => AiWorkflowProfiles.ArtifactLocalization;
     public static LlmRequest Create(ResearchReportWithDetails report, bool correcting) => new(Key, Version,
-        "Translate only reader-facing explanatory research content into Vietnamese. Keep the exact key-findings and gaps list order/count. Do not translate or alter IDs, claim statuses, source IDs, evidence IDs, URLs, source excerpts, dates/numbers, scores, metrics, model metadata, prompt metadata, or workflow states. Do not add facts or improve claims. Return JSON only.",
+        "Translate only reader-facing explanatory research content into Vietnamese. Keep every supplied index, list order, and list count exactly. Do not translate or alter IDs, claim statuses, source IDs, evidence IDs, URLs, source excerpts, dates/numbers, scores, metrics, model metadata, prompt metadata, or workflow states. Do not add facts or improve claims. Return JSON only.",
         $"Canonical dynamic research content:\n{JsonSerializer.Serialize(LocalizedResearchReportValidator.Source(report), RequestCompetitorAnalysisLocalizationHandler.JsonOptions)}" +
         (correcting ? "\nPreserve list topology exactly." : string.Empty), new Dictionary<string, string> { ["max_output_tokens"] = "5000" }, Schema(), ModelProfile);
 
     private static JsonNode Schema() => JsonNode.Parse("""
-    {"type":"object","additionalProperties":false,"properties":{"executiveSummary":{"type":"string"},"keyFindings":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"summary":{"type":"string"},"category":{"type":"string"}},"required":["summary","category"]}},"gaps":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"description":{"type":"string"}},"required":["description"]}},"warnings":{"type":"array","items":{"type":"string"}},"limitations":{"type":"array","items":{"type":"string"}}},"required":["executiveSummary","keyFindings","gaps","warnings","limitations"]}
+    {"type":"object","additionalProperties":false,"properties":{"executiveSummary":{"type":"string"},"keyFindings":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"index":{"type":"integer","minimum":0},"summary":{"type":"string"},"category":{"type":"string"}},"required":["index","summary","category"]}},"gaps":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"index":{"type":"integer","minimum":0},"description":{"type":"string"}},"required":["index","description"]}},"warnings":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"index":{"type":"integer","minimum":0},"text":{"type":"string"}},"required":["index","text"]}},"limitations":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"index":{"type":"integer","minimum":0},"text":{"type":"string"}},"required":["index","text"]}}},"required":["executiveSummary","keyFindings","gaps","warnings","limitations"]}
     """)!.DeepClone();
 }
 
-internal static class LocalizedResearchReportValidator
+public static class LocalizedResearchReportValidator
 {
     public static void Validate(ResearchReportWithDetails canonical, LocalizedResearchReportContent localized)
     {
         var source = Source(canonical);
-        if (string.IsNullOrWhiteSpace(localized.ExecutiveSummary) || localized.KeyFindings.Count != source.KeyFindings.Count ||
-            localized.Gaps.Count != source.Gaps.Count || localized.Warnings.Count != source.Warnings.Count || localized.Limitations.Count != source.Limitations.Count ||
+        if (string.IsNullOrWhiteSpace(localized.ExecutiveSummary) || !PreservesIndexSequence(localized.KeyFindings.Select(item => item.Index), source.KeyFindings.Count) ||
+            !PreservesIndexSequence(localized.Gaps.Select(item => item.Index), source.Gaps.Count) ||
+            !PreservesIndexSequence(localized.Warnings.Select(item => item.Index), source.Warnings.Count) || !PreservesIndexSequence(localized.Limitations.Select(item => item.Index), source.Limitations.Count) ||
             localized.KeyFindings.Any(item => string.IsNullOrWhiteSpace(item.Summary) || string.IsNullOrWhiteSpace(item.Category)) ||
-            localized.Gaps.Any(item => string.IsNullOrWhiteSpace(item.Description)) || localized.Warnings.Any(string.IsNullOrWhiteSpace) || localized.Limitations.Any(string.IsNullOrWhiteSpace))
+            localized.Gaps.Any(item => string.IsNullOrWhiteSpace(item.Description)) || localized.Warnings.Any(item => string.IsNullOrWhiteSpace(item.Text)) || localized.Limitations.Any(item => string.IsNullOrWhiteSpace(item.Text)))
             throw new StructuredOutputException("Localized research content does not preserve the canonical report topology.");
     }
 
-    public static ResearchLocalizationSource Source(ResearchReportWithDetails report)
+    internal static ResearchLocalizationSource Source(ResearchReportWithDetails report)
     {
         var payload = JsonSerializer.Deserialize<ResearchReportPayload>(report.Report.ResultJson, RequestCompetitorAnalysisLocalizationHandler.JsonOptions)
             ?? throw new InvalidOperationException("Stored research report is unreadable.");
-        return new(payload.Synthesis.ExecutiveSummary, payload.Synthesis.KeyFindings.Select(item => new LocalizedResearchFinding(item.Summary, item.Category)).ToArray(),
-            payload.Synthesis.Gaps.Select(item => new LocalizedResearchGap(item.Description)).ToArray(), payload.Synthesis.Warnings, payload.Synthesis.Limitations);
+        return new(payload.Synthesis.ExecutiveSummary, payload.Synthesis.KeyFindings.Select((item, index) => new LocalizedResearchFinding(index, item.Summary, item.Category)).ToArray(),
+            payload.Synthesis.Gaps.Select((item, index) => new LocalizedResearchGap(index, item.Description)).ToArray(),
+            payload.Synthesis.Warnings.Select((item, index) => new LocalizedResearchText(index, item)).ToArray(),
+            payload.Synthesis.Limitations.Select((item, index) => new LocalizedResearchText(index, item)).ToArray());
     }
+
+    private static bool PreservesIndexSequence(IEnumerable<int> indexes, int expectedCount) => indexes.SequenceEqual(Enumerable.Range(0, expectedCount));
 }
 
 internal sealed record ResearchLocalizationSource(string ExecutiveSummary, IReadOnlyList<LocalizedResearchFinding> KeyFindings,
-    IReadOnlyList<LocalizedResearchGap> Gaps, IReadOnlyList<string> Warnings, IReadOnlyList<string> Limitations);
+    IReadOnlyList<LocalizedResearchGap> Gaps, IReadOnlyList<LocalizedResearchText> Warnings, IReadOnlyList<LocalizedResearchText> Limitations);
 
 internal static class LocalizedResearchReportCache
 {

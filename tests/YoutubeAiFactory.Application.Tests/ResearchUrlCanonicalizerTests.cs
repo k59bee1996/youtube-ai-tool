@@ -1,4 +1,5 @@
 using YoutubeAiFactory.Application.Research;
+using YoutubeAiFactory.Application.Common;
 
 namespace YoutubeAiFactory.Application.Tests;
 
@@ -17,4 +18,26 @@ public sealed class ResearchUrlCanonicalizerTests
     [InlineData("ftp://example.org/item")]
     [InlineData("not a url")]
     public void Rejects_non_public_web_schemes(string value) => Assert.Throws<ArgumentException>(() => ResearchUrlCanonicalizer.Canonicalize(value));
+
+    [Fact]
+    public void Preserves_a_retryable_search_failure_when_no_source_urls_are_available()
+    {
+        var result = ResearchSearchFailurePolicy.GetRetryableNoResultsFailure([
+            new ExternalServiceException("Rate limited", ExternalServiceFailure.QuotaExceeded),
+            new ExternalServiceException("Provider unavailable", ExternalServiceFailure.Transient),
+        ]);
+
+        Assert.NotNull(result);
+        Assert.Equal(ExternalServiceFailure.QuotaExceeded, result.Failure);
+    }
+
+    [Fact]
+    public void Does_not_retry_a_no_results_response_with_only_permanent_failures()
+    {
+        var result = ResearchSearchFailurePolicy.GetRetryableNoResultsFailure([
+            new ExternalServiceException("Bad key", ExternalServiceFailure.Authentication),
+        ]);
+
+        Assert.Null(result);
+    }
 }

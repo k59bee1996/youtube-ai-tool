@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using YoutubeAiFactory.Application.Common;
@@ -6,8 +8,8 @@ using YoutubeAiFactory.Application.Research;
 
 namespace YoutubeAiFactory.Infrastructure.Research;
 
-/// <summary>Bing adapter kept behind the provider-neutral research search contract.</summary>
-internal sealed class BingResearchSearchClient(HttpClient client, IOptions<ResearchSearchOptions> options) : IResearchSearchClient
+/// <summary>Tavily adapter kept behind the provider-neutral research search contract.</summary>
+internal sealed class TavilyResearchSearchClient(HttpClient client, IOptions<ResearchSearchOptions> options) : IResearchSearchClient
 {
     public async Task<ResearchSearchResultPage> SearchAsync(ResearchSearchRequest request, CancellationToken cancellationToken)
     {
@@ -18,11 +20,14 @@ internal sealed class BingResearchSearchClient(HttpClient client, IOptions<Resea
             throw new ExternalServiceException("Research search timeout configuration is invalid.", ExternalServiceFailure.Configuration);
         if (!Uri.TryCreate(settings.Endpoint, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttps)
             throw new ExternalServiceException("Research search endpoint must be an absolute HTTPS URL.", ExternalServiceFailure.Configuration);
-        var query = $"?q={Uri.EscapeDataString(request.Query)}&count={request.MaxResults}&mkt={Uri.EscapeDataString(ToMarket(request.Language))}&textDecorations=false&textFormat=Raw";
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
-        using var message = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint + query));
-        message.Headers.Add("Ocp-Apim-Subscription-Key", settings.ApiKey);
+        using var message = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = JsonContent.Create(new TavilySearchRequest(request.Query, request.MaxResults, "basic", false, false, false)),
+        };
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
         try
         {
             using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
@@ -31,14 +36,14 @@ internal sealed class BingResearchSearchClient(HttpClient client, IOptions<Resea
             await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeout.Token);
             var results = new List<ResearchSearchResult>();
-            if (document.RootElement.TryGetProperty("webPages", out var pages) && pages.TryGetProperty("value", out var values) && values.ValueKind == JsonValueKind.Array)
+            if (document.RootElement.TryGetProperty("results", out var values) && values.ValueKind == JsonValueKind.Array)
             {
                 foreach (var item in values.EnumerateArray().Take(request.MaxResults))
                 {
                     if (!item.TryGetProperty("url", out var urlNode) || urlNode.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(urlNode.GetString())) continue;
-                    var title = item.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String ? name.GetString() : null;
-                    var snippet = item.TryGetProperty("snippet", out var text) && text.ValueKind == JsonValueKind.String ? text.GetString() : null;
-                    DateTimeOffset? published = item.TryGetProperty("dateLastCrawled", out var date) && date.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(date.GetString(), out var parsed) ? parsed : null;
+                    var title = item.TryGetProperty("title", out var titleNode) && titleNode.ValueKind == JsonValueKind.String ? titleNode.GetString() : null;
+                    var snippet = item.TryGetProperty("content", out var contentNode) && contentNode.ValueKind == JsonValueKind.String ? contentNode.GetString() : null;
+                    DateTimeOffset? published = item.TryGetProperty("published_date", out var date) && date.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(date.GetString(), out var parsed) ? parsed : null;
                     results.Add(new ResearchSearchResult(urlNode.GetString()!, title, snippet, published));
                 }
             }
@@ -54,13 +59,14 @@ internal sealed class BingResearchSearchClient(HttpClient client, IOptions<Resea
         }
     }
 
-    private static string ToMarket(string language) => language.StartsWith("en", StringComparison.OrdinalIgnoreCase) ||
-        language.Equals("English", StringComparison.OrdinalIgnoreCase) ? "en-US" : language;
     private static ExternalServiceFailure Classify(HttpStatusCode code) => code switch
     {
         HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => ExternalServiceFailure.Authentication,
-        HttpStatusCode.TooManyRequests => ExternalServiceFailure.QuotaExceeded,
+        HttpStatusCode.PaymentRequired or HttpStatusCode.TooManyRequests => ExternalServiceFailure.QuotaExceeded,
         HttpStatusCode.RequestTimeout or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout => ExternalServiceFailure.Transient,
         _ => ExternalServiceFailure.UnexpectedResponse,
     };
+
+    private sealed record TavilySearchRequest(string Query, int MaxResults, string SearchDepth, bool IncludeAnswer,
+        bool IncludeRawContent, bool IncludeImages);
 }
