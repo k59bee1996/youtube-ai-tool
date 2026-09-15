@@ -110,12 +110,17 @@ public sealed class VideoResearchJobProcessor(
     IResearchContentFetcher contentFetcher,
     ResearchOptions options,
     TimeProvider timeProvider,
-    ILogger<VideoResearchJobProcessor> logger)
+    ILogger<VideoResearchJobProcessor> logger,
+    IVideoResearchJobLeaseRenewer? leaseRenewer = null)
 {
     private static readonly Action<ILogger, Guid, Guid, int, int, int, Exception?> LogCompleted = LoggerMessage.Define<Guid, Guid, int, int, int>(
         LogLevel.Information, new EventId(1, nameof(LogCompleted)), "Research completed for project {ProjectId}, VideoProject {VideoProjectId}; sources {Sources}, evidence {Evidence}, claims {Claims}.");
     private static readonly Action<ILogger, Guid, Exception?> LogFailed = LoggerMessage.Define<Guid>(
         LogLevel.Warning, new EventId(2, nameof(LogFailed)), "Video research job {JobId} failed.");
+    private static readonly Action<ILogger, Guid, Exception?> LogLeaseLost = LoggerMessage.Define<Guid>(
+        LogLevel.Error, new EventId(3, nameof(LogLeaseLost)), "Video research job {JobId} lost ownership before completion.");
+    private static readonly Action<ILogger, Guid, Exception?> LogLeaseRenewalFailed = LoggerMessage.Define<Guid>(
+        LogLevel.Error, new EventId(4, nameof(LogLeaseRenewalFailed)), "Video research job {JobId} lease renewal failed.");
 
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
@@ -125,44 +130,52 @@ public sealed class VideoResearchJobProcessor(
         if (job is null) return false;
         var payload = JsonSerializer.Deserialize<ResearchJobPayload>(job.Payload, ResearchPrompts.SerializerOptions)
             ?? throw new ApplicationValidationException("Video research job payload is invalid.");
+        var leaseId = job.LeaseId ?? throw new ApplicationValidationException("Video research job has no ownership lease.");
+        using var leaseLostCancellation = new CancellationTokenSource();
+        using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leaseLostCancellation.Token);
+        var executionToken = executionCancellation.Token;
+        var heartbeat = leaseRenewer is null
+            ? Task.CompletedTask
+            : MaintainLeaseAsync(job.Id, leaseId, leaseLostCancellation, heartbeatCancellation.Token);
         AiRun? activeAiRun = null;
         try
         {
-            var videoProject = await store.GetVideoProjectAsync(payload.ProjectId, payload.VideoProjectId, true, cancellationToken)
+            var videoProject = await store.GetVideoProjectAsync(payload.ProjectId, payload.VideoProjectId, true, executionToken)
                 ?? throw new ResourceNotFoundException("The VideoProject for this research job no longer exists.");
-            var researchRun = await store.GetResearchRunAsync(payload.ProjectId, payload.VideoProjectId, payload.ResearchRunId, true, cancellationToken)
+            var researchRun = await store.GetResearchRunAsync(payload.ProjectId, payload.VideoProjectId, payload.ResearchRunId, true, executionToken)
                 ?? throw new ResourceNotFoundException("The research run for this job no longer exists.");
             if (researchRun.Status == ResearchRunStatus.Queued) researchRun.Start(now);
             if (videoProject.Status == VideoProjectStatus.ResearchQueued) videoProject.TransitionTo(VideoProjectStatus.Researching, now);
             if (videoProject.Status != VideoProjectStatus.Researching || researchRun.Status != ResearchRunStatus.Running)
                 throw new ApplicationValidationException("Video research job state is no longer runnable.");
-            var project = await store.GetProjectAsync(payload.ProjectId, cancellationToken)
+            var project = await store.GetProjectAsync(payload.ProjectId, executionToken)
                 ?? throw new ResourceNotFoundException("Project was not found.");
-            var sourceContext = await store.GetVideoProjectSourceAsync(payload.ProjectId, videoProject.PilotId, videoProject.PilotVideoId, cancellationToken)
+            var sourceContext = await store.GetVideoProjectSourceAsync(payload.ProjectId, videoProject.PilotId, videoProject.PilotVideoId, executionToken)
                 ?? throw new ResourceNotFoundException("Video project source context was not found.");
             var brief = ResearchBriefBuilder.Build(project, videoProject, sourceContext.Opportunity.Name);
             var inputFingerprint = ResearchBriefBuilder.CreateFingerprint(brief);
             if (!string.Equals(researchRun.InputFingerprint, inputFingerprint, StringComparison.Ordinal))
                 throw new ApplicationValidationException("Video project research inputs changed after this run was queued. Start a new research run from the current brief.");
 
-            var planAnswer = await GenerateAsync<ResearchQueryPlanResult>("ResearchQueryPlanning", ResearchPrompts.QueryPlan(brief),
-                value => ValidatePlan(value), payload, cancellationToken);
+            var planAnswer = await GenerateAsync<ResearchQueryPlanResult>("ResearchQueryPlanning", diagnostic => ResearchPrompts.QueryPlan(brief, diagnostic),
+                value => ValidatePlan(value), payload, executionToken);
             activeAiRun = planAnswer.AiRun;
             var plan = new ResearchPlan(planAnswer.Result.Objective, planAnswer.Result.Questions, planAnswer.Result.Queries,
                 planAnswer.Result.PriorityFactAreas, planAnswer.Result.KnownRisks);
 
-            var searchOutcome = await DiscoverAsync(plan, brief.TargetLanguage, cancellationToken);
-            var fetched = await FetchSourcesAsync(searchOutcome.Results, researchRun.Id, cancellationToken);
+            var searchOutcome = await DiscoverAsync(plan, brief.TargetLanguage, executionToken);
+            var fetched = await FetchSourcesAsync(searchOutcome.Results, researchRun.Id, executionToken);
             foreach (var item in fetched.AllSources) store.AddResearchSource(item.Source);
             researchRun.RecordMetrics(ToRunMetrics(plan, searchOutcome, fetched, 0, 0, 0, 0));
-            await store.SaveChangesAsync(cancellationToken);
+            await store.SaveChangesAsync(executionToken);
 
             var relevant = new List<FetchedSource>();
             foreach (var item in fetched.UsableSources)
             {
                 var relevance = await GenerateAsync<ResearchSourceRelevanceResult>("ResearchSourceRelevance",
-                    ResearchPrompts.Relevance(brief, plan, item.Source.Title ?? item.Source.Domain, item.Source.CanonicalUrl, item.Text),
-                    ValidateRelevance, payload, cancellationToken);
+                    diagnostic => ResearchPrompts.Relevance(brief, plan, item.Source.Title ?? item.Source.Domain, item.Source.CanonicalUrl, item.Text, diagnostic),
+                    ValidateRelevance, payload, executionToken);
                 activeAiRun = relevance.AiRun;
                 if (relevance.Result.Relevance is ResearchSourceRelevance.Relevant or ResearchSourceRelevance.PossiblyRelevant)
                 {
@@ -178,8 +191,8 @@ public sealed class VideoResearchJobProcessor(
             {
                 if (evidence.Count >= options.MaxTotalEvidenceItems) break;
                 var extracted = await GenerateAsync<ResearchEvidenceExtractionResult>("ResearchEvidenceExtraction",
-                    ResearchPrompts.Evidence(brief, plan, item.Source.Id, item.Source.Title ?? item.Source.Domain, item.Source.CanonicalUrl, item.Text),
-                    value => ValidateEvidenceExtraction(value, item.Text), payload, cancellationToken);
+                    diagnostic => ResearchPrompts.Evidence(brief, plan, item.Source.Id, item.Source.Title ?? item.Source.Domain, item.Source.CanonicalUrl, item.Text, diagnostic),
+                    value => ValidateEvidenceExtraction(value, item.Text), payload, executionToken);
                 activeAiRun = extracted.AiRun;
                 foreach (var candidate in extracted.Result.Evidence.Take(options.MaxEvidenceItemsPerSource))
                 {
@@ -195,7 +208,7 @@ public sealed class VideoResearchJobProcessor(
             if (evidence.Count < options.MinEvidenceItems)
                 throw new ApplicationValidationException("Research found sources but could not extract enough source-bound evidence.");
             researchRun.RecordMetrics(ToRunMetrics(plan, searchOutcome, fetched, relevant.Count, evidence.Count, 0, 0));
-            await store.SaveChangesAsync(cancellationToken);
+            await store.SaveChangesAsync(executionToken);
 
             var reportId = Guid.NewGuid();
             var claims = BuildClaims(reportId, evidence, timeProvider.GetUtcNow(), options.MaxClaims);
@@ -208,8 +221,8 @@ public sealed class VideoResearchJobProcessor(
             if (claims.Count > 0 && evidence.Count > 1)
             {
                 var contradictionAnswer = await GenerateAsync<ResearchContradictionAnalysisResult>("ResearchContradictionAnalysis",
-                    ResearchPrompts.Contradictions(brief, ToPromptClaims(claims, claimEvidence), ToPromptEvidence(evidence, sourceById)),
-                    value => ValidateConflicts(value, claims.Select(item => item.Claim.Id), evidence.Select(item => item.Id), claimEvidence), payload, cancellationToken);
+                    diagnostic => ResearchPrompts.Contradictions(brief, ToPromptClaims(claims, claimEvidence), ToPromptEvidence(evidence, sourceById), diagnostic),
+                    value => ValidateConflicts(value, claims.Select(item => item.Claim.Id), evidence.Select(item => item.Id), claimEvidence), payload, executionToken);
                 activeAiRun = contradictionAnswer.AiRun;
                 foreach (var conflict in contradictionAnswer.Result.Conflicts.DistinctBy(item => (item.ClaimId, item.SupportingEvidenceId, item.ContradictingEvidenceId)))
                 {
@@ -224,9 +237,9 @@ public sealed class VideoResearchJobProcessor(
             researchRun.RecordMetrics(ToRunMetrics(plan, searchOutcome, fetched, relevant.Count, evidence.Count, claims.Count, conflicts.Count));
             var deterministicGaps = BuildDeterministicGaps(claims.Select(item => item.Claim), fetched.FetchFailureCount);
             var synthesisAnswer = await GenerateAsync<ResearchSynthesisResult>("ResearchSynthesis",
-                ResearchPrompts.Synthesis(brief, plan, ToPromptClaims(claims, claimEvidence), ToPromptEvidence(evidence, sourceById),
-                    conflicts.Select(item => new ConflictForPrompt(item.ResearchClaimId, item.SupportingEvidenceId, item.ContradictingEvidenceId, item.Explanation, item.IsResolved)).ToArray(), deterministicGaps),
-                value => ValidateSynthesis(value, claims.Select(item => item.Claim), claimEvidence, evidenceById), payload, cancellationToken);
+                diagnostic => ResearchPrompts.Synthesis(brief, plan, ToPromptClaims(claims, claimEvidence), ToPromptEvidence(evidence, sourceById),
+                    conflicts.Select(item => new ConflictForPrompt(item.ResearchClaimId, item.SupportingEvidenceId, item.ContradictingEvidenceId, item.Explanation, item.IsResolved)).ToArray(), deterministicGaps, diagnostic),
+                value => ValidateSynthesis(value, claims.Select(item => item.Claim), claimEvidence, evidenceById), payload, executionToken);
             activeAiRun = synthesisAnswer.AiRun;
             var mergedSynthesis = synthesisAnswer.Result with
             {
@@ -246,13 +259,21 @@ public sealed class VideoResearchJobProcessor(
             researchRun.Complete(report.Id, ToRunMetrics(plan, searchOutcome, fetched, relevant.Count, evidence.Count, claims.Count, conflicts.Count), timeProvider.GetUtcNow());
             videoProject.TransitionTo(VideoProjectStatus.ResearchReady, timeProvider.GetUtcNow());
             job.Complete(timeProvider.GetUtcNow());
-            await store.SaveChangesAsync(cancellationToken);
+            await store.SaveChangesAsync(executionToken);
             LogCompleted(logger, payload.ProjectId, payload.VideoProjectId, fetched.UsableSources.Count, evidence.Count, claims.Count, null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             await store.RequeueVideoResearchJobAsync(job.Id, CancellationToken.None);
             throw;
+        }
+        catch (OperationCanceledException) when (leaseLostCancellation.IsCancellationRequested)
+        {
+            LogLeaseLost(logger, job.Id, null);
+        }
+        catch (Exception exception) when (leaseLostCancellation.IsCancellationRequested)
+        {
+            LogLeaseLost(logger, job.Id, exception);
         }
         catch (Exception exception)
         {
@@ -263,15 +284,22 @@ public sealed class VideoResearchJobProcessor(
                 retryable, failed, retryable ? failed.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null, CancellationToken.None);
             LogFailed(logger, job.Id, exception);
         }
+        finally
+        {
+            heartbeatCancellation.Cancel();
+            try { await heartbeat; }
+            catch (OperationCanceledException) { }
+        }
         return true;
     }
 
-    private async Task<(T Result, AiRun AiRun)> GenerateAsync<T>(string workflow, LlmRequest request, Action<T> validate,
+    private async Task<(T Result, AiRun AiRun)> GenerateAsync<T>(string workflow, Func<string?, LlmRequest> requestFactory, Action<T> validate,
         ResearchJobPayload payload, CancellationToken cancellationToken)
     {
-        var resolvedModel = modelResolver.Resolve(request.ModelProfile);
-        var run = new AiRun(workflow, payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, request.PromptKey,
-            request.PromptVersion, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), payload.VideoProjectId, payload.ResearchRunId);
+        var initialRequest = requestFactory(null);
+        var resolvedModel = modelResolver.Resolve(initialRequest.ModelProfile);
+        var run = new AiRun(workflow, payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, initialRequest.PromptKey,
+            initialRequest.PromptVersion, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), payload.VideoProjectId, payload.ResearchRunId);
         store.AddAiRun(run);
         await store.SaveChangesAsync(cancellationToken);
         string? diagnostic = null;
@@ -281,7 +309,8 @@ public sealed class VideoResearchJobProcessor(
             {
                 try
                 {
-                    var answer = await provider.GenerateStructuredAsync<T>(request.WithResolvedModel(resolvedModel), cancellationToken);
+                    var answer = await provider.GenerateStructuredAsync<T>(requestFactory(diagnostic).WithResolvedModel(resolvedModel), cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                     validate(answer.Value);
                     run.RecordProvider(answer.Provider, answer.Model);
                     run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
@@ -305,6 +334,29 @@ public sealed class VideoResearchJobProcessor(
                 await store.SaveChangesAsync(CancellationToken.None);
             }
             throw;
+        }
+    }
+
+    private async Task MaintainLeaseAsync(Guid jobId, Guid leaseId, CancellationTokenSource leaseLostCancellation, CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(5, options.RunningJobLeaseSeconds / 3d)));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!await leaseRenewer!.RenewAsync(jobId, leaseId, timeProvider.GetUtcNow(), cancellationToken))
+                {
+                    leaseLostCancellation.Cancel();
+                    LogLeaseLost(logger, jobId, null);
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            leaseLostCancellation.Cancel();
+            LogLeaseRenewalFailed(logger, jobId, exception);
         }
     }
 
@@ -333,8 +385,8 @@ public sealed class VideoResearchJobProcessor(
         }
         if (unique.Count == 0)
         {
-            var retryable = ResearchSearchFailurePolicy.GetRetryableNoResultsFailure(failures);
-            if (retryable is not null) throw retryable;
+            var providerFailure = ResearchSearchFailurePolicy.GetNoResultsFailure(failures);
+            if (providerFailure is not null) throw providerFailure;
             throw new ApplicationValidationException("Research search returned no usable public source URLs.");
         }
         return new SearchOutcome(unique, results.Count, failures.Count);

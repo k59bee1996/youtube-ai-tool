@@ -1,5 +1,5 @@
-using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Common;
+using YoutubeAiFactory.Application.Research;
 
 namespace YoutubeAiFactory.Application.Tests;
 
@@ -39,5 +39,17 @@ public sealed class ResearchUrlCanonicalizerTests
         ]);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public void Preserves_a_permanent_provider_failure_when_no_results_are_available()
+    {
+        var result = ResearchSearchFailurePolicy.GetNoResultsFailure([
+            new ExternalServiceException("Bad key", ExternalServiceFailure.Authentication),
+        ]);
+
+        Assert.NotNull(result);
+        Assert.Equal(ExternalServiceFailure.Authentication, result.Failure);
+        Assert.Equal("Bad key", result.Message);
     }
 }

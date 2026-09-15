@@ -189,3 +189,8 @@ public interface IYoutubeAiFactoryStore
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
+
+public interface IVideoResearchJobLeaseRenewer
+{
+    Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt, CancellationToken cancellationToken);
+}

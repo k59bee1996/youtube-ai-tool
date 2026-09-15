@@ -4,6 +4,14 @@ namespace YoutubeAiFactory.Application.Research;
 
 public static class ResearchSearchFailurePolicy
 {
+    public static ExternalServiceException? GetNoResultsFailure(IEnumerable<ExternalServiceException> failures)
+    {
+        var failuresList = failures.ToArray();
+        return GetRetryableNoResultsFailure(failuresList)
+            ?? failuresList.FirstOrDefault(item => item.Failure is ExternalServiceFailure.Configuration or
+                ExternalServiceFailure.Authentication or ExternalServiceFailure.UnexpectedResponse);
+    }
+
     public static ExternalServiceException? GetRetryableNoResultsFailure(IEnumerable<ExternalServiceException> failures)
     {
         var transient = failures.FirstOrDefault(item => item.Failure == ExternalServiceFailure.Transient);

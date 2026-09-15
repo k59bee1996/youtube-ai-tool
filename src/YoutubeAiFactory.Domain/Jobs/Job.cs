@@ -77,11 +77,13 @@ public sealed class Job
 
     public DateTimeOffset? StartedAt { get; private set; }
 
+    public Guid? LeaseId { get; private set; }
+
     public DateTimeOffset? CompletedAt { get; private set; }
 
     public string? FailureReason { get; private set; }
 
-    public void Start(DateTimeOffset startedAt)
+    public void Start(DateTimeOffset startedAt, Guid? leaseId = null)
     {
         if (Status is not JobStatus.Queued and not JobStatus.Retrying)
         {
@@ -93,9 +95,31 @@ public sealed class Job
             throw new DomainException("The job is not available yet.");
         }
 
+        if (leaseId == Guid.Empty)
+        {
+            throw new DomainException("A job lease ID cannot be empty.");
+        }
+
         Status = JobStatus.Running;
         StartedAt = startedAt;
+        LeaseId = leaseId ?? Guid.NewGuid();
         FailureReason = null;
+    }
+
+    public void RenewLease(Guid leaseId, DateTimeOffset renewedAt)
+    {
+        EnsureRunning();
+        if (LeaseId != leaseId)
+        {
+            throw new DomainException("The job lease ID does not match the current owner.");
+        }
+
+        if (StartedAt is not null && renewedAt < StartedAt)
+        {
+            throw new DomainException("A job lease cannot be renewed backwards.");
+        }
+
+        StartedAt = renewedAt;
     }
 
     public void Complete(DateTimeOffset completedAt)
@@ -103,6 +127,7 @@ public sealed class Job
         EnsureRunning();
         Status = JobStatus.Completed;
         CompletedAt = completedAt;
+        LeaseId = null;
     }
 
     public void Requeue(DateTimeOffset availableAt)
@@ -111,6 +136,7 @@ public sealed class Job
         Status = JobStatus.Queued;
         AvailableAt = availableAt;
         StartedAt = null;
+        LeaseId = null;
         FailureReason = "Recovered after worker interruption.";
     }
 
@@ -130,6 +156,7 @@ public sealed class Job
     {
         EnsureRunning();
         FailureReason = Guard.Required(reason, nameof(reason), 2_000);
+        LeaseId = null;
 
         if (retryable && RetryCount < MaxRetries)
         {
@@ -157,6 +184,7 @@ public sealed class Job
 
         Status = JobStatus.Cancelled;
         CompletedAt = cancelledAt;
+        LeaseId = null;
     }
 
     private void EnsureRunning()

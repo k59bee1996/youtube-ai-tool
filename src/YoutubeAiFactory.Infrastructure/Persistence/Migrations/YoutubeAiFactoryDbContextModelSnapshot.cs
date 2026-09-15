@@ -678,6 +678,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(10)")
                         .HasColumnName("locale");
 
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("lease_id");
+
                     b.Property<int>("MaxRetries")
                         .HasColumnType("int")
                         .HasColumnName("max_retries");
