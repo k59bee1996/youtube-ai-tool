@@ -23,7 +23,8 @@ public sealed class RunVideoResearchHandler(IYoutubeAiFactoryStore store, Resear
             ?? throw new ResourceNotFoundException("Video project was not found.");
         var active = await store.GetActiveVideoResearchJobAsync(projectId, videoProjectId, cancellationToken);
         if (active is not null) return new RunVideoResearchResult(active.Id, active.Status.ToString(), true);
-        if (videoProject.Status is not (VideoProjectStatus.Draft or VideoProjectStatus.ResearchReady or VideoProjectStatus.ResearchFailed))
+        if (videoProject.Status is not (VideoProjectStatus.Draft or VideoProjectStatus.ResearchReady or
+            VideoProjectStatus.ResearchFailed or VideoProjectStatus.OutlineReady))
             throw new ApplicationValidationException($"Research cannot start while the VideoProject is {videoProject.Status}.");
         var project = await store.GetProjectAsync(projectId, cancellationToken)
             ?? throw new ResourceNotFoundException("Project was not found.");

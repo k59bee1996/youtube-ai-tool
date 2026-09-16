@@ -7,6 +7,7 @@ using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Opportunities;
+using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Projects;
 using YoutubeAiFactory.Application.Research;
@@ -30,6 +31,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("IdeaGeneration")
 builder.Services.AddSingleton(builder.Configuration.GetSection("PilotGeneration").Get<PilotGenerationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(ArtifactLocalizationOptions.SectionName).Get<ArtifactLocalizationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(ResearchOptions.SectionName).Get<ResearchOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection(OutlineOptions.SectionName).Get<OutlineOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -78,6 +80,18 @@ builder.Services.AddScoped<ListVideoResearchReportsHandler>();
 builder.Services.AddScoped<RequestResearchReportLocalizationHandler>();
 builder.Services.AddScoped<GetResearchReportLocalizationHandler>();
 builder.Services.AddScoped<VideoResearchJobProcessor>();
+builder.Services.AddScoped<OutlineGenerationContextBuilder>();
+builder.Services.AddScoped<OutlineValidator>();
+builder.Services.AddScoped<RunVideoOutlineHandler>();
+builder.Services.AddScoped<GetVideoOutlineStatusHandler>();
+builder.Services.AddScoped<GetVideoOutlineHandler>();
+builder.Services.AddScoped<ListVideoOutlinesHandler>();
+builder.Services.AddScoped<UpdateVideoOutlineHandler>();
+builder.Services.AddScoped<ReorderVideoOutlineSectionsHandler>();
+builder.Services.AddScoped<ApproveVideoOutlineHandler>();
+builder.Services.AddScoped<VideoOutlineJobProcessor>();
+builder.Services.AddScoped<RequestVideoOutlineLocalizationHandler>();
+builder.Services.AddScoped<GetVideoOutlineLocalizationHandler>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"])
@@ -90,7 +104,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-8",
+    phase = "phase-9",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

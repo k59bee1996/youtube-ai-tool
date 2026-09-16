@@ -1,10 +1,12 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations;
 
+[DbContext(typeof(YoutubeAiFactoryDbContext))]
 [Migration("20260915170000_AddVideoResearchJobLease")]
 public partial class AddVideoResearchJobLease : Migration
 {

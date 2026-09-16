@@ -14,7 +14,7 @@ Web -> API -> Application -> Domain
                 Worker
 ```
 
-`Domain` has no framework or integration dependencies. `Application` defines use cases and external contracts. `Infrastructure` owns EF Core, SQL Server, provider adapters, and migrations. `Api` maps HTTP contracts to application use cases. `Worker` is reserved for long-running work.
+`Domain` has no framework or integration dependencies. `Application` defines use cases and external contracts. `Infrastructure` owns EF Core, SQL Server, provider adapters, and migrations. `Api` maps HTTP contracts to application use cases. `Worker` executes database-backed long-running workflows.
 
 ## AI model routing
 
@@ -24,7 +24,7 @@ AI workflows request an application-level capability, never a concrete vendor mo
 Workflow -> AiModelProfile -> IAiModelResolver -> ILlmProvider -> configured provider/model
 ```
 
-`Fast` is for mechanical transformation such as artifact localization and future structural repair. `Reasoning` is for bounded competitor interpretation and idea synthesis. `Premium` is reserved for high-leverage strategic synthesis and controlled experiment planning. The configuration-backed resolver is stateless and resolves each request independently; a missing or invalid required profile fails clearly and does not silently downgrade to another profile. Provider API keys remain in configuration only.
+`Fast` is for mechanical transformation such as artifact localization and structural JSON repair. `Reasoning` is for bounded competitor interpretation, idea synthesis, and evidence-grounded narrative planning. `Premium` is reserved for high-leverage strategic synthesis and controlled experiment planning. The configuration-backed resolver is stateless and resolves each request independently; a missing or invalid required profile fails clearly and does not silently downgrade to another profile. Provider API keys remain in configuration only.
 
 ## Phase 2 collection flow
 
@@ -46,7 +46,7 @@ Only fully resolved competitors may be persisted: channel identity, title, and c
 
 `/health/live` checks the process. `/health/ready` checks SQL Server and YouTube configuration. Structured collection logs include project, outcome, competitor/channel when resolved, video count, and elapsed time; API keys and response bodies are excluded. Job claiming and dispatch remain deferred.
 
-See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), [ADR-003](adr/ADR-003-synchronous-competitor-collection.md), [ADR-004](adr/ADR-004-sql-server-persistence.md), and [ADR-005](adr/ADR-005-evidence-backed-research.md).
+See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), [ADR-003](adr/ADR-003-synchronous-competitor-collection.md), [ADR-004](adr/ADR-004-sql-server-persistence.md), [ADR-005](adr/ADR-005-evidence-backed-research.md), and [ADR-006](adr/ADR-006-evidence-grounded-outlines.md).
 
 ## Phase 3 competitor-analysis flow
 
@@ -111,3 +111,19 @@ React -> API (202) -> Job + ResearchRun -> Worker
 Search snippets are discovery only; evidence is extracted only from successfully retrieved source content. `IResearchSearchClient` and `IResearchContentFetcher` are Application contracts. The Tavily search adapter and HTTP/HTML fetcher live in Infrastructure. The fetcher permits only public HTTP(S) destinations, validates every redirect target, blocks local/private/link-local IPv4 and IPv6 addresses plus metadata hosts, pins its connection to a validated public address, limits redirects/bytes/extracted characters, and never renders fetched HTML.
 
 `ResearchRun` records every execution attempt, including failures. Each retry and stale-worker recovery creates a fresh run and job payload, so a partially persisted run is never rediscovered into. A completed `ResearchReport` is a separate immutable version and exists only after usable source/evidence and synthesis-reference validation pass. `ResearchQueued -> Researching -> ResearchReady` is centralized by `VideoProject`; terminal failure uses `ResearchFailed`, which can explicitly queue another run. Premium stages receive only bounded source metadata, source-bound evidence, claims, gaps, and conflicts; full fetched pages never reach Premium.
+
+## Phase 9 evidence-grounded outline flow
+
+```text
+ResearchReady + current ResearchReport + approved Pilot context
+    -> API (202) -> Job -> Worker -> bounded OutlineGenerationContext
+    -> Reasoning narrative plan -> deterministic reference/experiment validation
+    -> immutable VideoOutline version -> OutlineReady
+    -> structured user edits/reorder -> explicit approval -> OutlineApproved
+```
+
+`OutlineGenerationContextBuilder` consumes Phase 8's immutable report, supported/corroborated/conflicted claims, limited evidence excerpts, conflicts, gaps, and Pilot control strategy. It rejects stale research, unsupported critical premises, and cross-report relationships. It never calls `IResearchSearchClient` or `IResearchContentFetcher`, and full webpages cannot enter this workflow.
+
+The AI selects narrative structure, information order, planning-level section objectives, viewer questions, transitions, payoff, pacing, and claim placement. C# owns project/report identity, source freshness, input fingerprint, version, workflow/artifact status, bounded retries, section sequence, claim ownership/support, conflict/gap references, duration totals, active-job idempotency, and approval. Malformed JSON may receive one Fast mechanical repair; semantic evidence or experiment errors receive a bounded Reasoning correction.
+
+`VideoOutline`, `VideoOutlineSection`, and relational Section-to-Claim/Conflict/Gap links preserve the exact ResearchReport version and the path `Section -> ResearchClaim -> ResearchClaimEvidence -> ResearchEvidence -> ResearchSource`. Reordering is transactional and requires transition review before approval. A newer ResearchReport or changed material execution context makes an Outline stale without deleting it; stale ready Outlines cannot be approved. An approved Outline is immutable and is the unambiguous Phase 10 source.

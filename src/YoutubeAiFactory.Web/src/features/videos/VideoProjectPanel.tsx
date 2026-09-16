@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react
 import { api, type ResearchJob, type ResearchLocalizationStatus, type ResearchReport, type ResearchStatus, type VideoProject, type VideoProjectListItem } from "../../services/api"
 import { messageFrom } from "../../lib/errors"
 import { AnalysisLanguageToggle, type AnalysisLocale } from "../localization/AnalysisLanguageToggle"
+import { OutlineWorkspace } from "./OutlineWorkspace"
 
 export function VideoProjectPanel({ projectId, onOpen }: { projectId: string; onOpen: (videoProject: VideoProject) => void }) {
   const [items, setItems] = useState<VideoProjectListItem[]>([])
@@ -32,6 +33,7 @@ export function VideoProjectWorkspace({ project, onBack }: { project: VideoProje
   const [research, setResearch] = useState<ResearchStatus | null>(null)
   const [researchError, setResearchError] = useState<string | null>(null)
   const [researchBusy, setResearchBusy] = useState(false)
+  const updateWorkflowStatus = useCallback((status: string) => setCurrent(value => value.status === status ? value : { ...value, status }), [])
   const loadResearch = useCallback(async () => {
     try { setResearch(await api.getResearchStatus(project.projectId, project.id)); setResearchError(null) }
     catch (requestError) { setResearchError(messageFrom(requestError)) }
@@ -60,11 +62,12 @@ export function VideoProjectWorkspace({ project, onBack }: { project: VideoProje
     {error ? <p className="error-copy" role="alert">{error}</p> : null}
     {current.sourceRequiresReview ? <p className="stale-note">Source strategy has changed since this Video Project was created. Its execution history remains intact.</p> : null}
     {current.sourceWarnings.map((warning) => <p className="stale-note" key={warning}>{warning}</p>)}
-    <div className="confidence-grid"><div><span>Planning</span><strong>Complete</strong></div><div><span>Research</span><strong>{research?.activeJob ? research.activeJob.status : refreshFailure ? "Refresh failed" : research?.latestReport ? "Complete" : "Not started"}</strong></div><div><span>Outline</span><strong>Locked</strong></div><div><span>Script</span><strong>Locked</strong></div><div><span>Production</span><strong>Locked</strong></div></div>
+    <div className="confidence-grid"><div><span>Planning</span><strong>Complete</strong></div><div><span>Research</span><strong>{research?.activeJob ? research.activeJob.status : refreshFailure ? "Refresh failed" : research?.latestReport ? "Complete" : "Not started"}</strong></div><div><span>Outline</span><strong>{current.status.startsWith("Outline") ? current.status.replace("Outline", "") || "Generating" : "Locked"}</strong></div><div><span>Script</span><strong>Locked</strong></div><div><span>Production</span><strong>Locked</strong></div></div>
     <section className="analysis-block"><h3>Source context</h3><p><strong>Opportunity:</strong> {current.opportunityName}</p><p><strong>Idea score:</strong> {current.ideaScore}</p><p><strong>Pilot:</strong> Version {current.pilotVersion}, slot {current.pilotSequence} · {current.experimentType}</p><p><strong>Hypothesis:</strong> {current.pilotHypothesis}</p><p><strong>Variable:</strong> {current.variableBeingTested}</p><p><strong>Primary metric:</strong> {current.primaryMetric}</p><p><strong>Success signal:</strong> {current.successSignal}</p></section>
     <section className="analysis-block"><h3>Execution brief</h3><p><strong>Topic:</strong> {current.topic}</p><p><strong>Angle:</strong> {current.angle}</p><p><strong>Format:</strong> {current.contentFormat}</p><p><strong>Audience:</strong> {current.targetAudience}</p><p><strong>Viewer promise:</strong> {current.viewerPromise}</p><p><strong>Hook:</strong> {current.hookConcept}</p><p><strong>Thumbnail concept:</strong> {current.thumbnailConcept}</p></section>
     <section className="analysis-block"><h3>Working details</h3><label>Working title<input value={workingTitle} maxLength={300} onChange={(event) => setWorkingTitle(event.target.value)} /></label><label>Execution notes<textarea value={notes} maxLength={10000} onChange={(event) => setNotes(event.target.value)} /></label><button className="primary-button" type="button" disabled={busy} onClick={() => void save()}>{busy ? "Saving..." : "Save working details"}</button></section>
     <section className="analysis-block"><h3>Research</h3>{researchError ? <p className="error-copy" role="alert">{researchError}</p> : null}{research?.activeJob ? <><p>Research is running: {research.activeJob.status}. It plans questions, retrieves public sources, extracts evidence, checks conflicts, and builds a report.</p><button className="quiet-button" type="button" onClick={() => void loadResearch()}>Refresh research status</button></> : research?.latestReport ? <ResearchReportView key={research.latestReport.id} projectId={current.projectId} videoProjectId={current.id} report={research.latestReport} refreshFailure={refreshFailure} onRerun={runResearch} busy={researchBusy} /> : <><p className="section-copy">No research has been created for this video. Research gathers external sources, extracts evidence, and builds a fact-backed report.</p>{research?.latestJob?.failureReason ? <p className="error-copy" role="alert">Research failed: {research.latestJob.failureReason}</p> : null}<button className="primary-button" type="button" disabled={researchBusy} onClick={() => void runResearch()}>{researchBusy ? "Queuing research..." : research?.latestJob?.status === "Failed" ? "Retry Research" : "Run Research"}</button></>}</section>
+    <OutlineWorkspace projectId={current.projectId} videoProjectId={current.id} revisionKey={`${current.updatedAt}:${research?.latestReport?.id ?? ""}:${research?.activeJob?.id ?? ""}`} onWorkflowStatusChange={updateWorkflowStatus} />
   </section>
 }
 

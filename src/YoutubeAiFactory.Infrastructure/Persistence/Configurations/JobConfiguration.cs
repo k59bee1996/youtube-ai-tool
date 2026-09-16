@@ -45,10 +45,10 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasDatabaseName("ux_jobs_active_idea_generation")
             .IsUnique()
             .HasFilter("type = 'idea-generation' AND status IN ('Queued', 'Running', 'Retrying')");
-        builder.HasIndex(job => job.VideoProjectId)
-            .HasDatabaseName("ux_jobs_active_video_project_research")
+        builder.HasIndex(job => new { job.VideoProjectId, job.Type })
+            .HasDatabaseName("ux_jobs_active_video_project_workflow")
             .IsUnique()
-            .HasFilter("type = 'video-research' AND status IN ('Queued', 'Running', 'Retrying')");
+            .HasFilter("type IN ('video-research', 'outline-generation') AND status IN ('Queued', 'Running', 'Retrying')");
         builder.HasIndex(job => new { job.ArtifactType, job.ArtifactId, job.ArtifactVersion, job.Locale })
             .HasDatabaseName("ux_jobs_active_artifact_localization")
             .IsUnique()

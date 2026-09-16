@@ -1,5 +1,6 @@
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
+using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Videos;
@@ -9,6 +10,7 @@ using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
+using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
@@ -152,6 +154,37 @@ public interface IYoutubeAiFactoryStore
     void AddResearchClaim(ResearchClaim claim) => throw new NotSupportedException("Research persistence is not configured.");
     void AddResearchClaimEvidence(ResearchClaimEvidence claimEvidence) => throw new NotSupportedException("Research persistence is not configured.");
     void AddResearchConflict(ResearchConflict conflict) => throw new NotSupportedException("Research persistence is not configured.");
+
+    Task<Job?> GetActiveVideoOutlineJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
+        Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestVideoOutlineJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
+        Task.FromResult<Job?>(null);
+    Task<Job> EnqueueVideoOutlineJobAsync(Job job, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Video outline job persistence is not configured.");
+    Task<Job?> TryClaimNextVideoOutlineJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore,
+        CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task RequeueVideoOutlineJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Video outline job persistence is not configured.");
+    Task FailVideoOutlineJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
+        DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Video outline job persistence is not configured.");
+    Task<int> GetNextVideoOutlineVersionAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<VideoOutlineWithDetails?> GetLatestVideoOutlineAsync(Guid projectId, Guid videoProjectId,
+        bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoOutlineWithDetails?>(null);
+    Task<VideoOutlineWithDetails?> GetVideoOutlineAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoOutlineWithDetails?>(null);
+    Task<VideoOutlineWithDetails?> GetApprovedVideoOutlineAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult<VideoOutlineWithDetails?>(null);
+    Task<IReadOnlyList<VideoOutline>> ListVideoOutlinesAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VideoOutline>>([]);
+    void AddVideoOutline(VideoOutline outline) => throw new NotSupportedException("Video outline persistence is not configured.");
+    void AddVideoOutlineSection(VideoOutlineSection section) => throw new NotSupportedException("Video outline persistence is not configured.");
+    void AddVideoOutlineSectionClaim(VideoOutlineSectionClaim claim) => throw new NotSupportedException("Video outline persistence is not configured.");
+    void AddVideoOutlineSectionConflict(VideoOutlineSectionConflict conflict) => throw new NotSupportedException("Video outline persistence is not configured.");
+    void AddVideoOutlineSectionGap(VideoOutlineSectionGap gap) => throw new NotSupportedException("Video outline persistence is not configured.");
+    Task ReorderVideoOutlineSectionsAsync(VideoOutline outline, IReadOnlyList<Guid> orderedSectionIds,
+        CancellationToken cancellationToken) => throw new NotSupportedException("Video outline persistence is not configured.");
 
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>

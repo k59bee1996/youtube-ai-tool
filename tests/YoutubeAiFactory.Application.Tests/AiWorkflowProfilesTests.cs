@@ -3,6 +3,7 @@ using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Opportunities;
+using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 
 namespace YoutubeAiFactory.Application.Tests;
@@ -23,6 +24,7 @@ public sealed class AiWorkflowProfilesTests
         Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ResearchEvidenceExtraction);
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ResearchContradictionAnalysis);
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ResearchSynthesis);
+        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.OutlineGeneration);
     }
 
     [Fact]
@@ -34,5 +36,11 @@ public sealed class AiWorkflowProfilesTests
         Assert.Equal(AiWorkflowProfiles.PilotGeneration, PilotGenerationPrompt.ModelProfile);
         Assert.Equal(AiWorkflowProfiles.ArtifactLocalization, CompetitorAnalysisLocalizationPrompt.ModelProfile);
         Assert.Equal(AiWorkflowProfiles.ArtifactLocalization, OpportunityReportLocalizationPrompt.ModelProfile);
+        var context = new OutlineGenerationContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "research", "outline",
+            "Title", "Topic", "Angle", "Explainer", "Audience", "Promise", "Hook", "English", "Global",
+            YoutubeAiFactory.Domain.Pilots.PilotExperimentType.Packaging, "Hypothesis", "Variable", "Control", "CTR", "CTR improves",
+            "Summary", [], [], [], [], [], [], []);
+        Assert.Equal(AiWorkflowProfiles.OutlineGeneration, OutlinePrompt.Create(context).ModelProfile);
+        Assert.Equal(AiWorkflowProfiles.StructuredOutputRepair, OutlinePrompt.CreateRepair("{}", "invalid").ModelProfile);
     }
 }

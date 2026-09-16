@@ -1,4 +1,5 @@
 using YoutubeAiFactory.Application.Localization;
+using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Videos;
 
@@ -19,6 +20,15 @@ internal static class VideoProjectEndpoints
         projects.MapGet("/video-projects/{videoProjectId:guid}/research/{researchReportId:guid}", GetResearchAsync);
         projects.MapPost("/video-projects/{videoProjectId:guid}/research/{researchReportId:guid}/localizations/{locale}", RequestResearchLocalizationAsync);
         projects.MapGet("/video-projects/{videoProjectId:guid}/research/{researchReportId:guid}/localizations/{locale}", GetResearchLocalizationAsync);
+        projects.MapPost("/video-projects/{videoProjectId:guid}/outline:generate", GenerateOutlineAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/outline/latest", GetLatestOutlineAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/outlines", GetOutlineHistoryAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}", GetOutlineAsync);
+        projects.MapPatch("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}", UpdateOutlineAsync);
+        projects.MapPut("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}/sections/order", ReorderOutlineAsync);
+        projects.MapPost("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}:approve", ApproveOutlineAsync);
+        projects.MapPost("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}/localizations/{locale}", RequestOutlineLocalizationAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}/localizations/{locale}", GetOutlineLocalizationAsync);
         return endpoints;
     }
 
@@ -45,4 +55,31 @@ internal static class VideoProjectEndpoints
         Results.Accepted($"/api/projects/{projectId}/video-projects/{videoProjectId}/research/{researchReportId}/localizations/{locale}", await handler.HandleAsync(projectId, videoProjectId, researchReportId, locale, ct));
     private static async Task<IResult> GetResearchLocalizationAsync(Guid projectId, Guid videoProjectId, Guid researchReportId, string locale, GetResearchReportLocalizationHandler handler, CancellationToken ct) =>
         Results.Ok(await handler.HandleAsync(projectId, videoProjectId, researchReportId, locale, ct));
+    private static async Task<IResult> GenerateOutlineAsync(Guid projectId, Guid videoProjectId, RunVideoOutlineHandler handler, CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(projectId, videoProjectId, ct);
+        return Results.Accepted($"/api/projects/{projectId}/video-projects/{videoProjectId}/outline/latest", result);
+    }
+    private static async Task<IResult> GetLatestOutlineAsync(Guid projectId, Guid videoProjectId,
+        GetVideoOutlineStatusHandler handler, CancellationToken ct) => Results.Ok(await handler.HandleAsync(projectId, videoProjectId, ct));
+    private static async Task<IResult> GetOutlineHistoryAsync(Guid projectId, Guid videoProjectId,
+        ListVideoOutlinesHandler handler, CancellationToken ct) => Results.Ok(await handler.HandleAsync(projectId, videoProjectId, ct));
+    private static async Task<IResult> GetOutlineAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        GetVideoOutlineHandler handler, CancellationToken ct) => Results.Ok(await handler.HandleAsync(projectId, videoProjectId, outlineId, ct));
+    private static async Task<IResult> UpdateOutlineAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        UpdateVideoOutlineRequest request, UpdateVideoOutlineHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, outlineId, request, ct));
+    private static async Task<IResult> ReorderOutlineAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        ReorderVideoOutlineSectionsRequest request, ReorderVideoOutlineSectionsHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, outlineId, request, ct));
+    private static async Task<IResult> ApproveOutlineAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        ApproveVideoOutlineHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, outlineId, ct));
+    private static async Task<IResult> RequestOutlineLocalizationAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        string locale, RequestVideoOutlineLocalizationHandler handler, CancellationToken ct) =>
+        Results.Accepted($"/api/projects/{projectId}/video-projects/{videoProjectId}/outlines/{outlineId}/localizations/{locale}",
+            await handler.HandleAsync(projectId, videoProjectId, outlineId, locale, ct));
+    private static async Task<IResult> GetOutlineLocalizationAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        string locale, GetVideoOutlineLocalizationHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, outlineId, locale, ct));
 }

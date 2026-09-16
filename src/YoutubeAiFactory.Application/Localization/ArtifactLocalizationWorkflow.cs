@@ -19,7 +19,8 @@ public sealed class ArtifactLocalizationOptions
     public int RunningJobLeaseSeconds { get; init; } = 300;
 }
 
-public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale, Guid? OpportunityReportId = null, Guid? ResearchReportId = null);
+public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale,
+    Guid? OpportunityReportId = null, Guid? ResearchReportId = null, Guid? VideoOutlineId = null);
 public sealed record ArtifactLocalizationStatusDto(LocalizedCompetitorAnalysisContent? Content, AnalysisJobDto? ActiveJob, AnalysisJobDto? LatestJob);
 public sealed record RequestArtifactLocalizationResult(Guid? JobId, string Status, bool Existing);
 
@@ -92,6 +93,11 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             if (job.ArtifactType == LocalizableArtifactTypes.ResearchReport)
             {
                 await ProcessResearchReportAsync(job, payload, cancellationToken);
+                return true;
+            }
+            if (job.ArtifactType == LocalizableArtifactTypes.VideoOutline)
+            {
+                await ProcessVideoOutlineAsync(job, payload, cancellationToken);
                 return true;
             }
             if (job.ArtifactType != LocalizableArtifactTypes.CompetitorAnalysis)
@@ -287,6 +293,80 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
                 exception is YoutubeAiFactoryException ? exception.Message : "Research report translation could not be completed. Try again later.",
                 retryable, failedAt, retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null, CancellationToken.None);
+            LogFailed(logger, job.Id, exception);
+        }
+    }
+
+    private async Task ProcessVideoOutlineAsync(Job job, ArtifactLocalizationJobPayload payload,
+        CancellationToken cancellationToken)
+    {
+        AiRun? run = null;
+        try
+        {
+            if (payload.VideoOutlineId is not Guid outlineId || outlineId == Guid.Empty || job.VideoProjectId is not Guid videoProjectId)
+                throw new ApplicationValidationException("Video outline localization job payload is invalid.");
+            var outline = await store.GetVideoOutlineAsync(payload.ProjectId, videoProjectId, outlineId, false, cancellationToken)
+                ?? throw new ResourceNotFoundException("Video outline for this localization job was not found.");
+            if (outline.Outline.Version != payload.ArtifactVersion)
+                throw new ApplicationValidationException("The requested video outline version is no longer available.");
+            var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.VideoOutline, outlineId,
+                outline.Outline.Version, payload.Locale, cancellationToken);
+            if (cached is not null && LocalizedVideoOutlineCache.IsValid(outline, cached))
+            {
+                job.Complete(timeProvider.GetUtcNow());
+                await store.SaveChangesAsync(cancellationToken);
+                return;
+            }
+            if (cached is not null) await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
+            var resolved = modelResolver.Resolve(VideoOutlineLocalizationPrompt.ModelProfile);
+            run = new AiRun("ArtifactLocalization", payload.ProjectId, resolved.Provider, resolved.Model,
+                VideoOutlineLocalizationPrompt.Key, VideoOutlineLocalizationPrompt.Version, timeProvider.GetUtcNow(),
+                resolved.Profile.ToString(), videoProjectId, researchReportId: outline.Outline.ResearchReportId);
+            store.AddAiRun(run);
+            await store.SaveChangesAsync(cancellationToken);
+            LlmResult<LocalizedVideoOutlineContent>? answer = null;
+            Exception? failure = null;
+            for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
+            {
+                try
+                {
+                    answer = await provider.GenerateStructuredAsync<LocalizedVideoOutlineContent>(
+                        VideoOutlineLocalizationPrompt.Create(outline, attempt > 0).WithResolvedModel(resolved), cancellationToken);
+                    LocalizedVideoOutlineValidator.Validate(outline, answer.Value);
+                    break;
+                }
+                catch (StructuredOutputException exception)
+                {
+                    answer = null;
+                    failure = exception;
+                    if (attempt >= options.MaxStructuredOutputRetries) break;
+                    run.RecordRetry();
+                    await store.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception exception) { failure = exception; break; }
+            }
+            if (answer is null)
+                throw failure ?? new StructuredOutputException("The provider did not return localized outline content.");
+            run.RecordProvider(answer.Provider, answer.Model);
+            store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.VideoOutline, outlineId,
+                outline.Outline.Version, payload.Locale,
+                JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id,
+                VideoOutlineLocalizationPrompt.Key, VideoOutlineLocalizationPrompt.Version, answer.Provider, answer.Model,
+                timeProvider.GetUtcNow()));
+            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            job.Complete(timeProvider.GetUtcNow());
+            await store.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            var failedAt = timeProvider.GetUtcNow();
+            var retryable = exception is ExternalServiceException
+            { Failure: ExternalServiceFailure.QuotaExceeded or ExternalServiceFailure.Transient };
+            await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
+                exception is YoutubeAiFactoryException ? exception.Message : "Video outline translation could not be completed. Try again later.",
+                retryable, failedAt, retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null,
+                CancellationToken.None);
             LogFailed(logger, job.Id, exception);
         }
     }

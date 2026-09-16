@@ -82,4 +82,16 @@ Creation returns `400` when the Pilot is not approved or the source idea/opportu
 - `GET /api/projects/{projectId}/video-projects/{videoProjectId}/research` lists immutable report versions; `GET .../research/{reportId}` returns a structured report and run history.
 - `POST` / `GET .../research/{reportId}/localizations/vi` lazily creates or reads the Vietnamese reading overlay. It changes only reader-facing synthesis text, never sources, claims, evidence, or report version.
 
-Research is valid from `Draft`, `ResearchReady`, or `ResearchFailed`. A bad state is a validation problem; missing or cross-project video projects/reports return `404`. Search/fetch/AI failure is persisted on the job/run and returns a safe actionable message through polling. A failed run creates no report version.
+Research is valid from `Draft`, `ResearchReady`, `ResearchFailed`, or an unapproved `OutlineReady` state. Rerunning it from `OutlineReady` preserves historical Outlines, which become stale against the new current report. A bad state is a validation problem; missing or cross-project video projects/reports return `404`. Search/fetch/AI failure is persisted on the job/run and returns a safe actionable message through polling. A failed run creates no report version.
+
+## Video Project Outlines
+
+- `POST /api/projects/{projectId}/video-projects/{videoProjectId}/outline:generate` queues a Reasoning outline job and returns `202 Accepted` with `jobId`, `status`, and `existing`. An active job for the same VideoProject is reused.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/outline/latest` returns the latest Outline, active/latest job, `canGenerate`, and an actionable block reason.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/outlines` lists immutable Outline versions; `GET .../outlines/{outlineId}` returns a specific version with ordered Sections and claim/evidence/source traceability.
+- `PATCH .../outlines/{outlineId}` edits Ready Section headings, objectives, summaries, viewer questions, transition intents, and timing estimates. It does not accept claim IDs.
+- `PUT .../outlines/{outlineId}/sections/order` transactionally reorders every Section ID exactly once. The resulting Outline requires transition review through a subsequent structured edit before approval.
+- `POST .../outlines/{outlineId}:approve` approves only the latest Ready, non-stale, fully validated version and transitions the VideoProject to `OutlineApproved`.
+- `POST` / `GET .../outlines/{outlineId}/localizations/vi` lazily creates or reads a Vietnamese reading overlay for the same Outline ID/version.
+
+Generation requires a current ResearchReport and `ResearchReady` or `OutlineReady` state. Missing/stale research, unsupported critical premise, stale approval, invalid ownership, or immutable-approved edits return business validation problems; missing or cross-project resources return `404`. Generation failure restores the prior retryable workflow state, preserves earlier Outline versions, and exposes safe Job/AiRun failure details. These routes do not perform research, create claims/evidence/sources, update WorkingTitle/ViewerPromise, or generate a Script.

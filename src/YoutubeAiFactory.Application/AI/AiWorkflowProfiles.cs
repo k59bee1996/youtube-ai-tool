@@ -14,4 +14,5 @@ public static class AiWorkflowProfiles
     public static AiModelProfile ResearchEvidenceExtraction => AiModelProfile.Reasoning;
     public static AiModelProfile ResearchContradictionAnalysis => AiModelProfile.Premium;
     public static AiModelProfile ResearchSynthesis => AiModelProfile.Premium;
+    public static AiModelProfile OutlineGeneration => AiModelProfile.Reasoning;
 }

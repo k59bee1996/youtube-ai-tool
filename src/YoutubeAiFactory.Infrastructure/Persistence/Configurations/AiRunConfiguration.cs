@@ -19,6 +19,7 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
         builder.Property(run => run.CompetitorId).HasColumnName("competitor_channel_id");
         builder.Property(run => run.VideoProjectId).HasColumnName("video_project_id");
         builder.Property(run => run.ResearchRunId).HasColumnName("research_run_id");
+        builder.Property(run => run.ResearchReportId).HasColumnName("research_report_id");
         builder.Property(run => run.Provider).HasColumnName("provider").HasMaxLength(100).IsRequired();
         builder.Property(run => run.Model).HasColumnName("model").HasMaxLength(100).IsRequired();
         builder.Property(run => run.ModelProfile).HasColumnName("model_profile").HasMaxLength(30).IsRequired();
@@ -46,10 +47,15 @@ internal sealed class AiRunConfiguration : IEntityTypeConfiguration<AiRun>
             .WithMany()
             .HasForeignKey(run => run.ResearchRunId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ResearchReport>()
+            .WithMany()
+            .HasForeignKey(run => run.ResearchReportId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(run => new { run.ProjectId, run.StartedAt });
         builder.HasIndex(run => new { run.CompetitorId, run.StartedAt });
         builder.HasIndex(run => new { run.VideoProjectId, run.StartedAt });
         builder.HasIndex(run => new { run.ResearchRunId, run.StartedAt });
+        builder.HasIndex(run => new { run.ResearchReportId, run.StartedAt });
     }
 }

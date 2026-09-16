@@ -2,12 +2,16 @@ using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using YoutubeAiFactory.Application.Common;
+using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
 using YoutubeAiFactory.Domain.Ideas;
+using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Opportunities;
+using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Videos;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -175,6 +179,103 @@ public sealed class SqlServerPersistenceTests
         Assert.Equal("The Economics of Owning a Medieval Castle", stored.WorkingTitle);
 
         context.VideoProjects.Add(new VideoProject(project.Id, pilot.Id, pilot.Version, pilotVideo.Id, idea.Id, opportunity.Id, "Duplicate", idea.Topic, idea.Angle, idea.ContentFormat, idea.TargetAudience, idea.HookConcept, idea.ThumbnailConcept, idea.ViewerPromise, pilotVideo.ExperimentType, pilotVideo.Hypothesis, pilotVideo.VariableBeingTested, pilotVideo.PrimaryMetric, pilotVideo.SuccessSignal, "[]", now));
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+    }
+
+    [SqlServerFact]
+    public async Task Phase9_migration_persists_outline_versions_traceability_unicode_and_transactional_order()
+    {
+        var options = CreateOptions();
+        await using var context = new YoutubeAiFactoryDbContext(options);
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var project = new Project("Outline persistence", new Market("History", "English", "Global"), new AudienceProfile("History viewers"), now);
+        var opportunityReport = new OpportunityReport(project.Id, 1, Guid.NewGuid(), "opportunity", 1, "Fake", "fake", "score:v1", 1, "[]", now);
+        var opportunity = new OpportunityCandidate(opportunityReport.Id, "Castle economics", "Description", "History viewers", "Economics", "Explainer", "Hidden costs", "Why", 80, 70, 40, 85, 75, 70, 80, 30, 85, 82m, "[]", "[]", now);
+        var ideaGeneration = new IdeaGeneration(project.Id, opportunity.Id, opportunityReport.Id, 1, 1, Guid.NewGuid(), "ideas", 1, "Fake", "fake", "score:v1", now);
+        var idea = new VideoIdea(project.Id, opportunity.Id, ideaGeneration.Id, "The Economics of Owning a Medieval Castle", "Economics", "Hidden costs", "Explainer", "History viewers", "Learn", "Hook", "Thumbnail", "Promise", "Question", "Why care", "Hypothesis", 80, 80, 70, 80, 75, 85, 85, 70, 80, 30, 20, 85, 82m, 0m, "score:v1", "[]", now);
+        var pilot = new Pilot(project.Id, 1, Guid.NewGuid(), "pilot", 1, "Fake", "fake", "plan:v1", "Pilot", "Learn", "[]", "[]", "[]", 12, now);
+        pilot.Approve(now);
+        var pilotVideo = new PilotVideo(pilot.Id, idea.Id, opportunity.Id, 6, PilotExperimentType.Packaging, "Hidden-cost framing should increase click intent.", "Framing", "Comparable storytelling", "CTR", "CTR improves", "Rationale");
+        var videoProject = new VideoProject(project.Id, pilot.Id, 1, pilotVideo.Id, idea.Id, opportunity.Id,
+            idea.WorkingTitle, idea.Topic, idea.Angle, idea.ContentFormat, idea.TargetAudience, idea.HookConcept,
+            idea.ThumbnailConcept, idea.ViewerPromise, pilotVideo.ExperimentType, pilotVideo.Hypothesis,
+            pilotVideo.VariableBeingTested, pilotVideo.PrimaryMetric, pilotVideo.SuccessSignal, "[]", now);
+        var researchRun = new ResearchRun(project.Id, videoProject.Id, "research-engine:v1", new string('a', 64), now);
+        var researchReport = new ResearchReport(project.Id, videoProject.Id, researchRun.Id, 1, "research-engine:v1",
+            new string('a', 64), "{}", null, now);
+        var sourceOne = new ResearchSource(researchRun.Id, "https://archive.example/a", "https://archive.example/a",
+            "archive.example", "Primary account", "Archive", null, now, ResearchSourceCategory.Primary,
+            ResearchSourceFetchStatus.Fetched, "hash-a", null, null);
+        var sourceTwo = new ResearchSource(researchRun.Id, "https://university.example/b", "https://university.example/b",
+            "university.example", "Secondary analysis", "University", null, now, ResearchSourceCategory.Academic,
+            ResearchSourceFetchStatus.Fetched, "hash-b", null, null);
+        var evidenceOne = new ResearchEvidence(researchRun.Id, sourceOne.Id, ResearchEvidenceType.Fact,
+            "Staffing created recurring obligations.", "Account excerpt.", "ledger 1", 90, now);
+        var evidenceTwo = new ResearchEvidence(researchRun.Id, sourceTwo.Id, ResearchEvidenceType.Statistic,
+            "Annual estimates vary.", "Analysis excerpt.", "page 2", 75, now);
+        var claim = new ResearchClaim(researchReport.Id, "Annual obligations cannot be reduced to one universal figure.",
+            ResearchClaimType.Numerical, 80, true, now);
+        claim.SetSupportStatus(ResearchClaimSupportStatus.Conflicted);
+        var support = new ResearchClaimEvidence(claim.Id, evidenceOne.Id, ResearchEvidenceStance.Support);
+        var contradict = new ResearchClaimEvidence(claim.Id, evidenceTwo.Id, ResearchEvidenceStance.Contradict);
+        var conflict = new ResearchConflict(researchReport.Id, claim.Id, evidenceOne.Id, evidenceTwo.Id,
+            "The sources describe different periods and estates.", false, now);
+        var aiRun = new AiRun("OutlineGeneration", project.Id, "Fake", "reasoning-model", "outline-generation", 1,
+            now, "Reasoning", videoProject.Id, researchReportId: researchReport.Id);
+        aiRun.Complete(100, 50, null, now.AddSeconds(1));
+        var staleAiRun = new AiRun("OutlineGeneration", project.Id, "Fake", "reasoning-model", "outline-generation", 1,
+            now, "Reasoning", videoProject.Id, researchReportId: researchReport.Id);
+        var outlineJob = new Job("outline-generation", JsonSerializer.Serialize(new OutlineJobPayload(project.Id,
+            videoProject.Id, researchReport.Id, 1, new string('b', 64), VideoProjectStatus.OutlineReady.ToString())),
+            now, projectId: project.Id, videoProjectId: videoProject.Id);
+        outlineJob.Start(now);
+        var outline = new VideoOutline(project.Id, videoProject.Id, researchReport.Id, 1, 1, aiRun.Id,
+            "outline-engine:v1", "outline-generation", 1, new string('b', 64), "Fake", "reasoning-model",
+            OutlineStructureType.Explainer, "Core cost question — café ledger?", "Prestige versus obligations.",
+            "Open with the contradiction.", videoProject.ViewerPromise, "Context to mechanism to payoff.",
+            "Ownership involved recurring obligations.", "Escalate evidence before synthesis.", PilotExperimentType.Packaging,
+            pilotVideo.VariableBeingTested, pilotVideo.ControlStrategy, "Preserves the packaging premise.", "[]", "[]", 120, now);
+        var firstSection = new VideoOutlineSection(outline.Id, 1, "Context — café records", OutlineSectionPurpose.Context,
+            "Establish the evidence.", "Use the conflicted estimate carefully.", "What can records establish?", "Move to synthesis.", 60);
+        var secondSection = new VideoOutlineSection(outline.Id, 2, "Payoff", OutlineSectionPurpose.Conclusion,
+            "Synthesize the evidence.", "Resolve the central question.", null, null, 60);
+        var sectionClaim = new VideoOutlineSectionClaim(firstSection.Id, claim.Id, OutlineClaimUsageRole.Conflict);
+        var sectionConflict = new VideoOutlineSectionConflict(firstSection.Id, conflict.Id);
+        var sectionGap = new VideoOutlineSectionGap(firstSection.Id, 0);
+        context.AddRange(project, opportunityReport, opportunity, ideaGeneration, idea, pilot, pilotVideo, videoProject,
+            researchRun, researchReport, sourceOne, sourceTwo, evidenceOne, evidenceTwo, claim, support, contradict,
+            conflict, aiRun, staleAiRun, outlineJob, outline, firstSection, secondSection, sectionClaim, sectionConflict,
+            sectionGap);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var stored = await context.VideoOutlines.SingleAsync();
+        Assert.Equal("Core cost question — café ledger?", stored.CoreQuestion);
+        Assert.Equal(researchReport.Id, stored.ResearchReportId);
+        Assert.Equal(researchReport.Id, (await context.AiRuns.SingleAsync(item => item.Id == aiRun.Id)).ResearchReportId);
+        Assert.Single(await context.VideoOutlineSectionClaims.ToListAsync());
+        Assert.Single(await context.VideoOutlineSectionConflicts.ToListAsync());
+        Assert.Single(await context.VideoOutlineSectionGaps.ToListAsync());
+
+        var store = new YoutubeAiFactoryStore(context);
+        var tracked = await store.GetVideoOutlineAsync(project.Id, videoProject.Id, outline.Id, true, CancellationToken.None);
+        tracked!.Outline.RecordReorder(now.AddMinutes(1));
+        await store.ReorderVideoOutlineSectionsAsync(tracked.Outline, [secondSection.Id, firstSection.Id], CancellationToken.None);
+        var reordered = await context.VideoOutlineSections.AsNoTracking().OrderBy(item => item.Sequence).ToListAsync();
+        Assert.Equal([secondSection.Id, firstSection.Id], reordered.Select(item => item.Id).ToArray());
+        Assert.Equal([1, 2], reordered.Select(item => item.Sequence).ToArray());
+
+        var reclaimed = await store.TryClaimNextVideoOutlineJobAsync(now.AddMinutes(20), now.AddMinutes(10),
+            CancellationToken.None);
+        Assert.Equal(outlineJob.Id, reclaimed?.Id);
+        Assert.Equal(JobStatus.Running, reclaimed?.Status);
+        var recoveredRun = await context.AiRuns.AsNoTracking().SingleAsync(item => item.Id == staleAiRun.Id);
+        Assert.Equal(AiRunStatus.Failed, recoveredRun.Status);
+        Assert.Contains("lease expired", recoveredRun.FailureReason, StringComparison.OrdinalIgnoreCase);
+
+        context.ResearchReports.Remove(await context.ResearchReports.SingleAsync());
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
     }
 
