@@ -5,6 +5,7 @@ using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
+using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
@@ -44,6 +45,11 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
     public DbSet<ResearchClaim> ResearchClaims => Set<ResearchClaim>();
     public DbSet<ResearchClaimEvidence> ResearchClaimEvidence => Set<ResearchClaimEvidence>();
     public DbSet<ResearchConflict> ResearchConflicts => Set<ResearchConflict>();
+    public DbSet<VideoOutline> VideoOutlines => Set<VideoOutline>();
+    public DbSet<VideoOutlineSection> VideoOutlineSections => Set<VideoOutlineSection>();
+    public DbSet<VideoOutlineSectionClaim> VideoOutlineSectionClaims => Set<VideoOutlineSectionClaim>();
+    public DbSet<VideoOutlineSectionConflict> VideoOutlineSectionConflicts => Set<VideoOutlineSectionConflict>();
+    public DbSet<VideoOutlineSectionGap> VideoOutlineSectionGaps => Set<VideoOutlineSectionGap>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

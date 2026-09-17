@@ -53,6 +53,7 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             messages = new[] { new { role = "developer", content = request.SystemInstructions }, new { role = "user", content = request.UserContent } },
             max_completion_tokens = request.ModelConfiguration.TryGetValue("max_output_tokens", out var tokens) && int.TryParse(tokens, out var parsed) ? parsed : model.MaxOutputTokens,
         }), Encoding.UTF8, "application/json");
+        string? structuredOutput = null;
         try
         {
             using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeoutCancellation.Token);
@@ -66,16 +67,16 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             var root = document.RootElement;
             var choice = root.GetProperty("choices")[0];
             var assistantMessage = choice.GetProperty("message");
-            var output = assistantMessage.GetProperty("content").GetString();
-            if (string.IsNullOrWhiteSpace(output))
+            structuredOutput = assistantMessage.GetProperty("content").GetString();
+            if (string.IsNullOrWhiteSpace(structuredOutput))
                 throw EmptyStructuredResponse(root, choice, assistantMessage, clientRequestId, ResponseHeader(response, "x-request-id"));
-            var value = JsonSerializer.Deserialize<T>(output, SerializerOptions)
-                ?? throw new StructuredOutputException("AI provider returned an empty structured response.");
+            var value = JsonSerializer.Deserialize<T>(structuredOutput, SerializerOptions)
+                ?? throw new StructuredOutputException("AI provider returned an empty structured response.", rawOutput: structuredOutput);
             var usage = root.TryGetProperty("usage", out var usageElement) ? usageElement : default;
             int? inputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("prompt_tokens", out var input) ? input.GetInt32() : null;
             int? outputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("completion_tokens", out var outputToken) ? outputToken.GetInt32() : null;
             var responseModelName = root.TryGetProperty("model", out var responseModel) ? responseModel.GetString() ?? model.Model : model.Model;
-            return new LlmResult<T>(value, model.Provider, responseModelName, inputTokens, outputTokens, output);
+            return new LlmResult<T>(value, model.Provider, responseModelName, inputTokens, outputTokens, structuredOutput);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -87,7 +88,7 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
         catch (StructuredOutputException) { throw; }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            throw new StructuredOutputException($"AI provider returned invalid structured output: {exception.Message}", exception);
+            throw new StructuredOutputException($"AI provider returned invalid structured output: {exception.Message}", exception, structuredOutput);
         }
     }
 

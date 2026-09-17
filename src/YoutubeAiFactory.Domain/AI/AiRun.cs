@@ -18,8 +18,9 @@ public sealed class AiRun
         DateTimeOffset startedAt,
         string modelProfile = "Reasoning",
         Guid? videoProjectId = null,
-        Guid? researchRunId = null)
-        : this(workflow, projectId, null, provider, model, promptKey, promptVersion, startedAt, modelProfile, videoProjectId, researchRunId)
+        Guid? researchRunId = null,
+        Guid? researchReportId = null)
+        : this(workflow, projectId, null, provider, model, promptKey, promptVersion, startedAt, modelProfile, videoProjectId, researchRunId, researchReportId)
     {
     }
 
@@ -34,7 +35,8 @@ public sealed class AiRun
         DateTimeOffset startedAt,
         string modelProfile = "Reasoning",
         Guid? videoProjectId = null,
-        Guid? researchRunId = null)
+        Guid? researchRunId = null,
+        Guid? researchReportId = null)
     {
         if (promptVersion < 1)
         {
@@ -47,6 +49,7 @@ public sealed class AiRun
         CompetitorId = competitorId;
         VideoProjectId = videoProjectId;
         ResearchRunId = researchRunId;
+        ResearchReportId = researchReportId;
         Provider = Guard.Required(provider, nameof(provider), 100);
         Model = Guard.Required(model, nameof(model), 100);
         ModelProfile = Guard.Required(modelProfile, nameof(modelProfile), 30);
@@ -67,6 +70,8 @@ public sealed class AiRun
     public Guid? VideoProjectId { get; private set; }
 
     public Guid? ResearchRunId { get; private set; }
+
+    public Guid? ResearchReportId { get; private set; }
 
     public string Provider { get; private set; } = string.Empty;
 

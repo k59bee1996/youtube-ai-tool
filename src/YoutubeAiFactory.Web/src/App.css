@@ -94,6 +94,18 @@ textarea { min-height: 92px; resize: vertical; }
 .pilot-card { display: grid; gap: 4px; margin: 10px 0; padding: 14px; border-left: 3px solid #ff6846; background: #0b1424; }
 .pilot-card p { margin: 4px 0; color: #c9d4e4; line-height: 1.45; }
 .pilot-card details { color: #c9d4e4; margin-top: 5px; }
+.outline-workspace { display: grid; gap: 18px; }
+.outline-strategy { padding: 16px; border: 1px solid #2c3a51; border-radius: 12px; background: #0b1424; }
+.outline-strategy h4, .outline-section-card h4 { margin: 0 0 10px; color: #f8fafc; }
+.outline-strategy dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.outline-strategy dl div { padding: 11px; border: 1px solid #26334a; border-radius: 8px; }
+.outline-strategy dt { color: #91a0b6; font-size: .75rem; text-transform: uppercase; }
+.outline-strategy dd { margin: 5px 0 0; color: #e8eef7; line-height: 1.45; }
+.outline-section-card { display: grid; gap: 10px; margin: 12px 0; padding: 16px; border-left: 3px solid #ff6846; background: #0b1424; }
+.outline-section-card p { margin: 3px 0; color: #c9d4e4; line-height: 1.5; }
+.outline-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.outline-edit-grid label { display: grid; gap: 6px; color: #c9d4e4; font-size: .82rem; }
+.outline-claim { margin: 10px 0; padding: 10px; border: 1px solid #26334a; border-radius: 8px; }
 .video-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .video-card { display: grid; grid-template-columns: 150px 1fr; overflow: hidden; min-height: 96px; border: 1px solid #26334a; border-radius: 12px; background: #0b1424; }
 .video-card img, .thumbnail-placeholder { width: 150px; height: 100%; min-height: 96px; object-fit: cover; background: #1c2940; }
@@ -107,6 +119,7 @@ textarea { min-height: 92px; resize: vertical; }
   .channel-card { grid-template-columns: auto 1fr; }
   .channel-stats { grid-column: 1 / -1; }
   .confidence-grid { grid-template-columns: 1fr; }
+  .outline-strategy dl, .outline-edit-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {

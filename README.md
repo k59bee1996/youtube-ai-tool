@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 8 adds an evidence-backed Research Report for a durable VideoProject.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 9 converts a current evidence-backed Research Report into a versioned, reviewable Video Outline without doing new research or writing a script.
 
 ## Repository layout
 
@@ -8,7 +8,7 @@ YouTube AI Factory turns YouTube market information into structured content inte
 - `src/YoutubeAiFactory.Application` — use cases and provider-neutral contracts.
 - `src/YoutubeAiFactory.Infrastructure` — EF Core, SQL Server, migrations, and the YouTube adapter.
 - `src/YoutubeAiFactory.Api` — HTTP endpoints, problem responses, and health checks.
-- `src/YoutubeAiFactory.Worker` — reserved host for later background work.
+- `src/YoutubeAiFactory.Worker` — database-backed background workflow host.
 - `src/YoutubeAiFactory.Web` — React and TypeScript project/competitor interface.
 - `tests` — domain, application, adapter, API, and SQL Server integration tests.
 - `docs` — product, architecture, domain, API, workflow, and setup notes.
@@ -47,4 +47,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Start the Worker as well as the API to process competitor, opportunity, idea-generation, pilot-generation, localization, and research jobs. A Draft VideoProject can queue bounded external research: research planning, source discovery, SSRF-safe retrieval, relevance filtering, evidence extraction, deterministic claim support, contradiction analysis, and immutable report synthesis. Outlines, scripts, and production packages remain outside this phase.
+Start the Worker as well as the API to process competitor, opportunity, idea-generation, pilot-generation, localization, research, and outline jobs. A current `ResearchReady` VideoProject can queue a bounded outline-planning job. The resulting Narrative Strategy and ordered Sections retain relational links to the exact ResearchReport claims, conflicts, and gaps, preserve the Pilot experiment, and require explicit approval. Phase 9 performs no web access and creates no research evidence. Scripts and production packages remain outside this phase.

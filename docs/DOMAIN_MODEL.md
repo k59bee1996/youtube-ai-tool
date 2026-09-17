@@ -30,13 +30,11 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 `Pilot` is a project-owned generation version of a learning plan, not a `VideoProject`. Its draft/approved state records provenance, prompt and planning versions, limitations, and balance warnings; a draft may be adjusted, while approval freezes it. A `PilotVideo` directly references one `VideoIdea` and its source opportunity, and records sequence, experiment type, hypothesis, variable, control strategy, planned primary metric, success signal, and rationale. Database constraints make `(PilotId, Sequence)` and `(PilotId, VideoIdeaId)` unique, and enforce 1–4 Topic, 5–8 Packaging, and 9–12 Storytelling blocks. A source idea or source opportunity becoming unapproved makes the Pilot require review.
 
-## Deferred concepts
-
 ## Video projects
 
 `VideoProject` is a durable execution aggregate, not another idea or a pilot slot. One approved `PilotVideo` can create at most one VideoProject. It preserves live relational references to `Project`, exact `Pilot` version, `PilotVideo`, `VideoIdea`, and `OpportunityCandidate`; it snapshots the initial title, topic, angle, format, audience, hook, thumbnail concept, viewer promise, and experiment brief so future upstream edits cannot silently rewrite production intent. Only working title and execution notes are editable in Phase 7.
 
-The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchFailed`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Research failure is explicit so a worker failure cannot leave a VideoProject reporting `Researching` forever; `ResearchFailed` can explicitly queue another run.
+The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchFailed`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Research failure is explicit so a worker failure cannot leave a VideoProject reporting `Researching` forever. Outline generation activates `ResearchReady -> OutlineGenerating -> OutlineReady -> OutlineApproved`; terminal generation failure returns to the exact retryable source state (`ResearchReady` or `OutlineReady`) and never skips approval.
 
 ## Research
 
@@ -45,3 +43,22 @@ The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `Re
 `ResearchReport` is an immutable successful artifact with a per-VideoProject version, exact input fingerprint, algorithm version, synthesis provenance, and structured presentation JSON. It owns relational `ResearchClaim` records, explicit `ResearchClaimEvidence` support/contradiction links, and `ResearchConflict` records. `ResearchSource` and `ResearchEvidence` belong to the run so retrieval remains observable even for failed attempts. Evidence is source-bound and retains only an extracted fact, short source excerpt, locator, type, and confidence.
 
 Support describes the retained research dataset, not universal truth: no supporting link is `Unsupported`; one independent support source is `Supported`; two or more independent source keys are `Corroborated`; any valid contradiction link is `Conflicted`. V1 uses source domain plus content hash/canonical URL as conservative independence signals.
+
+## Video outlines
+
+`VideoOutline` is an immutable-versioned narrative blueprint owned by one Project and VideoProject. It records the exact ResearchReport ID/version, `outline-engine:v1`, `outline-generation:v1`, input fingerprint, generation `AiRun`, provider/model provenance, `Ready` or `Approved` artifact state, structured Narrative Strategy, Pilot experiment snapshot/alignment, warnings, timing total, and timestamps. A successful regeneration adds the next `(VideoProjectId, Version)`; a failed attempt adds no artifact version. At most one version per VideoProject can be Approved.
+
+`VideoOutlineSection` stores contiguous sequence, heading, controlled purpose, objective, planning summary, optional viewer question, transition intent, and optional timing estimate. `VideoOutlineSectionClaim` assigns a narrative usage role (`Core`, `Supporting`, `Example`, `Counterpoint`, or `Conflict`) to a ResearchClaim. `VideoOutlineSectionConflict` preserves explicit disagreement, while `VideoOutlineSectionGap` points to the stable zero-based gap position in the immutable ResearchReport payload.
+
+```text
+VideoProject
+  -> ResearchReport
+       -> VideoOutline
+            -> ordered VideoOutlineSection
+                 -> ResearchClaim
+                      -> ResearchClaimEvidence
+                           -> ResearchEvidence
+                                -> ResearchSource
+```
+
+Ready Sections may be edited in their planning fields and transactionally reordered; claim associations remain backend-validated. A reorder marks transitions for review. Ordinary edits, reorder, regeneration, and re-approval are rejected after approval. Phase 10 can retrieve the one explicitly Approved outline rather than guessing from creation time or version number.

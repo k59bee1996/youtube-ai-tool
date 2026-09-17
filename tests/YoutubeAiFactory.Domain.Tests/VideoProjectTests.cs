@@ -63,6 +63,44 @@ public sealed class VideoProjectTests
         Assert.Equal(VideoProjectStatus.ResearchQueued, project.Status);
     }
 
+    [Fact]
+    public void Outline_generation_can_recover_or_complete_without_skipping_approval()
+    {
+        var project = Create();
+        var now = DateTimeOffset.UtcNow;
+        MoveToResearchReady(project, now);
+
+        project.TransitionTo(VideoProjectStatus.OutlineGenerating, now);
+        project.TransitionTo(VideoProjectStatus.ResearchReady, now);
+        project.TransitionTo(VideoProjectStatus.OutlineGenerating, now);
+        project.TransitionTo(VideoProjectStatus.OutlineReady, now);
+
+        Assert.Throws<DomainException>(() => project.TransitionTo(VideoProjectStatus.ScriptGenerating, now));
+        project.TransitionTo(VideoProjectStatus.OutlineApproved, now);
+        Assert.Equal(VideoProjectStatus.OutlineApproved, project.Status);
+    }
+
+    [Fact]
+    public void Ready_outline_state_can_rerun_research_without_erasing_history()
+    {
+        var project = Create();
+        var now = DateTimeOffset.UtcNow;
+        MoveToResearchReady(project, now);
+        project.TransitionTo(VideoProjectStatus.OutlineGenerating, now);
+        project.TransitionTo(VideoProjectStatus.OutlineReady, now);
+
+        project.TransitionTo(VideoProjectStatus.ResearchQueued, now);
+
+        Assert.Equal(VideoProjectStatus.ResearchQueued, project.Status);
+    }
+
+    private static void MoveToResearchReady(VideoProject project, DateTimeOffset now)
+    {
+        project.TransitionTo(VideoProjectStatus.ResearchQueued, now);
+        project.TransitionTo(VideoProjectStatus.Researching, now);
+        project.TransitionTo(VideoProjectStatus.ResearchReady, now);
+    }
+
     private static VideoProject Create() => new(Guid.NewGuid(), Guid.NewGuid(), 1, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
         "The Economics of Owning a Medieval Castle", "Historical economics", "Hidden costs", "Explainer", "History viewers",
         "Reveal the cost before the title card", "Castle against a ledger", "Understand the real ownership cost",

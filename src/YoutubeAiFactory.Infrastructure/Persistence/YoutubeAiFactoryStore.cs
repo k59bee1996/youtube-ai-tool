@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using YoutubeAiFactory.Application.Common;
 using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
+using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Research;
@@ -14,6 +15,7 @@ using YoutubeAiFactory.Domain.Ideas;
 using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
+using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
@@ -121,12 +123,9 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public Task FailArtifactLocalizationJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
         FailJobAsync(jobId, aiRunId, reason, retryable, failedAt, retryAt, cancellationToken);
     public void AddArtifactLocalization(ArtifactLocalization localization) => dbContext.ArtifactLocalizations.Add(localization);
-    public async Task DeleteArtifactLocalizationAsync(Guid localizationId, CancellationToken cancellationToken)
-    {
-        var localization = await dbContext.ArtifactLocalizations.SingleAsync(item => item.Id == localizationId, cancellationToken);
-        dbContext.ArtifactLocalizations.Remove(localization);
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
+    public async Task DeleteArtifactLocalizationAsync(Guid localizationId, CancellationToken cancellationToken) =>
+        _ = await dbContext.ArtifactLocalizations.Where(item => item.Id == localizationId)
+            .ExecuteDeleteAsync(cancellationToken);
 
     public async Task<IReadOnlyList<CurrentCompetitorAnalysis>> GetCurrentCompetitorAnalysesForProjectAsync(Guid projectId, CancellationToken cancellationToken)
     {
@@ -426,9 +425,180 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     public void AddResearchClaimEvidence(ResearchClaimEvidence claimEvidence) => dbContext.ResearchClaimEvidence.Add(claimEvidence);
     public void AddResearchConflict(ResearchConflict conflict) => dbContext.ResearchConflicts.Add(conflict);
 
+    public Task<Job?> GetActiveVideoOutlineJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
+        FindVideoOutlineJobAsync(projectId, videoProjectId, true, cancellationToken);
+
+    public Task<Job?> GetLatestVideoOutlineJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) =>
+        FindVideoOutlineJobAsync(projectId, videoProjectId, false, cancellationToken);
+
+    public async Task<Job> EnqueueVideoOutlineJobAsync(Job job, CancellationToken cancellationToken)
+    {
+        dbContext.Jobs.Add(job);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return job;
+        }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return await dbContext.Jobs.AsNoTracking().SingleAsync(candidate =>
+                candidate.Type == "outline-generation" && candidate.VideoProjectId == job.VideoProjectId &&
+                (candidate.Status == JobStatus.Queued || candidate.Status == JobStatus.Running ||
+                 candidate.Status == JobStatus.Retrying), cancellationToken);
+        }
+    }
+
+    public Task<Job?> TryClaimNextVideoOutlineJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore,
+        CancellationToken cancellationToken) =>
+        TryClaimJobAsync("outline-generation", now, staleRunningBefore, cancellationToken, RecoverStaleOutlineJobAsync);
+
+    public Task RequeueVideoOutlineJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        RequeueJobAsync(jobId, cancellationToken);
+
+    public async Task FailVideoOutlineJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
+        DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken)
+    {
+        dbContext.ChangeTracker.Clear();
+        var job = await dbContext.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
+        var payload = JsonSerializer.Deserialize<OutlineJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
+            ?? throw new InvalidOperationException("Video outline job payload is invalid.");
+        if (aiRunId is { } runId)
+        {
+            var aiRun = await dbContext.AiRuns.SingleOrDefaultAsync(candidate => candidate.Id == runId, cancellationToken);
+            if (aiRun?.Status == AiRunStatus.Running) aiRun.Fail(reason, failedAt);
+        }
+        var willRetry = retryable && job.RetryCount < job.MaxRetries;
+        if (!willRetry)
+        {
+            var videoProject = await dbContext.VideoProjects.SingleOrDefaultAsync(candidate =>
+                candidate.ProjectId == payload.ProjectId && candidate.Id == payload.VideoProjectId, cancellationToken);
+            if (videoProject?.Status == VideoProjectStatus.OutlineGenerating)
+            {
+                var returnStatus = Enum.TryParse<VideoProjectStatus>(payload.ReturnStatus, out var parsed) &&
+                    parsed is VideoProjectStatus.ResearchReady or VideoProjectStatus.OutlineReady
+                        ? parsed : VideoProjectStatus.ResearchReady;
+                videoProject.TransitionTo(returnStatus, failedAt);
+            }
+        }
+        if (job.Status == JobStatus.Running) job.Fail(reason, willRetry, failedAt, retryAt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> CompleteVideoOutlineJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var job = await dbContext.Jobs.FromSqlInterpolated($"""
+                SELECT * FROM [yaf].[jobs] WITH (UPDLOCK, ROWLOCK)
+                WHERE [id] = {jobId}
+                  AND [type] = 'outline-generation'
+                  AND [status] = 'Running'
+                  AND [lease_id] = {leaseId}
+                """).SingleOrDefaultAsync(cancellationToken);
+            if (job is null) return false;
+
+            job.Complete(completedAt);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        });
+    }
+
+    public async Task<int> GetNextVideoOutlineVersionAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) =>
+        (await dbContext.VideoOutlines.Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId)
+            .Select(item => (int?)item.Version).MaxAsync(cancellationToken) ?? 0) + 1;
+
+    public Task<VideoOutlineWithDetails?> GetLatestVideoOutlineAsync(Guid projectId, Guid videoProjectId,
+        bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.VideoOutlines.Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId)
+            .OrderByDescending(item => item.Version);
+        return GetVideoOutlineInternalAsync(forUpdate ? query : query.AsNoTracking(), forUpdate, cancellationToken);
+    }
+
+    public Task<VideoOutlineWithDetails?> GetVideoOutlineAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
+        bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.VideoOutlines.Where(item => item.ProjectId == projectId &&
+            item.VideoProjectId == videoProjectId && item.Id == outlineId);
+        return GetVideoOutlineInternalAsync(forUpdate ? query : query.AsNoTracking(), forUpdate, cancellationToken);
+    }
+
+    public Task<VideoOutlineWithDetails?> GetApprovedVideoOutlineAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => GetVideoOutlineInternalAsync(dbContext.VideoOutlines.AsNoTracking()
+            .Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId &&
+                item.Status == VideoOutlineStatus.Approved), false, cancellationToken);
+
+    public async Task<IReadOnlyList<VideoOutline>> ListVideoOutlinesAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => await dbContext.VideoOutlines.AsNoTracking()
+        .Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId)
+        .OrderByDescending(item => item.Version).ToListAsync(cancellationToken);
+
+    public void AddVideoOutline(VideoOutline outline) => dbContext.VideoOutlines.Add(outline);
+    public void AddVideoOutlineSection(VideoOutlineSection section) => dbContext.VideoOutlineSections.Add(section);
+    public void AddVideoOutlineSectionClaim(VideoOutlineSectionClaim claim) => dbContext.VideoOutlineSectionClaims.Add(claim);
+    public void AddVideoOutlineSectionConflict(VideoOutlineSectionConflict conflict) => dbContext.VideoOutlineSectionConflicts.Add(conflict);
+    public void AddVideoOutlineSectionGap(VideoOutlineSectionGap gap) => dbContext.VideoOutlineSectionGaps.Add(gap);
+
+    public async Task ReorderVideoOutlineSectionsAsync(VideoOutline outline, IReadOnlyList<Guid> orderedSectionIds,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.VideoOutlineSections.Where(item => item.VideoOutlineId == outline.Id)
+            .ExecuteUpdateAsync(update => update.SetProperty(item => item.Sequence, item => -item.Sequence), cancellationToken);
+        for (var index = 0; index < orderedSectionIds.Count; index++)
+        {
+            var sectionId = orderedSectionIds[index];
+            var sequence = index + 1;
+            var updated = await dbContext.VideoOutlineSections.Where(item => item.VideoOutlineId == outline.Id && item.Id == sectionId)
+                .ExecuteUpdateAsync(update => update.SetProperty(item => item.Sequence, sequence), cancellationToken);
+            if (updated != 1) throw new InvalidOperationException("An outline section disappeared during reordering.");
+        }
+        await transaction.CommitAsync(cancellationToken);
+        dbContext.ChangeTracker.Clear();
+    }
+
+    private async Task<VideoOutlineWithDetails?> GetVideoOutlineInternalAsync(IQueryable<VideoOutline> query,
+        bool forUpdate, CancellationToken cancellationToken)
+    {
+        var outline = await query.FirstOrDefaultAsync(cancellationToken);
+        if (outline is null) return null;
+        var sectionQuery = dbContext.VideoOutlineSections.Where(item => item.VideoOutlineId == outline.Id);
+        var sections = await (forUpdate ? sectionQuery : sectionQuery.AsNoTracking())
+            .OrderBy(item => item.Sequence).ToListAsync(cancellationToken);
+        var sectionIds = sections.Select(item => item.Id).ToArray();
+        var claimQuery = dbContext.VideoOutlineSectionClaims.Where(item => sectionIds.Contains(item.OutlineSectionId));
+        var conflictQuery = dbContext.VideoOutlineSectionConflicts.Where(item => sectionIds.Contains(item.OutlineSectionId));
+        var gapQuery = dbContext.VideoOutlineSectionGaps.Where(item => sectionIds.Contains(item.OutlineSectionId));
+        var claims = await (forUpdate ? claimQuery : claimQuery.AsNoTracking()).ToListAsync(cancellationToken);
+        var conflicts = await (forUpdate ? conflictQuery : conflictQuery.AsNoTracking()).ToListAsync(cancellationToken);
+        var gaps = await (forUpdate ? gapQuery : gapQuery.AsNoTracking()).ToListAsync(cancellationToken);
+        return new VideoOutlineWithDetails(outline, sections, claims, conflicts, gaps);
+    }
+
     private async Task RotateStaleResearchRunAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await RotateResearchRunForRetryAsync(job, "Research worker lease expired before this attempt completed.", now, cancellationToken);
+        job.Requeue(now);
+    }
+
+    private async Task RecoverStaleOutlineJobAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<OutlineJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
+            ?? throw new InvalidOperationException("Video outline job payload is invalid.");
+        var staleRuns = await dbContext.AiRuns.Where(run => run.ProjectId == payload.ProjectId &&
+            run.VideoProjectId == payload.VideoProjectId && run.ResearchReportId == payload.ResearchReportId &&
+            run.Status == AiRunStatus.Running &&
+            (run.Workflow == "OutlineGeneration" || run.Workflow == "StructuredOutputRepair"))
+            .ToListAsync(cancellationToken);
+        foreach (var run in staleRuns)
+            run.Fail("Outline worker lease expired before this attempt completed.", now);
         job.Requeue(now);
     }
 
@@ -588,6 +758,18 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "video-research" && job.VideoProjectId == videoProjectId &&
             dbContext.VideoProjects.Any(videoProject => videoProject.Id == videoProjectId && videoProject.ProjectId == projectId));
         if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
+        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private Task<Job?> FindVideoOutlineJobAsync(Guid projectId, Guid videoProjectId, bool activeOnly,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "outline-generation" &&
+            job.VideoProjectId == videoProjectId && dbContext.VideoProjects.Any(videoProject =>
+                videoProject.Id == videoProjectId && videoProject.ProjectId == projectId));
+        if (activeOnly)
+            query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running ||
+                job.Status == JobStatus.Retrying);
         return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
 
