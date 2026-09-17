@@ -485,6 +485,29 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> CompleteVideoOutlineJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var job = await dbContext.Jobs.FromSqlInterpolated($"""
+                SELECT * FROM [yaf].[jobs] WITH (UPDLOCK, ROWLOCK)
+                WHERE [id] = {jobId}
+                  AND [type] = 'outline-generation'
+                  AND [status] = 'Running'
+                  AND [lease_id] = {leaseId}
+                """).SingleOrDefaultAsync(cancellationToken);
+            if (job is null) return false;
+
+            job.Complete(completedAt);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        });
+    }
+
     public async Task<int> GetNextVideoOutlineVersionAsync(Guid projectId, Guid videoProjectId,
         CancellationToken cancellationToken) =>
         (await dbContext.VideoOutlines.Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId)

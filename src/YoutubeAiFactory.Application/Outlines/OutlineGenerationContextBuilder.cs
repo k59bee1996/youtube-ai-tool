@@ -54,7 +54,10 @@ public sealed class OutlineGenerationContextBuilder(OutlineOptions options)
         var claimContexts = selectedClaims.Select(claim => new OutlineContextClaim(claim.Id, claim.Statement,
             claim.Type.ToString(), claim.SupportStatus.ToString(), claim.IsCritical, claim.Confidence,
             research.ClaimEvidence.Where(link => link.ResearchClaimId == claim.Id && evidenceById.ContainsKey(link.ResearchEvidenceId))
-                .Select(link => link.ResearchEvidenceId).Distinct().ToArray())).ToArray();
+                .OrderBy(link => link.ResearchEvidenceId)
+                .Select(link => new OutlineContextClaimEvidence(link.ResearchEvidenceId, link.Stance.ToString()))
+                .Distinct()
+                .ToArray())).ToArray();
         var evidenceContexts = evidence.Where(item => sourceById.ContainsKey(item.ResearchSourceId))
             .Select(item => new OutlineContextEvidence(item.Id, item.ResearchSourceId, item.Fact,
                 item.SupportingExcerpt, item.SourceLocator, item.Type.ToString(), item.Confidence,

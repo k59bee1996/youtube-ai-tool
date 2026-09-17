@@ -49,7 +49,8 @@ public sealed class OutlineValidator(OutlineOptions options)
                 section.ConflictIds.Distinct().Count() != section.ConflictIds.Count ||
                 section.ResearchGapIndexes.Distinct().Count() != section.ResearchGapIndexes.Count)
                 throw Invalid("Outline section references cannot contain duplicates.");
-            if (section.Purpose is not (OutlineSectionPurpose.Hook or OutlineSectionPurpose.Conclusion) && section.ClaimReferences.Count == 0)
+            if (section.Purpose is not (OutlineSectionPurpose.Hook or OutlineSectionPurpose.Conclusion or
+                OutlineSectionPurpose.PatternInterrupt or OutlineSectionPurpose.CTA) && section.ClaimReferences.Count == 0)
                 throw Invalid("A factual outline section must reference at least one supplied ResearchClaim.");
             foreach (var reference in section.ClaimReferences)
             {
@@ -72,8 +73,22 @@ public sealed class OutlineValidator(OutlineOptions options)
                 throw Invalid("Outline referenced a research gap outside its source ResearchReport.");
         }
 
+        ValidateNarrativeRelease(result);
         ValidateExperiment(result, context);
         return BuildWarnings(result, context);
+    }
+
+    private static void ValidateNarrativeRelease(OutlineGenerationResult result)
+    {
+        var hookCount = result.Sections.Count(item => item.Purpose == OutlineSectionPurpose.Hook);
+        if (hookCount == 0)
+            throw Invalid("Outline must include a Hook section.");
+        var ctas = result.Sections.Where(item => item.Purpose == OutlineSectionPurpose.CTA).ToArray();
+        if (ctas.Length != 1 || ctas[0].Sequence != result.Sections.Count)
+            throw Invalid("Outline must include exactly one final CTA planning section.");
+        if (!result.Sections.Any(item => item.Purpose == OutlineSectionPurpose.PatternInterrupt &&
+            item.Sequence > 1 && item.Sequence < result.Sections.Count))
+            throw Invalid("Outline must include a mid-outline PatternInterrupt section.");
     }
 
     private static void ValidateExperiment(OutlineGenerationResult result, OutlineGenerationContext context)

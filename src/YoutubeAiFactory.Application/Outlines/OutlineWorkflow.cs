@@ -213,10 +213,15 @@ public sealed class ApproveVideoOutlineHandler(IYoutubeAiFactoryStore store,
 
 public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore store, ILlmProvider provider,
     IAiModelResolver modelResolver, OutlineGenerationContextBuilder contextBuilder, OutlineValidator validator,
-    OutlineOptions options, TimeProvider timeProvider, ILogger<VideoOutlineJobProcessor> logger)
+    OutlineOptions options, TimeProvider timeProvider, ILogger<VideoOutlineJobProcessor> logger,
+    IVideoOutlineJobLeaseRenewer? leaseRenewer = null)
 {
     private static readonly Action<ILogger, Guid, Exception?> LogFailed = LoggerMessage.Define<Guid>(LogLevel.Warning,
         new EventId(2, nameof(LogFailed)), "Video outline job {JobId} failed.");
+    private static readonly Action<ILogger, Guid, Exception?> LogLeaseLost = LoggerMessage.Define<Guid>(LogLevel.Error,
+        new EventId(3, nameof(LogLeaseLost)), "Video outline job {JobId} lost ownership before completion.");
+    private static readonly Action<ILogger, Guid, Exception?> LogLeaseRenewalFailed = LoggerMessage.Define<Guid>(LogLevel.Error,
+        new EventId(4, nameof(LogLeaseRenewalFailed)), "Video outline job {JobId} lease renewal failed.");
 
     [LoggerMessage(EventId = 1, Level = LogLevel.Information,
         Message = "Outline completed for Project {ProjectId}, VideoProject {VideoProjectId}, ResearchReport {ResearchReportId}, Outline {OutlineId}; version {OutlineVersion}, algorithm {OutlineAlgorithmVersion}, prompt {PromptVersion}, profile {ModelProfile}, sections {SectionCount}, referenced claims {ClaimCount}, conflicts {ConflictReferenceCount}, gaps {GapReferenceCount}, estimated seconds {TotalEstimatedSeconds}, duration {DurationMs} ms, status {Status}.")]
@@ -233,32 +238,41 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
         if (job is null) return false;
         var payload = JsonSerializer.Deserialize<OutlineJobPayload>(job.Payload, OutlinePrompt.SerializerOptions)
             ?? throw new ApplicationValidationException("Video outline job payload is invalid.");
+        var leaseId = job.LeaseId ?? throw new ApplicationValidationException("Video outline job has no ownership lease.");
+        using var leaseLostCancellation = new CancellationTokenSource();
+        using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leaseLostCancellation.Token);
+        var executionToken = executionCancellation.Token;
+        var heartbeat = leaseRenewer is null
+            ? Task.CompletedTask
+            : MaintainLeaseAsync(job.Id, leaseId, leaseLostCancellation, heartbeatCancellation.Token);
         AiRun? aiRun = null;
         try
         {
-            var videoProject = await store.GetVideoProjectAsync(payload.ProjectId, payload.VideoProjectId, true, cancellationToken)
+            var videoProject = await store.GetVideoProjectAsync(payload.ProjectId, payload.VideoProjectId, true, executionToken)
                 ?? throw new ResourceNotFoundException("The VideoProject for this outline job no longer exists.");
             if (videoProject.Status != VideoProjectStatus.OutlineGenerating)
                 throw new ApplicationValidationException("Video outline job state is no longer runnable.");
             var research = await store.GetResearchReportAsync(payload.ProjectId, payload.VideoProjectId,
-                payload.ResearchReportId, cancellationToken)
+                payload.ResearchReportId, executionToken)
                 ?? throw new ApplicationValidationException("The source ResearchReport is no longer available.");
-            var latestResearch = await store.GetLatestResearchReportAsync(payload.ProjectId, payload.VideoProjectId, cancellationToken);
+            var latestResearch = await store.GetLatestResearchReportAsync(payload.ProjectId, payload.VideoProjectId, executionToken);
             if (latestResearch?.Report.Id != payload.ResearchReportId || research.Report.Version != payload.ResearchReportVersion)
                 throw new ApplicationValidationException("A newer ResearchReport became current. Queue a new outline from the current research.");
-            var project = await store.GetProjectAsync(payload.ProjectId, cancellationToken)
+            var project = await store.GetProjectAsync(payload.ProjectId, executionToken)
                 ?? throw new ResourceNotFoundException("Project was not found.");
             var source = await store.GetVideoProjectSourceAsync(payload.ProjectId, videoProject.PilotId,
-                videoProject.PilotVideoId, cancellationToken)
+                videoProject.PilotVideoId, executionToken)
                 ?? throw new ResourceNotFoundException("Video project source context was not found.");
             var context = contextBuilder.Build(project, videoProject, source, research);
             if (!string.Equals(context.OutlineInputFingerprint, payload.InputFingerprint, StringComparison.Ordinal))
                 throw new ApplicationValidationException("Outline inputs changed after the job was queued. Queue a new outline from the current inputs.");
 
-            var generated = await GenerateAsync(context, cancellationToken);
+            var generated = await GenerateAsync(context, executionToken);
             aiRun = generated.AiRun;
             var warnings = validator.ValidateGenerated(generated.Result, context);
-            var version = await store.GetNextVideoOutlineVersionAsync(payload.ProjectId, payload.VideoProjectId, cancellationToken);
+            executionToken.ThrowIfCancellationRequested();
+            var version = await store.GetNextVideoOutlineVersionAsync(payload.ProjectId, payload.VideoProjectId, executionToken);
             int? totalSeconds = generated.Result.Sections.Any(item => item.EstimatedSeconds.HasValue)
                 ? generated.Result.Sections.Sum(item => item.EstimatedSeconds ?? 0) : null;
             var outline = new VideoOutline(payload.ProjectId, payload.VideoProjectId, research.Report.Id,
@@ -289,8 +303,17 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
             }
             var completedAt = timeProvider.GetUtcNow();
             videoProject.TransitionTo(VideoProjectStatus.OutlineReady, completedAt);
-            job.Complete(completedAt);
-            await store.SaveChangesAsync(cancellationToken);
+            if (leaseRenewer is null)
+            {
+                job.Complete(completedAt);
+                await store.SaveChangesAsync(executionToken);
+            }
+            else if (!await store.CompleteVideoOutlineJobAsync(job.Id, leaseId, completedAt, executionToken))
+            {
+                leaseLostCancellation.Cancel();
+                LogLeaseLost(logger, job.Id, null);
+                return true;
+            }
             if (logger.IsEnabled(LogLevel.Information))
             {
                 var modelProfile = AiWorkflowProfiles.OutlineGeneration.ToString();
@@ -310,6 +333,14 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
             await store.RequeueVideoOutlineJobAsync(job.Id, CancellationToken.None);
             throw;
         }
+        catch (OperationCanceledException) when (leaseLostCancellation.IsCancellationRequested)
+        {
+            LogLeaseLost(logger, job.Id, null);
+        }
+        catch (Exception exception) when (leaseLostCancellation.IsCancellationRequested)
+        {
+            LogLeaseLost(logger, job.Id, exception);
+        }
         catch (Exception exception)
         {
             var failedAt = timeProvider.GetUtcNow();
@@ -321,7 +352,37 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                 CancellationToken.None);
             LogFailed(logger, job.Id, exception);
         }
+        finally
+        {
+            heartbeatCancellation.Cancel();
+            try { await heartbeat; }
+            catch (OperationCanceledException) { }
+        }
         return true;
+    }
+
+    private async Task MaintainLeaseAsync(Guid jobId, Guid leaseId, CancellationTokenSource leaseLostCancellation,
+        CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(5, options.RunningJobLeaseSeconds / 3d)));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!await leaseRenewer!.RenewAsync(jobId, leaseId, timeProvider.GetUtcNow(), cancellationToken))
+                {
+                    leaseLostCancellation.Cancel();
+                    LogLeaseLost(logger, jobId, null);
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            leaseLostCancellation.Cancel();
+            LogLeaseRenewalFailed(logger, jobId, exception);
+        }
     }
 
     private async Task<GeneratedOutline> GenerateAsync(OutlineGenerationContext context, CancellationToken cancellationToken)

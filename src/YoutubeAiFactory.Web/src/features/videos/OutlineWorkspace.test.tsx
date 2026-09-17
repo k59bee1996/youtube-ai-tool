@@ -5,6 +5,7 @@ import { OutlineWorkspace } from "./OutlineWorkspace"
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -92,6 +93,35 @@ test("uses a persisted Vietnamese reading overlay without changing outline ident
   expect(fetchMock.mock.calls.filter(([input, init]) => String(input) === localizationUrl && (init as RequestInit | undefined)?.method === "POST")).toHaveLength(0)
 })
 
+test("continues polling a queued Vietnamese overlay until it is available", async () => {
+  const outline = readyOutline()
+  const localizationUrl = `/api/projects/project-1/video-projects/video-1/outlines/${outline.id}/localizations/vi`
+  let localizationGets = 0
+  vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    const method = init?.method ?? "GET"
+    if (url.endsWith("/outline/latest")) return json(status({ latestOutline: outline, activeJob: null, canGenerate: true }))
+    if (url.endsWith("/outlines") && method === "GET") return json([])
+    if (url === localizationUrl && method === "POST") return json({ jobId: "translation-1", status: "Queued" }, 202)
+    if (url === localizationUrl && method === "GET") {
+      localizationGets++
+      if (localizationGets < 3) return json({ content: null, activeJob: { id: "translation-1", status: "Running", failureReason: null }, latestJob: null })
+      return json({ content: localizedContent(outline), activeJob: null, latestJob: { id: "translation-1", status: "Completed", failureReason: null } })
+    }
+    throw new Error(`Unexpected request: ${method} ${url}`)
+  }))
+
+  render(<OutlineWorkspace projectId="project-1" videoProjectId="video-1" revisionKey="r1" onWorkflowStatusChange={vi.fn()} />)
+  const toggle = await screen.findByRole("button", { name: "VI" })
+  vi.useFakeTimers()
+  fireEvent.click(toggle)
+  await Promise.resolve()
+  await vi.advanceTimersByTimeAsync(2000)
+
+  expect(screen.getByText("VI What made ownership costly?")).toBeVisible()
+  expect(localizationGets).toBeGreaterThanOrEqual(3)
+})
+
 test("shows stale outline warning and withholds edit reorder and approval actions", async () => {
   const outline = { ...readyOutline(), isStale: true }
   vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
@@ -145,6 +175,20 @@ function readyOutline(): VideoOutline {
       { ...baseSection, id: "section-4", sequence: 4, heading: "The payoff", purpose: "Conclusion" },
     ],
     createdAt: "2026-09-16T00:00:00Z", updatedAt: "2026-09-16T00:00:00Z", approvedAt: null,
+  }
+}
+
+function localizedContent(outline: VideoOutline) {
+  return {
+    canonicalContentFingerprint: "a".repeat(64), coreQuestion: `VI ${outline.coreQuestion}`,
+    coreTension: `VI ${outline.coreTension}`, openingHookConcept: `VI ${outline.openingHookConcept}`,
+    viewerPromise: `VI ${outline.viewerPromise}`, narrativeProgression: `VI ${outline.narrativeProgression}`,
+    payoff: `VI ${outline.payoff}`, pacingStrategy: `VI ${outline.pacingStrategy}`,
+    howOutlineImplementsExperiment: `VI ${outline.experimentAlignment.howOutlineImplementsExperiment}`,
+    risksToExperimentIntegrity: [], warnings: [],
+    sections: outline.sections.map(section => ({ sectionId: section.id, heading: `VI ${section.heading}`,
+      objective: `VI ${section.objective}`, summary: `VI ${section.summary}`, viewerQuestion: section.viewerQuestion,
+      transitionIntent: section.transitionIntent })),
   }
 }
 

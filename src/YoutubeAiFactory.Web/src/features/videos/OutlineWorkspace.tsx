@@ -164,8 +164,8 @@ function OutlineView({ outline, isLatest, canGenerate, busy, editing, drafts, on
 
   useEffect(() => {
     if (locale !== "vi" || !localizationBusy) return undefined
-    const timer = window.setTimeout(() => void loadLocalization(), 2000)
-    return () => window.clearTimeout(timer)
+    const timer = window.setInterval(() => void loadLocalization(), 2000)
+    return () => window.clearInterval(timer)
   }, [loadLocalization, locale, localizationBusy])
 
   async function selectLocale(nextLocale: AnalysisLocale) {

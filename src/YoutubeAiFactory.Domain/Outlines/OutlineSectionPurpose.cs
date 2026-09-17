@@ -8,8 +8,10 @@ public enum OutlineSectionPurpose
     Explanation,
     Escalation,
     Example,
+    PatternInterrupt,
     Counterpoint,
     Conflict,
     Payoff,
     Conclusion,
+    CTA,
 }

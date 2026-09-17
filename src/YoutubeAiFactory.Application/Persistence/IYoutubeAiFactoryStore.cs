@@ -168,6 +168,8 @@ public interface IYoutubeAiFactoryStore
     Task FailVideoOutlineJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
         DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
         throw new NotSupportedException("Video outline job persistence is not configured.");
+    Task<bool> CompleteVideoOutlineJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken) => Task.FromResult(false);
     Task<int> GetNextVideoOutlineVersionAsync(Guid projectId, Guid videoProjectId,
         CancellationToken cancellationToken) => Task.FromResult(1);
     Task<VideoOutlineWithDetails?> GetLatestVideoOutlineAsync(Guid projectId, Guid videoProjectId,
@@ -224,6 +226,11 @@ public interface IYoutubeAiFactoryStore
 }
 
 public interface IVideoResearchJobLeaseRenewer
+{
+    Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt, CancellationToken cancellationToken);
+}
+
+public interface IVideoOutlineJobLeaseRenewer
 {
     Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt, CancellationToken cancellationToken);
 }

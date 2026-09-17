@@ -13,8 +13,8 @@ public sealed class OutlineGenerationContextBuilderTests
         var fixture = new OutlineTestFixture();
         var builder = new OutlineGenerationContextBuilder(new OutlineOptions
         {
-            MaxClaimsForOutline = 2,
-            MaxEvidenceExcerptsForOutline = 2,
+            MaxClaimsForOutline = 3,
+            MaxEvidenceExcerptsForOutline = 3,
             MaxConflictItemsForOutline = 1,
             MaxResearchGapsForOutline = 1,
         });
@@ -23,10 +23,13 @@ public sealed class OutlineGenerationContextBuilderTests
 
         Assert.Equal(fixture.Report.Id, context.ResearchReportId);
         Assert.Equal(fixture.PilotVideo.ControlStrategy, context.ControlStrategy);
-        Assert.Equal(2, context.Claims.Count);
+        Assert.Equal(3, context.Claims.Count);
         Assert.DoesNotContain(context.Claims, claim => claim.Id == fixture.UnsupportedClaim.Id);
-        Assert.True(context.Evidence.Count <= 2);
+        Assert.True(context.Evidence.Count <= 3);
         Assert.Single(context.ResearchGaps);
+        var conflicted = context.Claims.Single(claim => claim.Id == fixture.ConflictedClaim.Id);
+        Assert.Contains(conflicted.Evidence, evidence => evidence.Stance == ResearchEvidenceStance.Support.ToString());
+        Assert.Contains(conflicted.Evidence, evidence => evidence.Stance == ResearchEvidenceStance.Contradict.ToString());
         Assert.Equal(64, context.OutlineInputFingerprint.Length);
     }
 

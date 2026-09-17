@@ -25,8 +25,9 @@ public sealed record OutlineGenerationResult(OutlineNarrativeStrategyResult Narr
     OutlineExperimentAlignmentResult ExperimentAlignment, IReadOnlyList<OutlineSectionResult> Sections);
 
 public sealed record OutlineContextFinding(string Summary, string Category, IReadOnlyList<Guid> ClaimIds);
+public sealed record OutlineContextClaimEvidence(Guid EvidenceId, string Stance);
 public sealed record OutlineContextClaim(Guid Id, string Statement, string Type, string SupportStatus,
-    bool IsCritical, decimal Confidence, IReadOnlyList<Guid> EvidenceIds);
+    bool IsCritical, decimal Confidence, IReadOnlyList<OutlineContextClaimEvidence> Evidence);
 public sealed record OutlineContextEvidence(Guid Id, Guid SourceId, string Fact, string SupportingExcerpt,
     string SourceLocator, string Type, decimal Confidence, string Domain);
 public sealed record OutlineContextConflict(Guid Id, Guid ClaimId, string Explanation, bool IsResolved);

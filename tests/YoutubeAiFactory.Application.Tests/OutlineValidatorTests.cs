@@ -21,14 +21,14 @@ public sealed class OutlineValidatorTests
     }
 
     [Theory]
-    [InlineData(1, 2, 4, 5)]
-    [InlineData(1, 1, 2, 3)]
-    [InlineData(0, 1, 2, 3)]
-    public void Rejects_non_contiguous_or_duplicate_sequences(int one, int two, int three, int four)
+    [InlineData(1, 2, 4, 5, 6, 7)]
+    [InlineData(1, 1, 2, 3, 4, 5)]
+    [InlineData(0, 1, 2, 3, 4, 5)]
+    public void Rejects_non_contiguous_or_duplicate_sequences(int one, int two, int three, int four, int five, int six)
     {
         var fixture = Fixture();
         var result = ValidResult(fixture.SupportedClaimId);
-        result = result with { Sections = result.Sections.Select((section, index) => section with { Sequence = new[] { one, two, three, four }[index] }).ToArray() };
+        result = result with { Sections = result.Sections.Select((section, index) => section with { Sequence = new[] { one, two, three, four, five, six }[index] }).ToArray() };
 
         var error = Assert.Throws<StructuredOutputException>(() => _validator.ValidateGenerated(result, fixture.Context));
 
@@ -108,8 +108,10 @@ public sealed class OutlineValidatorTests
             [
                 basic.Sections[0],
                 basic.Sections[1] with { Purpose = OutlineSectionPurpose.Escalation },
-                basic.Sections[2] with { Purpose = OutlineSectionPurpose.Counterpoint },
-                basic.Sections[3] with { Purpose = OutlineSectionPurpose.Payoff },
+                basic.Sections[2],
+                basic.Sections[3] with { Purpose = OutlineSectionPurpose.Counterpoint },
+                basic.Sections[4] with { Purpose = OutlineSectionPurpose.Payoff },
+                basic.Sections[5],
             ],
         };
 
@@ -131,6 +133,31 @@ public sealed class OutlineValidatorTests
         Assert.Contains("confound", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Requires_a_mid_outline_pattern_interrupt_and_a_final_cta()
+    {
+        var fixture = Fixture();
+        var basic = ValidResult(fixture.SupportedClaimId);
+        var withoutPattern = basic with
+        {
+            Sections = basic.Sections.Where(section => section.Purpose != OutlineSectionPurpose.PatternInterrupt)
+                .Select((section, index) => section with { Sequence = index + 1 }).ToArray(),
+        };
+
+        var patternError = Assert.Throws<StructuredOutputException>(() => _validator.ValidateGenerated(withoutPattern, fixture.Context));
+        Assert.Contains("PatternInterrupt", patternError.Message, StringComparison.OrdinalIgnoreCase);
+
+        var nonFinalCta = basic with
+        {
+            Sections = basic.Sections.Select(section => section.Purpose == OutlineSectionPurpose.CTA
+                ? section with { Sequence = 5 }
+                : section.Purpose == OutlineSectionPurpose.Conclusion ? section with { Sequence = 6 }
+                : section).ToArray(),
+        };
+        var ctaError = Assert.Throws<StructuredOutputException>(() => _validator.ValidateGenerated(nonFinalCta, fixture.Context));
+        Assert.Contains("final CTA", ctaError.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static OutlineGenerationResult ValidResult(Guid claimId) => new(
         new(OutlineStructureType.Explainer, "What made ownership costly?", "Prestige carried recurring obligations.",
             "Open with the contradiction between visible wealth and hidden cost.",
@@ -142,8 +169,12 @@ public sealed class OutlineValidatorTests
                 "Introduce visible prestige versus hidden obligations without stating new facts.", "What did ownership really require?",
                 "Move from the question to necessary context.", [], [], [], 45),
             Section(2, OutlineSectionPurpose.Context, claimId),
-            Section(3, OutlineSectionPurpose.Explanation, claimId),
-            Section(4, OutlineSectionPurpose.Conclusion, claimId),
+            new(3, "Reset the question", OutlineSectionPurpose.PatternInterrupt, "Refresh the open question.",
+                "Plan a concise contrast without final narration.", "What remains unclear?", "Return to the mechanism.", [], [], [], 20),
+            Section(4, OutlineSectionPurpose.Explanation, claimId),
+            Section(5, OutlineSectionPurpose.Conclusion, claimId),
+            new(6, "Next step", OutlineSectionPurpose.CTA, "Plan a next-viewer action.",
+                "Reserve CTA intent only; do not write spoken copy.", null, null, [], [], [], 20),
         ]);
 
     private static OutlineSectionResult Section(int sequence, OutlineSectionPurpose purpose, Guid claimId) =>

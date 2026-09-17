@@ -161,8 +161,13 @@ public sealed class Phase9ApiTests
                 [
                     new(1, "The contradiction", OutlineSectionPurpose.Hook, "Frame the question.", "Introduce the contradiction without narration.", "What did ownership require?", "Move to context.", [], [], [], 45),
                     Section(2, OutlineSectionPurpose.Context),
-                    Section(3, OutlineSectionPurpose.Explanation),
-                    Section(4, OutlineSectionPurpose.Conclusion),
+                    new(3, "Reset the question", OutlineSectionPurpose.PatternInterrupt,
+                        "Refresh the open question.", "Plan a concise contrast without spoken narration.",
+                        "What remains unexplained?", "Return to the mechanism.", [], [], [], 20),
+                    Section(4, OutlineSectionPurpose.Explanation),
+                    Section(5, OutlineSectionPurpose.Conclusion),
+                    new(6, "Next step", OutlineSectionPurpose.CTA, "Plan a viewer next step.",
+                        "Reserve CTA intent only; do not write final copy.", null, null, [], [], [], 20),
                 ]);
             return Task.FromResult(new LlmResult<T>((T)(object)result, "Fake", request.ResolvedModel!.Model, 100, 50, "{}"));
         }

@@ -37,7 +37,7 @@ public sealed class OutlineWorkflowTests
         Assert.Single(workflow.Store.Outlines);
         Assert.Equal(1, workflow.Store.Outlines[0].Version);
         Assert.Equal(fixture.VideoProject.ViewerPromise, workflow.Store.Outlines[0].ViewerPromise);
-        Assert.Equal(225, workflow.Store.Outlines[0].TotalEstimatedSeconds);
+        Assert.Equal(265, workflow.Store.Outlines[0].TotalEstimatedSeconds);
 
         await workflow.Queue.HandleAsync(fixture.Project.Id, fixture.VideoProject.Id, CancellationToken.None);
         await workflow.Processor.ProcessNextAsync(CancellationToken.None);
@@ -200,8 +200,14 @@ public sealed class OutlineWorkflowTests
                 "Introduce the evidence-backed contradiction without finished narration.", "What did ownership really require?",
                 "Move to the minimum historical context.", [], [], [], 45),
             Section(2, OutlineSectionPurpose.Context, claimId),
-            Section(3, OutlineSectionPurpose.Explanation, claimId),
-            Section(4, OutlineSectionPurpose.Conclusion, claimId),
+            new(3, "Reset the question", OutlineSectionPurpose.PatternInterrupt,
+                "Refresh attention by reframing the open question.",
+                "Plan a brief contrast or question using only already established context.", "What remains unexplained?",
+                "Return to the evidence-backed mechanism.", [], [], [], 20),
+            Section(4, OutlineSectionPurpose.Explanation, claimId),
+            Section(5, OutlineSectionPurpose.Conclusion, claimId),
+            new(6, "Next step", OutlineSectionPurpose.CTA, "Close with a planning-level next-viewer action.",
+                "Reserve a concise CTA intent without final spoken wording.", null, null, [], [], [], 20),
         ]);
 
     private static OutlineSectionResult Section(int sequence, OutlineSectionPurpose purpose, Guid claimId) =>
