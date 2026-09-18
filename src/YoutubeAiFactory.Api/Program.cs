@@ -11,6 +11,7 @@ using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Projects;
 using YoutubeAiFactory.Application.Research;
+using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Infrastructure;
 
@@ -32,6 +33,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("PilotGeneration"
 builder.Services.AddSingleton(builder.Configuration.GetSection(ArtifactLocalizationOptions.SectionName).Get<ArtifactLocalizationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(ResearchOptions.SectionName).Get<ResearchOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(OutlineOptions.SectionName).Get<OutlineOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection(ScriptOptions.SectionName).Get<ScriptOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -92,6 +94,16 @@ builder.Services.AddScoped<ApproveVideoOutlineHandler>();
 builder.Services.AddScoped<VideoOutlineJobProcessor>();
 builder.Services.AddScoped<RequestVideoOutlineLocalizationHandler>();
 builder.Services.AddScoped<GetVideoOutlineLocalizationHandler>();
+builder.Services.AddScoped<ScriptGenerationContextBuilder>();
+builder.Services.AddScoped<ScriptValidator>();
+builder.Services.AddScoped<RunVideoScriptHandler>();
+builder.Services.AddScoped<GetVideoScriptStatusHandler>();
+builder.Services.AddScoped<GetVideoScriptHandler>();
+builder.Services.AddScoped<ListVideoScriptsHandler>();
+builder.Services.AddScoped<UpdateVideoScriptHandler>();
+builder.Services.AddScoped<ValidateVideoScriptHandler>();
+builder.Services.AddScoped<ApproveVideoScriptHandler>();
+builder.Services.AddScoped<VideoScriptJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"])
@@ -104,7 +116,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-9",
+    phase = "phase-10",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

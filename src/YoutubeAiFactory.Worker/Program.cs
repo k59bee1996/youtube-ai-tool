@@ -5,6 +5,7 @@ using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Research;
+using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Infrastructure;
 using YoutubeAiFactory.Worker;
 
@@ -18,6 +19,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("PilotGeneration"
 builder.Services.AddSingleton(builder.Configuration.GetSection(ArtifactLocalizationOptions.SectionName).Get<ArtifactLocalizationOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(ResearchOptions.SectionName).Get<ResearchOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(OutlineOptions.SectionName).Get<OutlineOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection(ScriptOptions.SectionName).Get<ScriptOptions>() ?? new());
 builder.Services.AddScoped<CompetitorAnalysisContextBuilder>();
 builder.Services.AddScoped<CompetitorAnalysisJobProcessor>();
 builder.Services.AddScoped<OpportunityAnalysisContextBuilder>();
@@ -35,6 +37,9 @@ builder.Services.AddScoped<VideoResearchJobProcessor>();
 builder.Services.AddScoped<OutlineGenerationContextBuilder>();
 builder.Services.AddScoped<OutlineValidator>();
 builder.Services.AddScoped<VideoOutlineJobProcessor>();
+builder.Services.AddScoped<ScriptGenerationContextBuilder>();
+builder.Services.AddScoped<ScriptValidator>();
+builder.Services.AddScoped<VideoScriptJobProcessor>();
 builder.Services.AddHostedService<DatabaseHeartbeatWorker>();
 builder.Services.AddHostedService<CompetitorAnalysisWorker>();
 builder.Services.AddHostedService<OpportunityAnalysisWorker>();
@@ -43,6 +48,7 @@ builder.Services.AddHostedService<PilotGenerationWorker>();
 builder.Services.AddHostedService<ArtifactLocalizationWorker>();
 builder.Services.AddHostedService<VideoResearchWorker>();
 builder.Services.AddHostedService<VideoOutlineWorker>();
+builder.Services.AddHostedService<VideoScriptWorker>();
 
 var host = builder.Build();
 host.Run();

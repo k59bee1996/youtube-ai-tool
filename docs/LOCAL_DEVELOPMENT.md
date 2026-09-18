@@ -50,6 +50,11 @@ $env:Outline__MaxClaimsForOutline = "30"
 $env:Outline__MaxEvidenceExcerptsForOutline = "40"
 $env:Outline__MinOutlineSections = "4"
 $env:Outline__MaxOutlineSections = "12"
+$env:Script__PlanningWordsPerMinute = "150"
+$env:Script__MinimumLengthRatio = "0.8"
+$env:Script__MaximumLengthRatio = "1.2"
+$env:Script__MaxLengthCorrectionAttempts = "1"
+$env:Script__MaxGroundingCorrectionAttempts = "1"
 ```
 
 Readiness reports `Degraded` when the key is absent. Project endpoints still work, while collection returns a `503` problem response. The adapter sends the key in the `X-Goog-Api-Key` header and logs no credentials.
@@ -63,11 +68,15 @@ dotnet run --project src/YoutubeAiFactory.Worker
 
 Run the client from `src/YoutubeAiFactory.Web` with `npm install` and `npm run dev`. Vite serves port 5173 and proxies `/api` and `/health` to port 5050. Create a project in the UI, then submit a supported channel URL; submit it again to refresh metadata.
 
+Phase 10 Script generation and edited-Script revalidation require the Worker and `AI__ApiKey`. They consume the Approved Outline and persisted Research only; they never use `ResearchSearch__ApiKey`, fetch pages, or make new Research entities. Routine tests use provider fakes.
+
 For Phase 3–6 analysis, Phase 8 research, and Phase 9 outline generation, run the Worker in a separate terminal after setting `AI__ApiKey`. Research additionally requires server-side `ResearchSearch__ApiKey`; it is never sent to the browser. Outline generation consumes persisted Research only and never uses that search key. Phase 7 VideoProject creation is synchronous and needs neither service. The default OpenAI-compatible provider posts to the Chat Completions endpoint with JSON-mode output. No provider key is needed for routine tests.
 
 `Research` provides bounded query/result/source/evidence/claim limits. `ResearchFetch` controls request timeout, redirect count, response bytes, and normalized source characters. `ResearchSearch` controls the Tavily endpoint and timeout. `Outline` bounds generation/repair retries, Section count, Claims, evidence excerpts, conflicts, gaps, findings, and worker lease age. Keep real keys in environment variables or User Secrets; normal tests use fakes and do not call live search, web pages, or paid models.
 
 `AI:Models:Fast`, `AI:Models:Reasoning`, and `AI:Models:Premium` each require `Provider`, `Model`, `TimeoutSeconds`, and `MaxOutputTokens`. Environment variables such as `AI__Models__Premium__Model` may map profiles differently by environment, or intentionally map all profiles to one local-development model. Missing profiles fail clearly; routing never silently downgrades a Premium workload.
+
+`Script` configuration bounds generation/repair retries, independent length and grounding correction attempts, block/narration size, WPM, fallback target duration, length ratios, and the worker lease. Defaults use 150 WPM and a 0.8-1.2 target-word tolerance.
 
 ## Validate
 

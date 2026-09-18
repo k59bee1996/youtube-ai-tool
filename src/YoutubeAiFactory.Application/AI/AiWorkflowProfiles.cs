@@ -15,4 +15,7 @@ public static class AiWorkflowProfiles
     public static AiModelProfile ResearchContradictionAnalysis => AiModelProfile.Premium;
     public static AiModelProfile ResearchSynthesis => AiModelProfile.Premium;
     public static AiModelProfile OutlineGeneration => AiModelProfile.Reasoning;
+    public static AiModelProfile ScriptGeneration => AiModelProfile.Premium;
+    public static AiModelProfile ScriptGroundingAudit => AiModelProfile.Reasoning;
+    public static AiModelProfile ScriptGroundingCorrection => AiModelProfile.Premium;
 }

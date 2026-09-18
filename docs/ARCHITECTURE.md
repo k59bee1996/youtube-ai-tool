@@ -46,7 +46,7 @@ Only fully resolved competitors may be persisted: channel identity, title, and c
 
 `/health/live` checks the process. `/health/ready` checks SQL Server and YouTube configuration. Structured collection logs include project, outcome, competitor/channel when resolved, video count, and elapsed time; API keys and response bodies are excluded. Job claiming and dispatch remain deferred.
 
-See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), [ADR-003](adr/ADR-003-synchronous-competitor-collection.md), [ADR-004](adr/ADR-004-sql-server-persistence.md), [ADR-005](adr/ADR-005-evidence-backed-research.md), and [ADR-006](adr/ADR-006-evidence-grounded-outlines.md).
+See [ADR-001](adr/ADR-001-modular-monolith.md), [ADR-002](adr/ADR-002-postgresql-and-jobs.md), [ADR-003](adr/ADR-003-synchronous-competitor-collection.md), [ADR-004](adr/ADR-004-sql-server-persistence.md), [ADR-005](adr/ADR-005-evidence-backed-research.md), [ADR-006](adr/ADR-006-evidence-grounded-outlines.md), and [ADR-007](adr/ADR-007-evidence-grounded-scripts.md).
 
 ## Phase 3 competitor-analysis flow
 
@@ -127,3 +127,21 @@ ResearchReady + current ResearchReport + approved Pilot context
 The AI selects narrative structure, information order, planning-level section objectives, viewer questions, transitions, payoff, pacing, and claim placement. C# owns project/report identity, source freshness, input fingerprint, version, workflow/artifact status, bounded retries, section sequence, claim ownership/support, conflict/gap references, duration totals, active-job idempotency, and approval. Malformed JSON may receive one Fast mechanical repair; semantic evidence or experiment errors receive a bounded Reasoning correction.
 
 `VideoOutline`, `VideoOutlineSection`, and relational Section-to-Claim/Conflict/Gap links preserve the exact ResearchReport version and the path `Section -> ResearchClaim -> ResearchClaimEvidence -> ResearchEvidence -> ResearchSource`. Reordering is transactional and requires transition review before approval. A newer ResearchReport or changed material execution context makes an Outline stale without deleting it; stale ready Outlines cannot be approved. An approved Outline is immutable and is the unambiguous Phase 10 source.
+
+## Phase 10 evidence-grounded Script flow
+
+```text
+OutlineApproved + approved VideoOutline + exact ResearchReport
+    -> API (202) -> Job -> Worker -> bounded ScriptGenerationContext
+    -> Premium structured narration -> deterministic structure/reference/length validation
+    -> Reasoning grounding audit -> bounded Premium correction and re-audit when required
+    -> relational VideoScript version -> ScriptReady
+    -> structured block edit -> Grounding Pending -> async revalidation
+    -> explicit approval -> ScriptApproved
+```
+
+`ScriptGenerationContextBuilder` loads the explicitly Approved Outline and its exact source ResearchReport. Every Outline Section receives only its own supported/corroborated/conflicted Claims, source-bound evidence excerpts, conflicts, and gaps plus audience, ViewerPromise, Narrative Strategy, content language, and Pilot experiment controls. It rejects stale fingerprints and invalid ownership. The Script module has no search/fetch dependency, never creates Research entities, and never mutates WorkingTitle or upstream artifacts.
+
+The writer, auditor, correction, and structural-repair calls are separate `AiRun` records. C# owns IDs, exact section/block order, reference validation, versions, word counts, runtime estimates, length policy, job/state transitions, staleness, and approval. The worker renews and fences the job lease; the final artifact and `ScriptReady` transition commit together. Terminal generation failure restores `OutlineApproved` (or the previous `ScriptReady` during regeneration) and creates no successful Script version.
+
+`VideoScript`, `VideoScriptSection`, `VideoScriptBlock`, and relational block-to-Claim/Conflict links are the Phase 11 boundary. An approved Script is immutable and unambiguously queryable. Phase 11 may consume its ordered narration and runtime metadata without parsing one text blob or rerunning Research/Script generation.

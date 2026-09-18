@@ -103,6 +103,15 @@ export type OutlineStatus = { latestOutline: VideoOutline | null; activeJob: Res
 export type OutlineHistoryItem = { id: string; version: number; status: string; researchReportVersion: number; structureType: string; isStale: boolean; createdAt: string; approvedAt: string | null }
 export type LocalizedVideoOutlineContent = { canonicalContentFingerprint: string; coreQuestion: string; coreTension: string; openingHookConcept: string; viewerPromise: string; narrativeProgression: string; payoff: string; pacingStrategy: string; howOutlineImplementsExperiment: string; risksToExperimentIntegrity: { index: number; text: string }[]; warnings: { index: number; text: string }[]; sections: { sectionId: string; heading: string; objective: string; summary: string; viewerQuestion: string | null; transitionIntent: string | null }[] }
 export type OutlineLocalizationStatus = { content: LocalizedVideoOutlineContent | null; activeJob: ResearchJob | null; latestJob: ResearchJob | null }
+export type ScriptGroundingIssue = { sectionSequence: number; blockSequence: number; issueType: string; severity: string; problematicText: string; relevantClaimIds: string[]; explanation: string }
+export type ScriptClaim = { id: string; statement: string; type: string; supportStatus: string; confidence: number; isCritical: boolean; evidence: OutlineEvidence[] }
+export type ScriptConflict = { id: string; claimId: string; explanation: string; isResolved: boolean }
+export type ScriptBlock = { id: string; sequence: number; type: string; text: string; wordCount: number; claims: ScriptClaim[]; conflicts: ScriptConflict[] }
+export type ScriptSection = { id: string; outlineSectionId: string; sequence: number; heading: string; wordCount: number; estimatedDurationSeconds: number; blocks: ScriptBlock[] }
+export type VideoScript = { id: string; projectId: string; videoProjectId: string; videoOutlineId: string; videoOutlineVersion: number; researchReportId: string; researchReportVersion: number; version: number; status: string; groundingStatus: string; scriptEngineVersion: string; promptKey: string; promptVersion: number; provider: string; model: string; contentLanguage: string; totalWordCount: number; estimatedDurationSeconds: number; isStale: boolean; warnings: string[]; groundingIssues: ScriptGroundingIssue[]; sections: ScriptSection[]; createdAt: string; updatedAt: string; approvedAt: string | null }
+export type ScriptJob = { id: string; status: string; operation: string; failureReason: string | null }
+export type ScriptStatus = { latestScript: VideoScript | null; activeJob: ScriptJob | null; latestJob: ScriptJob | null; canGenerate: boolean; blockReason: string | null }
+export type ScriptHistoryItem = { id: string; version: number; status: string; groundingStatus: string; videoOutlineVersion: number; researchReportVersion: number; isStale: boolean; createdAt: string; approvedAt: string | null }
 
 export type CreateProjectRequest = {
   name: string
@@ -200,4 +209,11 @@ export const api = {
   approveOutline: (projectId: string, videoProjectId: string, outlineId: string) => request<VideoOutline>(`/api/projects/${projectId}/video-projects/${videoProjectId}/outlines/${outlineId}:approve`, { method: 'POST' }),
   getOutlineLocalization: (projectId: string, videoProjectId: string, outlineId: string, locale: 'vi') => request<OutlineLocalizationStatus>(`/api/projects/${projectId}/video-projects/${videoProjectId}/outlines/${outlineId}/localizations/${locale}`),
   requestOutlineLocalization: (projectId: string, videoProjectId: string, outlineId: string, locale: 'vi') => request<AnalysisRun>(`/api/projects/${projectId}/video-projects/${videoProjectId}/outlines/${outlineId}/localizations/${locale}`, { method: 'POST' }),
+  getScriptStatus: (projectId: string, videoProjectId: string, signal?: AbortSignal) => request<ScriptStatus>(`/api/projects/${projectId}/video-projects/${videoProjectId}/script/latest`, { signal }),
+  generateScript: (projectId: string, videoProjectId: string) => request<AnalysisRun>(`/api/projects/${projectId}/video-projects/${videoProjectId}/script:generate`, { method: 'POST' }),
+  listScripts: (projectId: string, videoProjectId: string, signal?: AbortSignal) => request<ScriptHistoryItem[]>(`/api/projects/${projectId}/video-projects/${videoProjectId}/scripts`, { signal }),
+  getScript: (projectId: string, videoProjectId: string, scriptId: string) => request<VideoScript>(`/api/projects/${projectId}/video-projects/${videoProjectId}/scripts/${scriptId}`),
+  updateScript: (projectId: string, videoProjectId: string, scriptId: string, blocks: { blockId: string; text: string }[]) => request<VideoScript>(`/api/projects/${projectId}/video-projects/${videoProjectId}/scripts/${scriptId}`, { method: 'PATCH', body: JSON.stringify({ blocks }) }),
+  validateScript: (projectId: string, videoProjectId: string, scriptId: string) => request<AnalysisRun>(`/api/projects/${projectId}/video-projects/${videoProjectId}/scripts/${scriptId}:validate`, { method: 'POST' }),
+  approveScript: (projectId: string, videoProjectId: string, scriptId: string) => request<VideoScript>(`/api/projects/${projectId}/video-projects/${videoProjectId}/scripts/${scriptId}:approve`, { method: 'POST' }),
 }

@@ -1,6 +1,7 @@
 using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Research;
+using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
 
 namespace YoutubeAiFactory.Api.Endpoints;
@@ -29,6 +30,13 @@ internal static class VideoProjectEndpoints
         projects.MapPost("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}:approve", ApproveOutlineAsync);
         projects.MapPost("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}/localizations/{locale}", RequestOutlineLocalizationAsync);
         projects.MapGet("/video-projects/{videoProjectId:guid}/outlines/{outlineId:guid}/localizations/{locale}", GetOutlineLocalizationAsync);
+        projects.MapPost("/video-projects/{videoProjectId:guid}/script:generate", GenerateScriptAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/script/latest", GetLatestScriptAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/scripts", GetScriptHistoryAsync);
+        projects.MapGet("/video-projects/{videoProjectId:guid}/scripts/{scriptId:guid}", GetScriptAsync);
+        projects.MapPatch("/video-projects/{videoProjectId:guid}/scripts/{scriptId:guid}", UpdateScriptAsync);
+        projects.MapPost("/video-projects/{videoProjectId:guid}/scripts/{scriptId:guid}:validate", ValidateScriptAsync);
+        projects.MapPost("/video-projects/{videoProjectId:guid}/scripts/{scriptId:guid}:approve", ApproveScriptAsync);
         return endpoints;
     }
 
@@ -82,4 +90,31 @@ internal static class VideoProjectEndpoints
     private static async Task<IResult> GetOutlineLocalizationAsync(Guid projectId, Guid videoProjectId, Guid outlineId,
         string locale, GetVideoOutlineLocalizationHandler handler, CancellationToken ct) =>
         Results.Ok(await handler.HandleAsync(projectId, videoProjectId, outlineId, locale, ct));
+    private static async Task<IResult> GenerateScriptAsync(Guid projectId, Guid videoProjectId,
+        RunVideoScriptHandler handler, CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(projectId, videoProjectId, ct);
+        return Results.Accepted($"/api/projects/{projectId}/video-projects/{videoProjectId}/script/latest", result);
+    }
+    private static async Task<IResult> GetLatestScriptAsync(Guid projectId, Guid videoProjectId,
+        GetVideoScriptStatusHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, ct));
+    private static async Task<IResult> GetScriptHistoryAsync(Guid projectId, Guid videoProjectId,
+        ListVideoScriptsHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, ct));
+    private static async Task<IResult> GetScriptAsync(Guid projectId, Guid videoProjectId, Guid scriptId,
+        GetVideoScriptHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, scriptId, ct));
+    private static async Task<IResult> UpdateScriptAsync(Guid projectId, Guid videoProjectId, Guid scriptId,
+        UpdateVideoScriptRequest request, UpdateVideoScriptHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, scriptId, request, ct));
+    private static async Task<IResult> ValidateScriptAsync(Guid projectId, Guid videoProjectId, Guid scriptId,
+        ValidateVideoScriptHandler handler, CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(projectId, videoProjectId, scriptId, ct);
+        return Results.Accepted($"/api/projects/{projectId}/video-projects/{videoProjectId}/script/latest", result);
+    }
+    private static async Task<IResult> ApproveScriptAsync(Guid projectId, Guid videoProjectId, Guid scriptId,
+        ApproveVideoScriptHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.HandleAsync(projectId, videoProjectId, scriptId, ct));
 }

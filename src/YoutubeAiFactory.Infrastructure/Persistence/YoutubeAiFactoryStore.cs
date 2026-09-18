@@ -8,6 +8,7 @@ using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Research;
+using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
@@ -19,6 +20,7 @@ using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
+using YoutubeAiFactory.Domain.Scripts;
 using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
@@ -582,6 +584,150 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         return new VideoOutlineWithDetails(outline, sections, claims, conflicts, gaps);
     }
 
+    public Task<Job?> GetActiveVideoScriptJobAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => FindVideoScriptJobAsync(projectId, videoProjectId, true,
+        cancellationToken);
+
+    public Task<Job?> GetLatestVideoScriptJobAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => FindVideoScriptJobAsync(projectId, videoProjectId, false,
+        cancellationToken);
+
+    public async Task<Job> EnqueueVideoScriptJobAsync(Job job, CancellationToken cancellationToken)
+    {
+        dbContext.Jobs.Add(job);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return job;
+        }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return await dbContext.Jobs.AsNoTracking().SingleAsync(candidate =>
+                candidate.Type == "script-workflow" && candidate.VideoProjectId == job.VideoProjectId &&
+                (candidate.Status == JobStatus.Queued || candidate.Status == JobStatus.Running ||
+                 candidate.Status == JobStatus.Retrying), cancellationToken);
+        }
+    }
+
+    public Task<Job?> TryClaimNextVideoScriptJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore,
+        CancellationToken cancellationToken) => TryClaimJobAsync("script-workflow", now, staleRunningBefore,
+        cancellationToken, RecoverStaleScriptJobAsync);
+
+    public Task RequeueVideoScriptJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        RequeueJobAsync(jobId, cancellationToken);
+
+    public async Task FailVideoScriptJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
+        DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken)
+    {
+        dbContext.ChangeTracker.Clear();
+        var job = await dbContext.Jobs.SingleAsync(candidate => candidate.Id == jobId, cancellationToken);
+        var payload = JsonSerializer.Deserialize<ScriptJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
+            ?? throw new InvalidOperationException("Video Script job payload is invalid.");
+        if (aiRunId is { } runId)
+        {
+            var aiRun = await dbContext.AiRuns.SingleOrDefaultAsync(candidate => candidate.Id == runId,
+                cancellationToken);
+            if (aiRun?.Status == AiRunStatus.Running) aiRun.Fail(reason, failedAt);
+        }
+        var willRetry = retryable && job.RetryCount < job.MaxRetries;
+        if (!willRetry && payload.Operation == ScriptJobOperation.Generate)
+        {
+            var videoProject = await dbContext.VideoProjects.SingleOrDefaultAsync(candidate =>
+                candidate.ProjectId == payload.ProjectId && candidate.Id == payload.VideoProjectId,
+                cancellationToken);
+            if (videoProject?.Status == VideoProjectStatus.ScriptGenerating)
+            {
+                var returnStatus = Enum.TryParse<VideoProjectStatus>(payload.ReturnStatus, out var parsed) &&
+                    parsed is VideoProjectStatus.OutlineApproved or VideoProjectStatus.ScriptReady
+                        ? parsed : VideoProjectStatus.OutlineApproved;
+                videoProject.TransitionTo(returnStatus, failedAt);
+            }
+        }
+        if (job.Status == JobStatus.Running) job.Fail(reason, willRetry, failedAt, retryAt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> CompleteVideoScriptJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var job = await dbContext.Jobs.FromSqlInterpolated($"""
+                SELECT * FROM [yaf].[jobs] WITH (UPDLOCK, ROWLOCK)
+                WHERE [id] = {jobId}
+                  AND [type] = 'script-workflow'
+                  AND [status] = 'Running'
+                  AND [lease_id] = {leaseId}
+                """).SingleOrDefaultAsync(cancellationToken);
+            if (job is null) return false;
+            job.Complete(completedAt);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        });
+    }
+
+    public async Task<int> GetNextVideoScriptVersionAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) =>
+        (await dbContext.VideoScripts.Where(item => item.ProjectId == projectId &&
+                item.VideoProjectId == videoProjectId).Select(item => (int?)item.Version)
+            .MaxAsync(cancellationToken) ?? 0) + 1;
+
+    public Task<VideoScriptWithDetails?> GetLatestVideoScriptAsync(Guid projectId, Guid videoProjectId,
+        bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.VideoScripts.Where(item => item.ProjectId == projectId &&
+            item.VideoProjectId == videoProjectId).OrderByDescending(item => item.Version);
+        return GetVideoScriptInternalAsync(forUpdate ? query : query.AsNoTracking(), forUpdate, cancellationToken);
+    }
+
+    public Task<VideoScriptWithDetails?> GetVideoScriptAsync(Guid projectId, Guid videoProjectId,
+        Guid scriptId, bool forUpdate, CancellationToken cancellationToken)
+    {
+        var query = dbContext.VideoScripts.Where(item => item.ProjectId == projectId &&
+            item.VideoProjectId == videoProjectId && item.Id == scriptId);
+        return GetVideoScriptInternalAsync(forUpdate ? query : query.AsNoTracking(), forUpdate, cancellationToken);
+    }
+
+    public Task<VideoScriptWithDetails?> GetApprovedVideoScriptAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => GetVideoScriptInternalAsync(dbContext.VideoScripts.AsNoTracking()
+            .Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId &&
+                item.Status == VideoScriptStatus.Approved), false, cancellationToken);
+
+    public async Task<IReadOnlyList<VideoScript>> ListVideoScriptsAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => await dbContext.VideoScripts.AsNoTracking()
+        .Where(item => item.ProjectId == projectId && item.VideoProjectId == videoProjectId)
+        .OrderByDescending(item => item.Version).ToListAsync(cancellationToken);
+
+    public void AddVideoScript(VideoScript script) => dbContext.VideoScripts.Add(script);
+    public void AddVideoScriptSection(VideoScriptSection section) => dbContext.VideoScriptSections.Add(section);
+    public void AddVideoScriptBlock(VideoScriptBlock block) => dbContext.VideoScriptBlocks.Add(block);
+    public void AddVideoScriptBlockClaim(VideoScriptBlockClaim claim) => dbContext.VideoScriptBlockClaims.Add(claim);
+    public void AddVideoScriptBlockConflict(VideoScriptBlockConflict conflict) => dbContext.VideoScriptBlockConflicts.Add(conflict);
+
+    private async Task<VideoScriptWithDetails?> GetVideoScriptInternalAsync(IQueryable<VideoScript> query,
+        bool forUpdate, CancellationToken cancellationToken)
+    {
+        var script = await query.FirstOrDefaultAsync(cancellationToken);
+        if (script is null) return null;
+        var sectionQuery = dbContext.VideoScriptSections.Where(item => item.VideoScriptId == script.Id);
+        var sections = await (forUpdate ? sectionQuery : sectionQuery.AsNoTracking())
+            .OrderBy(item => item.Sequence).ToListAsync(cancellationToken);
+        var sectionIds = sections.Select(item => item.Id).ToArray();
+        var blockQuery = dbContext.VideoScriptBlocks.Where(item => sectionIds.Contains(item.VideoScriptSectionId));
+        var blocks = await (forUpdate ? blockQuery : blockQuery.AsNoTracking())
+            .OrderBy(item => item.VideoScriptSectionId).ThenBy(item => item.Sequence).ToListAsync(cancellationToken);
+        var blockIds = blocks.Select(item => item.Id).ToArray();
+        var claimQuery = dbContext.VideoScriptBlockClaims.Where(item => blockIds.Contains(item.ScriptBlockId));
+        var conflictQuery = dbContext.VideoScriptBlockConflicts.Where(item => blockIds.Contains(item.ScriptBlockId));
+        var claims = await (forUpdate ? claimQuery : claimQuery.AsNoTracking()).ToListAsync(cancellationToken);
+        var conflicts = await (forUpdate ? conflictQuery : conflictQuery.AsNoTracking()).ToListAsync(cancellationToken);
+        return new(script, sections, blocks, claims, conflicts);
+    }
+
     private async Task RotateStaleResearchRunAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await RotateResearchRunForRetryAsync(job, "Research worker lease expired before this attempt completed.", now, cancellationToken);
@@ -599,6 +745,22 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
             .ToListAsync(cancellationToken);
         foreach (var run in staleRuns)
             run.Fail("Outline worker lease expired before this attempt completed.", now);
+        job.Requeue(now);
+    }
+
+    private async Task RecoverStaleScriptJobAsync(Job job, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<ScriptJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
+            ?? throw new InvalidOperationException("Video Script job payload is invalid.");
+        var staleRuns = await dbContext.AiRuns.Where(run => run.ProjectId == payload.ProjectId &&
+            run.VideoProjectId == payload.VideoProjectId && run.ResearchReportId == payload.ResearchReportId &&
+            run.Status == AiRunStatus.Running &&
+            (run.Workflow == "ScriptGeneration" || run.Workflow == "ScriptGroundingAudit" ||
+             run.Workflow == "ScriptGroundingCorrection" || run.Workflow == "StructuredOutputRepair"))
+            .ToListAsync(cancellationToken);
+        foreach (var run in staleRuns)
+            run.Fail("Script worker lease expired before this attempt completed.", now);
         job.Requeue(now);
     }
 
@@ -765,6 +927,18 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         CancellationToken cancellationToken)
     {
         var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "outline-generation" &&
+            job.VideoProjectId == videoProjectId && dbContext.VideoProjects.Any(videoProject =>
+                videoProject.Id == videoProjectId && videoProject.ProjectId == projectId));
+        if (activeOnly)
+            query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running ||
+                job.Status == JobStatus.Retrying);
+        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private Task<Job?> FindVideoScriptJobAsync(Guid projectId, Guid videoProjectId, bool activeOnly,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "script-workflow" &&
             job.VideoProjectId == videoProjectId && dbContext.VideoProjects.Any(videoProject =>
                 videoProject.Id == videoProjectId && videoProject.ProjectId == projectId));
         if (activeOnly)
