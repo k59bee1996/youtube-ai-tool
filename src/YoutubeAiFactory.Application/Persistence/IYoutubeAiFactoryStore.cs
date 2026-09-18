@@ -3,6 +3,7 @@ using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Research;
+using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
 using YoutubeAiFactory.Domain.AI;
 using YoutubeAiFactory.Domain.Competitors;
@@ -14,6 +15,7 @@ using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
+using YoutubeAiFactory.Domain.Scripts;
 using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Application.Persistence;
@@ -188,6 +190,37 @@ public interface IYoutubeAiFactoryStore
     Task ReorderVideoOutlineSectionsAsync(VideoOutline outline, IReadOnlyList<Guid> orderedSectionIds,
         CancellationToken cancellationToken) => throw new NotSupportedException("Video outline persistence is not configured.");
 
+    Task<Job?> GetActiveVideoScriptJobAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestVideoScriptJobAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job> EnqueueVideoScriptJobAsync(Job job, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Video Script job persistence is not configured.");
+    Task<Job?> TryClaimNextVideoScriptJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore,
+        CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task RequeueVideoScriptJobAsync(Guid jobId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Video Script job persistence is not configured.");
+    Task FailVideoScriptJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable,
+        DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Video Script job persistence is not configured.");
+    Task<bool> CompleteVideoScriptJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken) => Task.FromResult(false);
+    Task<int> GetNextVideoScriptVersionAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<VideoScriptWithDetails?> GetLatestVideoScriptAsync(Guid projectId, Guid videoProjectId,
+        bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoScriptWithDetails?>(null);
+    Task<VideoScriptWithDetails?> GetVideoScriptAsync(Guid projectId, Guid videoProjectId, Guid scriptId,
+        bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<VideoScriptWithDetails?>(null);
+    Task<VideoScriptWithDetails?> GetApprovedVideoScriptAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult<VideoScriptWithDetails?>(null);
+    Task<IReadOnlyList<VideoScript>> ListVideoScriptsAsync(Guid projectId, Guid videoProjectId,
+        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VideoScript>>([]);
+    void AddVideoScript(VideoScript script) => throw new NotSupportedException("Video Script persistence is not configured.");
+    void AddVideoScriptSection(VideoScriptSection section) => throw new NotSupportedException("Video Script persistence is not configured.");
+    void AddVideoScriptBlock(VideoScriptBlock block) => throw new NotSupportedException("Video Script persistence is not configured.");
+    void AddVideoScriptBlockClaim(VideoScriptBlockClaim claim) => throw new NotSupportedException("Video Script persistence is not configured.");
+    void AddVideoScriptBlockConflict(VideoScriptBlockConflict conflict) => throw new NotSupportedException("Video Script persistence is not configured.");
+
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         Task.FromResult<Job?>(null);
@@ -233,4 +266,10 @@ public interface IVideoResearchJobLeaseRenewer
 public interface IVideoOutlineJobLeaseRenewer
 {
     Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt, CancellationToken cancellationToken);
+}
+
+public interface IVideoScriptJobLeaseRenewer
+{
+    Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt,
+        CancellationToken cancellationToken);
 }

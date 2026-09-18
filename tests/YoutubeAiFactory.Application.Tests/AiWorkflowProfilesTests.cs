@@ -25,6 +25,9 @@ public sealed class AiWorkflowProfilesTests
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ResearchContradictionAnalysis);
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ResearchSynthesis);
         Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.OutlineGeneration);
+        Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ScriptGeneration);
+        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ScriptGroundingAudit);
+        Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ScriptGroundingCorrection);
     }
 
     [Fact]

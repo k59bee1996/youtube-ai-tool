@@ -34,7 +34,7 @@ Submitting the same resolved channel for a project refreshes its metadata and up
 
 `VideoProject` is a durable execution aggregate, not another idea or a pilot slot. One approved `PilotVideo` can create at most one VideoProject. It preserves live relational references to `Project`, exact `Pilot` version, `PilotVideo`, `VideoIdea`, and `OpportunityCandidate`; it snapshots the initial title, topic, angle, format, audience, hook, thumbnail concept, viewer promise, and experiment brief so future upstream edits cannot silently rewrite production intent. Only working title and execution notes are editable in Phase 7.
 
-The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchFailed`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Research failure is explicit so a worker failure cannot leave a VideoProject reporting `Researching` forever. Outline generation activates `ResearchReady -> OutlineGenerating -> OutlineReady -> OutlineApproved`; terminal generation failure returns to the exact retryable source state (`ResearchReady` or `OutlineReady`) and never skips approval.
+The production-state vocabulary is `Draft`, `ResearchQueued`, `Researching`, `ResearchFailed`, `ResearchReady`, `OutlineGenerating`, `OutlineReady`, `OutlineApproved`, `ScriptGenerating`, `ScriptReady`, `ScriptApproved`, `Packaging`, and `ProductionReady`. The aggregate centralizes its transition matrix. Research failure is explicit so a worker failure cannot leave a VideoProject reporting `Researching` forever. Outline generation activates `ResearchReady -> OutlineGenerating -> OutlineReady -> OutlineApproved`; Script generation activates `OutlineApproved -> ScriptGenerating -> ScriptReady -> ScriptApproved`. Terminal work restores the exact retryable source state and never skips an approval.
 
 ## Research
 
@@ -62,3 +62,24 @@ VideoProject
 ```
 
 Ready Sections may be edited in their planning fields and transactionally reordered; claim associations remain backend-validated. A reorder marks transitions for review. Ordinary edits, reorder, regeneration, and re-approval are rejected after approval. Phase 10 can retrieve the one explicitly Approved outline rather than guessing from creation time or version number.
+
+## Video Scripts
+
+`VideoScript` is a versioned viewer-facing narration artifact for one VideoProject. It records the exact Approved `VideoOutline` ID/version and `ResearchReport` ID/version, `script-engine:v1`, prompt version, deterministic input fingerprint, content target language, the final content-producing and grounding `AiRun` IDs, final content provider/model provenance, backend word/runtime metrics, structured grounding issues, and `Ready` or `Approved` status. Earlier generation, correction, and repair calls remain independently observable as `AiRun` records. A successful regeneration creates the next `(VideoProjectId, Version)`; a failed attempt creates no artifact. At most one Script per VideoProject can be Approved.
+
+`VideoScriptSection` maps one-to-one to an ordered `VideoOutlineSection` and stores backend-calculated section metrics. `VideoScriptBlock` stores ordered narration text, controlled block type, and word count. `VideoScriptBlockClaim` and `VideoScriptBlockConflict` retain validated relational references. Editing any block preserves structural IDs but changes grounding to `Pending`; a separate audit must restore `Passed` before approval. Approved Scripts are immutable.
+
+```text
+VideoProject
+  -> Approved VideoOutline
+       -> ordered VideoOutlineSection
+            -> VideoScript
+                 -> ordered VideoScriptSection
+                      -> ordered VideoScriptBlock
+                           -> ResearchClaim
+                                -> ResearchClaimEvidence
+                                     -> ResearchEvidence
+                                          -> ResearchSource
+```
+
+The approved Script is the Phase 11 source of truth: ordered blocks, narration, content language, references, and runtime metadata are all relationally available without regenerating Script or Research.

@@ -94,6 +94,29 @@ public sealed class VideoProjectTests
         Assert.Equal(VideoProjectStatus.ResearchQueued, project.Status);
     }
 
+    [Fact]
+    public void Script_workflow_can_recover_regenerate_and_requires_approval_before_packaging()
+    {
+        var project = Create();
+        var now = DateTimeOffset.UtcNow;
+        MoveToResearchReady(project, now);
+        project.TransitionTo(VideoProjectStatus.OutlineGenerating, now);
+        project.TransitionTo(VideoProjectStatus.OutlineReady, now);
+        project.TransitionTo(VideoProjectStatus.OutlineApproved, now);
+
+        project.TransitionTo(VideoProjectStatus.ScriptGenerating, now);
+        project.TransitionTo(VideoProjectStatus.OutlineApproved, now);
+        project.TransitionTo(VideoProjectStatus.ScriptGenerating, now);
+        project.TransitionTo(VideoProjectStatus.ScriptReady, now);
+        Assert.Throws<DomainException>(() => project.TransitionTo(VideoProjectStatus.Packaging, now));
+        project.TransitionTo(VideoProjectStatus.ScriptGenerating, now);
+        project.TransitionTo(VideoProjectStatus.ScriptReady, now);
+        project.TransitionTo(VideoProjectStatus.ScriptApproved, now);
+        project.TransitionTo(VideoProjectStatus.Packaging, now);
+
+        Assert.Equal(VideoProjectStatus.Packaging, project.Status);
+    }
+
     private static void MoveToResearchReady(VideoProject project, DateTimeOffset now)
     {
         project.TransitionTo(VideoProjectStatus.ResearchQueued, now);

@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 9 converts a current evidence-backed Research Report into a versioned, reviewable Video Outline without doing new research or writing a script.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 10 converts an explicitly approved, evidence-grounded Video Outline into versioned viewer-facing narration, audits every Script against persisted ResearchClaims, and requires explicit user approval before production packaging.
 
 ## Repository layout
 
@@ -47,4 +47,4 @@ Run the same checks locally using the commands in [Local Development](docs/LOCAL
 
 ## Phase boundary
 
-Start the Worker as well as the API to process competitor, opportunity, idea-generation, pilot-generation, localization, research, and outline jobs. A current `ResearchReady` VideoProject can queue a bounded outline-planning job. The resulting Narrative Strategy and ordered Sections retain relational links to the exact ResearchReport claims, conflicts, and gaps, preserve the Pilot experiment, and require explicit approval. Phase 9 performs no web access and creates no research evidence. Scripts and production packages remain outside this phase.
+Start the Worker as well as the API to process competitor, opportunity, idea-generation, pilot-generation, localization, research, outline, and Script jobs. An `OutlineApproved` VideoProject can queue Premium Script generation. The worker preserves exact Outline/Research lineage, writes ordered structured narration blocks in the project's content target language, validates block-to-Claim references, runs a separate Reasoning grounding audit, and persists only a safe version as `ScriptReady`. Any narration edit invalidates grounding and requires asynchronous revalidation before explicit approval moves the project to `ScriptApproved`. Phase 10 performs no research and generates no scenes, images, audio, or ProductionPackage.

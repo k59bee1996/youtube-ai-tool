@@ -95,3 +95,14 @@ Research is valid from `Draft`, `ResearchReady`, `ResearchFailed`, or an unappro
 - `POST` / `GET .../outlines/{outlineId}/localizations/vi` lazily creates or reads a Vietnamese reading overlay for the same Outline ID/version.
 
 Generation requires a current ResearchReport and `ResearchReady` or `OutlineReady` state. Missing/stale research, unsupported critical premise, stale approval, invalid ownership, or immutable-approved edits return business validation problems; missing or cross-project resources return `404`. Generation failure restores the prior retryable workflow state, preserves earlier Outline versions, and exposes safe Job/AiRun failure details. These routes do not perform research, create claims/evidence/sources, update WorkingTitle/ViewerPromise, or generate a Script.
+
+## Video Project Scripts
+
+- `POST /api/projects/{projectId}/video-projects/{videoProjectId}/script:generate` queues Premium generation plus Reasoning grounding and returns `202 Accepted` with `jobId`, `status`, and `existing`; one active Script workflow per VideoProject is reused.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/script/latest` returns the latest Script, active/latest job, `canGenerate`, and an actionable block reason.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/scripts` lists version history; `GET .../scripts/{scriptId}` returns ordered Sections/Blocks with Claim, Evidence, Source, and Conflict traceability.
+- `PATCH .../scripts/{scriptId}` updates narration text for identified Blocks of the latest Ready version. Every edit recalculates metrics and changes grounding to `Pending`; Claim IDs and structural identities are not accepted from the client.
+- `POST .../scripts/{scriptId}:validate` queues a Reasoning audit of current edited narration and returns `202`.
+- `POST .../scripts/{scriptId}:approve` approves only the latest Ready, current, structurally valid, grounding-passed version and transitions the VideoProject to `ScriptApproved`.
+
+Initial generation requires `OutlineApproved`; regeneration may create another immutable version while the project is `ScriptReady`. The source Approved Outline and its exact ResearchReport must still be current. Terminal generation failure restores the prior retryable state and preserves earlier Script versions. Approved Scripts are immutable. These routes never search/fetch, create or mutate Research, change WorkingTitle, or generate production scenes/assets/audio.

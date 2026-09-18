@@ -17,9 +17,12 @@ The application asks for an intelligence class; Infrastructure resolves the conf
 | Research Contradiction Analysis | Premium | Cross-source disagreement interpretation |
 | Research Synthesis | Premium | Evidence-limited report synthesis |
 | Outline Generation | Reasoning | Evidence-grounded narrative and information architecture |
+| Script Generation | Premium | Viewer-facing, long-form structured narration under the approved narrative contract |
+| Script Grounding Audit | Reasoning | Evidence-fidelity review of factual assertions, uncertainty, and conflicts |
+| Script Grounding Correction | Premium | Rewrite only against supplied Claims and structured audit findings |
 | Structured Output Repair | Fast | Mechanical JSON/schema correction without semantic changes |
 
-Scores, rankings, ID/evidence validation, duplicate detection, versions, job state, VideoProject creation, and the Pilot 4/4/4 constraint remain deterministic C# responsibilities. A semantic validation failure reruns the originating workflow profile; structural repair uses `Fast` and cannot add reasoning or alter business meaning. Future policy is: production-package generation uses `Reasoning`; scripts use `Premium`. Those future workflows are not implemented.
+Scores, rankings, ID/evidence validation, duplicate detection, versions, word/runtime metrics, job state, VideoProject creation, and the Pilot 4/4/4 constraint remain deterministic C# responsibilities. A semantic validation failure reruns the originating workflow profile; structural repair uses `Fast` and cannot add reasoning or alter business meaning. Future production-package generation is not implemented.
 
 ## Competitor analysis (`competitor-analysis:v2`)
 
@@ -74,3 +77,13 @@ The Reasoning model produces only a canonical English structured Narrative Strat
 C# validates required fields, bounded section count, contiguous sequence, Hook/PatternInterrupt/final-CTA placement, all claim/conflict/gap identities, claim ownership/support, conflict co-location, and experiment structure. C# computes the version, input fingerprint, status, duration total, and warnings. The outline worker renews its lease and lease-fences the final persistence transaction. Invalid semantic output receives a bounded Reasoning correction. Only malformed output carrying raw JSON may use `structured-output-repair:v1` on Fast, once. Each call receives an `AiRun` tied to the ResearchReport; failed calls and jobs remain observable but create no Outline version.
 
 `video-outline-localization:v1` uses the shared lazy Fast localization queue. It translates only narrative/alignment/warning and Section planning text and must preserve the canonical-content fingerprint, exact Section IDs, order, count, list indexes, and nullable-field topology. A Ready-outline edit invalidates an older overlay even if a concurrent translation finishes later. Claim/conflict/gap references, enums, status, versions, provider/model data, timestamps, URLs, metrics, and canonical production content never change. Switching `EN | VI` creates no Outline version and performs no research.
+
+## Evidence-grounded Script (`script-generation:v1`, `script-engine:v1`)
+
+Script generation is a worker workflow over the one explicitly Approved, current VideoOutline. The context contains audience, ViewerPromise, content format/language, Narrative Strategy, Pilot hypothesis/variable/control, ordered Outline Sections, and only the Claims/evidence/conflicts/gaps assigned to each Section. Unsupported Claims and cross-section/cross-report IDs cannot enter valid output. No raw pages, search results, research client, or fetch client are used.
+
+The Premium writer produces full narration as ordered Sections and Blocks, preserves Outline identity/order, references backend-issued Claim/Conflict IDs, keeps uncertainty, fulfills the approved payoff, honors the experiment, and emits no scenes, B-roll, image prompts, TTS, or SSML. C# validates required content, exact Section mapping, contiguous block order, reference ownership/support/conflict co-location, and configured limits. It calculates all word counts and runtime estimates at `Script:PlanningWordsPerMinute` (150 by default); output outside the configured ratio receives at most `MaxLengthCorrectionAttempts` Premium corrections.
+
+Every structurally valid candidate receives a separate `script-grounding-audit:v1` Reasoning call. The audit returns typed issues for unsupported facts/numbers/dates, fabricated quotes, overstatement, conflict misrepresentation, strengthened uncertainty, and claim mismatch. A failed audit receives at most `MaxGroundingCorrectionAttempts` Premium corrections and is audited again. Malformed structured output may receive one `structured-script-repair:v1` Fast mechanical repair. Only a passed candidate is persisted and advances to `ScriptReady`; each call has its own `AiRun` provenance, and the Script's generation run/provider/model identify the final call that produced its persisted narration.
+
+Any narration edit deterministically changes grounding to `Pending` and recalculates metrics in C#. `script:validate` queues the current text for a Reasoning-only grounding audit without regenerating it. Approval requires the latest Ready, non-stale Script, an Approved current Outline, exact fingerprint, valid structure, and `GroundingStatus=Passed`. The canonical Script language is `Project.Market.TargetLanguage`; the analysis-reading locale is unrelated. Phase 10 intentionally adds no Script translation overlay.

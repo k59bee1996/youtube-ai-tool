@@ -9,6 +9,7 @@ using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
+using YoutubeAiFactory.Domain.Scripts;
 using YoutubeAiFactory.Domain.Videos;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence;
@@ -50,6 +51,11 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
     public DbSet<VideoOutlineSectionClaim> VideoOutlineSectionClaims => Set<VideoOutlineSectionClaim>();
     public DbSet<VideoOutlineSectionConflict> VideoOutlineSectionConflicts => Set<VideoOutlineSectionConflict>();
     public DbSet<VideoOutlineSectionGap> VideoOutlineSectionGaps => Set<VideoOutlineSectionGap>();
+    public DbSet<VideoScript> VideoScripts => Set<VideoScript>();
+    public DbSet<VideoScriptSection> VideoScriptSections => Set<VideoScriptSection>();
+    public DbSet<VideoScriptBlock> VideoScriptBlocks => Set<VideoScriptBlock>();
+    public DbSet<VideoScriptBlockClaim> VideoScriptBlockClaims => Set<VideoScriptBlockClaim>();
+    public DbSet<VideoScriptBlockConflict> VideoScriptBlockConflicts => Set<VideoScriptBlockConflict>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
