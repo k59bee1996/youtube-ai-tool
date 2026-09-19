@@ -85,7 +85,7 @@ public sealed class VideoProject
             [VideoProjectStatus.ScriptGenerating] = [VideoProjectStatus.OutlineApproved, VideoProjectStatus.ScriptReady],
             [VideoProjectStatus.ScriptReady] = [VideoProjectStatus.ScriptGenerating, VideoProjectStatus.ScriptApproved],
             [VideoProjectStatus.ScriptApproved] = [VideoProjectStatus.Packaging],
-            [VideoProjectStatus.Packaging] = [VideoProjectStatus.ProductionReady],
+            [VideoProjectStatus.Packaging] = [VideoProjectStatus.ScriptApproved, VideoProjectStatus.ProductionReady],
             [VideoProjectStatus.ProductionReady] = [],
         };
 }

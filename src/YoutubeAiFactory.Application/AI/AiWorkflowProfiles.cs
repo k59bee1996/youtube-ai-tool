@@ -18,4 +18,7 @@ public static class AiWorkflowProfiles
     public static AiModelProfile ScriptGeneration => AiModelProfile.Premium;
     public static AiModelProfile ScriptGroundingAudit => AiModelProfile.Reasoning;
     public static AiModelProfile ScriptGroundingCorrection => AiModelProfile.Premium;
+    public static AiModelProfile ProductionPackageGeneration => AiModelProfile.Reasoning;
+    public static AiModelProfile ProductionGroundingAudit => AiModelProfile.Reasoning;
+    public static AiModelProfile ProductionPackageCorrection => AiModelProfile.Reasoning;
 }

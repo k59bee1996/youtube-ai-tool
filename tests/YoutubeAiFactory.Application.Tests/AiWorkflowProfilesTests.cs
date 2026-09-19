@@ -5,6 +5,7 @@ using YoutubeAiFactory.Application.Localization;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
+using YoutubeAiFactory.Application.Production;
 
 namespace YoutubeAiFactory.Application.Tests;
 
@@ -28,6 +29,9 @@ public sealed class AiWorkflowProfilesTests
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ScriptGeneration);
         Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ScriptGroundingAudit);
         Assert.Equal(AiModelProfile.Premium, AiWorkflowProfiles.ScriptGroundingCorrection);
+        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ProductionPackageGeneration);
+        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ProductionGroundingAudit);
+        Assert.Equal(AiModelProfile.Reasoning, AiWorkflowProfiles.ProductionPackageCorrection);
     }
 
     [Fact]
@@ -45,5 +49,7 @@ public sealed class AiWorkflowProfilesTests
             "Summary", [], [], [], [], [], [], []);
         Assert.Equal(AiWorkflowProfiles.OutlineGeneration, OutlinePrompt.Create(context).ModelProfile);
         Assert.Equal(AiWorkflowProfiles.StructuredOutputRepair, OutlinePrompt.CreateRepair("{}", "invalid").ModelProfile);
+        Assert.NotNull(ProductionPrompt.GenerationSchema());
+        Assert.NotNull(ProductionPrompt.AuditSchema());
     }
 }

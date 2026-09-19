@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddSingleton<IVideoResearchJobLeaseRenewer, VideoResearchJobLeaseRenewer>();
         services.AddSingleton<IVideoOutlineJobLeaseRenewer, VideoOutlineJobLeaseRenewer>();
         services.AddSingleton<IVideoScriptJobLeaseRenewer, VideoScriptJobLeaseRenewer>();
+        services.AddSingleton<IProductionPackageJobLeaseRenewer, ProductionPackageJobLeaseRenewer>();
         services.Configure<YouTubeOptions>(configuration.GetSection(YouTubeOptions.SectionName));
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
         services.Configure<ResearchSearchOptions>(configuration.GetSection(ResearchSearchOptions.SectionName));

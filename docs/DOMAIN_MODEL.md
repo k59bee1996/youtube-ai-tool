@@ -83,3 +83,10 @@ VideoProject
 ```
 
 The approved Script is the Phase 11 source of truth: ordered blocks, narration, content language, references, and runtime metadata are all relationally available without regenerating Script or Research.
+## Production package
+
+`ProductionPackage` is a versioned downstream artifact with exact `VideoScript`, `VideoOutline`, and `ResearchReport` IDs and versions. It records generation and grounding AiRuns, input fingerprint, provider/model provenance, content language, global visual/audio direction, deterministic duration, warnings, grounding issues, and Ready/Approved state.
+
+Every `ProductionScene` owns an ordered, non-empty, contiguous range of `VideoScriptBlock` links. The database prevents a ScriptBlock from appearing twice in one package. Narration remains owned by the approved Script; package reads and exports derive it through these links. Scenes own ordered Shots and OnScreenText. Reusable AssetRequirements are package-scoped and referenced by Shots. Separate link tables connect factual shots, assets, and on-screen text to persisted ResearchClaims.
+
+Factuality modes distinguish generic atmosphere, illustrative reconstruction, evidence-based depiction, data visualization, and text-only treatment. Acquisition modes distinguish generation/graphic creation from licensed, public-domain, captured, or existing assets. Sourced media requires rights verification, and generated visuals cannot be represented as authentic archival evidence.

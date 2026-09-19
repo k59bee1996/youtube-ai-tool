@@ -48,7 +48,7 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.HasIndex(job => new { job.VideoProjectId, job.Type })
             .HasDatabaseName("ux_jobs_active_video_project_workflow")
             .IsUnique()
-            .HasFilter("type IN ('video-research', 'outline-generation', 'script-workflow') AND status IN ('Queued', 'Running', 'Retrying')");
+            .HasFilter("type IN ('video-research', 'outline-generation', 'script-workflow', 'production-package') AND status IN ('Queued', 'Running', 'Retrying')");
         builder.HasIndex(job => new { job.ArtifactType, job.ArtifactId, job.ArtifactVersion, job.Locale })
             .HasDatabaseName("ux_jobs_active_artifact_localization")
             .IsUnique()

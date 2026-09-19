@@ -2,6 +2,7 @@ using YoutubeAiFactory.Application.Ideas;
 using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
+using YoutubeAiFactory.Application.Production;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
@@ -14,6 +15,7 @@ using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Production;
 using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Scripts;
 using YoutubeAiFactory.Domain.Videos;
@@ -221,6 +223,28 @@ public interface IYoutubeAiFactoryStore
     void AddVideoScriptBlockClaim(VideoScriptBlockClaim claim) => throw new NotSupportedException("Video Script persistence is not configured.");
     void AddVideoScriptBlockConflict(VideoScriptBlockConflict conflict) => throw new NotSupportedException("Video Script persistence is not configured.");
 
+    Task<Job?> GetActiveProductionPackageJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job?> GetLatestProductionPackageJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task<Job> EnqueueProductionPackageJobAsync(Job job, CancellationToken cancellationToken) => throw new NotSupportedException("Production package job persistence is not configured.");
+    Task<Job?> TryClaimNextProductionPackageJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => Task.FromResult<Job?>(null);
+    Task RequeueProductionPackageJobAsync(Guid jobId, CancellationToken cancellationToken) => throw new NotSupportedException("Production package job persistence is not configured.");
+    Task FailProductionPackageJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken) => throw new NotSupportedException("Production package job persistence is not configured.");
+    Task<bool> CompleteProductionPackageJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt, CancellationToken cancellationToken) => Task.FromResult(false);
+    Task<int> GetNextProductionPackageVersionAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult(1);
+    Task<ProductionPackageWithDetails?> GetLatestProductionPackageAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<ProductionPackageWithDetails?>(null);
+    Task<ProductionPackageWithDetails?> GetProductionPackageAsync(Guid projectId, Guid videoProjectId, Guid packageId, bool forUpdate, CancellationToken cancellationToken) => Task.FromResult<ProductionPackageWithDetails?>(null);
+    Task<ProductionPackageWithDetails?> GetApprovedProductionPackageAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<ProductionPackageWithDetails?>(null);
+    Task<IReadOnlyList<ProductionPackage>> ListProductionPackagesAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ProductionPackage>>([]);
+    void AddProductionPackage(ProductionPackage package) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionScene(ProductionScene scene) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionSceneScriptBlock(ProductionSceneScriptBlock link) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionShot(ProductionShot shot) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionShotClaim(ProductionShotClaim claim) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionAsset(ProductionAssetRequirement asset) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionAssetClaim(ProductionAssetClaim claim) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionOnScreenText(ProductionOnScreenText text) => throw new NotSupportedException("Production package persistence is not configured.");
+    void AddProductionOnScreenTextClaim(ProductionOnScreenTextClaim claim) => throw new NotSupportedException("Production package persistence is not configured.");
+
     Task<Job?> GetActiveCompetitorAnalysisJobAsync(
         Guid projectId, Guid competitorId, CancellationToken cancellationToken) =>
         Task.FromResult<Job?>(null);
@@ -272,4 +296,9 @@ public interface IVideoScriptJobLeaseRenewer
 {
     Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt,
         CancellationToken cancellationToken);
+}
+
+public interface IProductionPackageJobLeaseRenewer
+{
+    Task<bool> RenewAsync(Guid jobId, Guid leaseId, DateTimeOffset renewedAt, CancellationToken cancellationToken);
 }

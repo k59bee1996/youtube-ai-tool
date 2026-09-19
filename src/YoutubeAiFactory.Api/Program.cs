@@ -10,6 +10,7 @@ using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Pilots;
 using YoutubeAiFactory.Application.Projects;
+using YoutubeAiFactory.Application.Production;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
@@ -34,6 +35,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection(ArtifactLocalizat
 builder.Services.AddSingleton(builder.Configuration.GetSection(ResearchOptions.SectionName).Get<ResearchOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(OutlineOptions.SectionName).Get<OutlineOptions>() ?? new());
 builder.Services.AddSingleton(builder.Configuration.GetSection(ScriptOptions.SectionName).Get<ScriptOptions>() ?? new());
+builder.Services.AddSingleton(builder.Configuration.GetSection(ProductionOptions.SectionName).Get<ProductionOptions>() ?? new());
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
@@ -104,6 +106,17 @@ builder.Services.AddScoped<UpdateVideoScriptHandler>();
 builder.Services.AddScoped<ValidateVideoScriptHandler>();
 builder.Services.AddScoped<ApproveVideoScriptHandler>();
 builder.Services.AddScoped<VideoScriptJobProcessor>();
+builder.Services.AddScoped<ProductionContextBuilder>();
+builder.Services.AddScoped<ProductionValidator>();
+builder.Services.AddScoped<RunProductionPackageHandler>();
+builder.Services.AddScoped<GetProductionPackageStatusHandler>();
+builder.Services.AddScoped<GetProductionPackageHandler>();
+builder.Services.AddScoped<ListProductionPackagesHandler>();
+builder.Services.AddScoped<UpdateProductionPackageHandler>();
+builder.Services.AddScoped<ValidateProductionPackageHandler>();
+builder.Services.AddScoped<ApproveProductionPackageHandler>();
+builder.Services.AddScoped<ExportProductionPackageHandler>();
+builder.Services.AddScoped<ProductionPackageJobProcessor>();
 builder.Services
     .AddHealthChecks()
     .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"])
@@ -116,7 +129,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-10",
+    phase = "phase-11",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

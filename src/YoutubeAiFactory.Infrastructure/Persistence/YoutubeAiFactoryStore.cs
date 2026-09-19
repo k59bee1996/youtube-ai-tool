@@ -7,6 +7,7 @@ using YoutubeAiFactory.Application.Opportunities;
 using YoutubeAiFactory.Application.Outlines;
 using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Pilots;
+using YoutubeAiFactory.Application.Production;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Application.Scripts;
 using YoutubeAiFactory.Application.Videos;
@@ -19,6 +20,7 @@ using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
 using YoutubeAiFactory.Domain.Projects;
+using YoutubeAiFactory.Domain.Production;
 using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Scripts;
 using YoutubeAiFactory.Domain.Videos;
@@ -728,6 +730,60 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         return new(script, sections, blocks, claims, conflicts);
     }
 
+    public Task<Job?> GetActiveProductionPackageJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => FindProductionPackageJobAsync(projectId, videoProjectId, true, cancellationToken);
+    public Task<Job?> GetLatestProductionPackageJobAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => FindProductionPackageJobAsync(projectId, videoProjectId, false, cancellationToken);
+    public async Task<Job> EnqueueProductionPackageJobAsync(Job job, CancellationToken cancellationToken)
+    {
+        dbContext.Jobs.Add(job);
+        try { await dbContext.SaveChangesAsync(cancellationToken); return job; }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        { dbContext.ChangeTracker.Clear(); return await dbContext.Jobs.AsNoTracking().SingleAsync(x => x.Type == "production-package" && x.VideoProjectId == job.VideoProjectId && (x.Status == JobStatus.Queued || x.Status == JobStatus.Running || x.Status == JobStatus.Retrying), cancellationToken); }
+    }
+    public Task<Job?> TryClaimNextProductionPackageJobAsync(DateTimeOffset now, DateTimeOffset staleRunningBefore, CancellationToken cancellationToken) => TryClaimJobAsync("production-package", now, staleRunningBefore, cancellationToken, RecoverStaleProductionPackageJobAsync);
+    public Task RequeueProductionPackageJobAsync(Guid jobId, CancellationToken cancellationToken) => RequeueJobAsync(jobId, cancellationToken);
+    public async Task FailProductionPackageJobAsync(Guid jobId, Guid? aiRunId, string reason, bool retryable, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken)
+    {
+        dbContext.ChangeTracker.Clear(); var job = await dbContext.Jobs.SingleAsync(x => x.Id == jobId, cancellationToken);
+        var payload = JsonSerializer.Deserialize<ProductionJobPayload>(job.Payload, ResearchPayloadSerializerOptions) ?? throw new InvalidOperationException("Production package job payload is invalid.");
+        if (aiRunId is Guid runId) { var run = await dbContext.AiRuns.SingleOrDefaultAsync(x => x.Id == runId, cancellationToken); if (run?.Status == AiRunStatus.Running) run.Fail(reason, failedAt); }
+        var willRetry = retryable && job.RetryCount < job.MaxRetries;
+        if (!willRetry && payload.Operation == ProductionJobOperation.Generate)
+        {
+            var project = await dbContext.VideoProjects.SingleOrDefaultAsync(x => x.Id == payload.VideoProjectId && x.ProjectId == payload.ProjectId, cancellationToken);
+            if (project?.Status == VideoProjectStatus.Packaging && payload.ReturnStatus == VideoProjectStatus.ScriptApproved.ToString()) project.TransitionTo(VideoProjectStatus.ScriptApproved, failedAt);
+        }
+        if (job.Status == JobStatus.Running) job.Fail(reason, willRetry, failedAt, retryAt);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+    public async Task<bool> CompleteProductionPackageJobAsync(Guid jobId, Guid leaseId, DateTimeOffset completedAt, CancellationToken cancellationToken)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy(); return await strategy.ExecuteAsync(async () => { await using var tx = await dbContext.Database.BeginTransactionAsync(cancellationToken); var job = await dbContext.Jobs.FromSqlInterpolated($"""SELECT * FROM [yaf].[jobs] WITH (UPDLOCK, ROWLOCK) WHERE [id] = {jobId} AND [type] = 'production-package' AND [status] = 'Running' AND [lease_id] = {leaseId}""").SingleOrDefaultAsync(cancellationToken); if (job is null) return false; job.Complete(completedAt); await dbContext.SaveChangesAsync(cancellationToken); await tx.CommitAsync(cancellationToken); return true; });
+    }
+    public async Task<int> GetNextProductionPackageVersionAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => (await dbContext.ProductionPackages.Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId).Select(x => (int?)x.Version).MaxAsync(cancellationToken) ?? 0) + 1;
+    public Task<ProductionPackageWithDetails?> GetLatestProductionPackageAsync(Guid projectId, Guid videoProjectId, bool forUpdate, CancellationToken cancellationToken) { var q = dbContext.ProductionPackages.Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId).OrderByDescending(x => x.Version); return GetProductionPackageInternalAsync(forUpdate ? q : q.AsNoTracking(), forUpdate, cancellationToken); }
+    public Task<ProductionPackageWithDetails?> GetProductionPackageAsync(Guid projectId, Guid videoProjectId, Guid packageId, bool forUpdate, CancellationToken cancellationToken) { var q = dbContext.ProductionPackages.Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId && x.Id == packageId); return GetProductionPackageInternalAsync(forUpdate ? q : q.AsNoTracking(), forUpdate, cancellationToken); }
+    public Task<ProductionPackageWithDetails?> GetApprovedProductionPackageAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => GetProductionPackageInternalAsync(dbContext.ProductionPackages.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId && x.Status == ProductionPackageStatus.Approved), false, cancellationToken);
+    public async Task<IReadOnlyList<ProductionPackage>> ListProductionPackagesAsync(Guid projectId, Guid videoProjectId, CancellationToken cancellationToken) => await dbContext.ProductionPackages.AsNoTracking().Where(x => x.ProjectId == projectId && x.VideoProjectId == videoProjectId).OrderByDescending(x => x.Version).ToListAsync(cancellationToken);
+    public void AddProductionPackage(ProductionPackage package) => dbContext.ProductionPackages.Add(package);
+    public void AddProductionScene(ProductionScene scene) => dbContext.ProductionScenes.Add(scene);
+    public void AddProductionSceneScriptBlock(ProductionSceneScriptBlock link) => dbContext.ProductionSceneScriptBlocks.Add(link);
+    public void AddProductionShot(ProductionShot shot) => dbContext.ProductionShots.Add(shot);
+    public void AddProductionShotClaim(ProductionShotClaim claim) => dbContext.ProductionShotClaims.Add(claim);
+    public void AddProductionAsset(ProductionAssetRequirement asset) => dbContext.ProductionAssetRequirements.Add(asset);
+    public void AddProductionAssetClaim(ProductionAssetClaim claim) => dbContext.ProductionAssetClaims.Add(claim);
+    public void AddProductionOnScreenText(ProductionOnScreenText text) => dbContext.ProductionOnScreenTexts.Add(text);
+    public void AddProductionOnScreenTextClaim(ProductionOnScreenTextClaim claim) => dbContext.ProductionOnScreenTextClaims.Add(claim);
+    private async Task<ProductionPackageWithDetails?> GetProductionPackageInternalAsync(IQueryable<ProductionPackage> query, bool forUpdate, CancellationToken ct)
+    {
+        var package = await query.FirstOrDefaultAsync(ct); if (package is null) return null;
+        var sceneQuery = dbContext.ProductionScenes.Where(x => x.ProductionPackageId == package.Id); var scenes = await (forUpdate ? sceneQuery : sceneQuery.AsNoTracking()).OrderBy(x=>x.Sequence).ToListAsync(ct); var sceneIds=scenes.Select(x=>x.Id).ToArray();
+        var mapQuery=dbContext.ProductionSceneScriptBlocks.Where(x=>x.ProductionPackageId==package.Id); var shotQuery=dbContext.ProductionShots.Where(x=>sceneIds.Contains(x.ProductionSceneId)); var textQuery=dbContext.ProductionOnScreenTexts.Where(x=>sceneIds.Contains(x.ProductionSceneId)); var assetQuery=dbContext.ProductionAssetRequirements.Where(x=>x.ProductionPackageId==package.Id);
+        var maps=await (forUpdate?mapQuery:mapQuery.AsNoTracking()).ToListAsync(ct); var shots=await (forUpdate?shotQuery:shotQuery.AsNoTracking()).ToListAsync(ct); var texts=await (forUpdate?textQuery:textQuery.AsNoTracking()).ToListAsync(ct); var assets=await (forUpdate?assetQuery:assetQuery.AsNoTracking()).ToListAsync(ct);
+        var shotIds=shots.Select(x=>x.Id).ToArray(); var textIds=texts.Select(x=>x.Id).ToArray(); var assetIds=assets.Select(x=>x.Id).ToArray();
+        var scq=dbContext.ProductionShotClaims.Where(x=>shotIds.Contains(x.ProductionShotId)); var tcq=dbContext.ProductionOnScreenTextClaims.Where(x=>textIds.Contains(x.ProductionOnScreenTextId)); var acq=dbContext.ProductionAssetClaims.Where(x=>assetIds.Contains(x.ProductionAssetRequirementId));
+        return new(package,scenes,maps,shots,await(forUpdate?scq:scq.AsNoTracking()).ToListAsync(ct),assets,await(forUpdate?acq:acq.AsNoTracking()).ToListAsync(ct),texts,await(forUpdate?tcq:tcq.AsNoTracking()).ToListAsync(ct));
+    }
+
     private async Task RotateStaleResearchRunAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await RotateResearchRunForRetryAsync(job, "Research worker lease expired before this attempt completed.", now, cancellationToken);
@@ -761,6 +817,19 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
             .ToListAsync(cancellationToken);
         foreach (var run in staleRuns)
             run.Fail("Script worker lease expired before this attempt completed.", now);
+        job.Requeue(now);
+    }
+
+    private async Task RecoverStaleProductionPackageJobAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<ProductionJobPayload>(job.Payload, ResearchPayloadSerializerOptions)
+            ?? throw new InvalidOperationException("Production package job payload is invalid.");
+        var runs = await dbContext.AiRuns.Where(run => run.ProjectId == payload.ProjectId &&
+            run.VideoProjectId == payload.VideoProjectId && run.Status == AiRunStatus.Running &&
+            (run.Workflow == "ProductionPackageGeneration" || run.Workflow == "ProductionGroundingAudit" ||
+             run.Workflow == "ProductionPackageCorrection" || run.Workflow == "StructuredOutputRepair"))
+            .ToListAsync(cancellationToken);
+        foreach (var run in runs) run.Fail("Production package worker lease expired before this attempt completed.", now);
         job.Requeue(now);
     }
 
@@ -944,6 +1013,16 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         if (activeOnly)
             query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running ||
                 job.Status == JobStatus.Retrying);
+        return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private Task<Job?> FindProductionPackageJobAsync(Guid projectId, Guid videoProjectId, bool activeOnly,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.Jobs.AsNoTracking().Where(job => job.Type == "production-package" &&
+            job.VideoProjectId == videoProjectId && dbContext.VideoProjects.Any(videoProject =>
+                videoProject.Id == videoProjectId && videoProject.ProjectId == projectId));
+        if (activeOnly) query = query.Where(job => job.Status == JobStatus.Queued || job.Status == JobStatus.Running || job.Status == JobStatus.Retrying);
         return query.OrderByDescending(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
     }
 

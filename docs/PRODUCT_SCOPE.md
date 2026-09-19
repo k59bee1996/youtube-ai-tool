@@ -4,7 +4,7 @@
 
 YouTube AI Factory converts market and competitor evidence into structured, reusable content intelligence. V1 will guide creators from market research through ideas, pilots, research, scripts, and production packages; it will not create or upload complete videos.
 
-## Current delivery: Phase 10
+## Current delivery: Phase 11
 
 The repository provides the foundation plus the first end-to-end business slice:
 
@@ -34,4 +34,8 @@ Project update/delete, competitor deletion, background collection, production pa
 
 ## Next product milestone
 
-Phase 11 can consume the one approved `VideoScript`, its ordered Sections/Blocks, narration, content language, Claim traceability, and runtime metadata. Production packaging must not regenerate Research or Script and remains out of scope for Phase 10.
+Phase 11 consumes the one approved, current, grounding-passed `VideoScript` and creates versioned `ProductionPackage` records. Each package contains global direction, ordered scenes, deterministic duration estimates, exact ScriptBlock mapping, shots, reusable asset requirements, on-screen text, transitions, motion, music/SFX/voice direction, factuality modes, rights-review flags, and ResearchClaim traceability. Users may edit instructions, asynchronously re-audit, approve the latest version, and export stable JSON.
+
+Phase 11 deliberately stops at planning data. It does not generate images or video, synthesize speech, render timelines, create files in asset storage, automate editing software, rewrite narration, generate thumbnails, or publish to YouTube. Phase 12 observability and cost dashboards remain next-phase work.
+
+Production package fields are canonical machine/creator instructions in the project's content language. They are not reader-facing analysis overlays, so Phase 11 intentionally does not translate them or expose an EN/VI toggle. Narration is never copied into editable package storage and is derived from the approved Script when read or exported.
