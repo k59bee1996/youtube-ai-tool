@@ -19,8 +19,8 @@ using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
-using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Production;
+using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Scripts;
 using YoutubeAiFactory.Domain.Videos;
@@ -776,12 +776,12 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
     private async Task<ProductionPackageWithDetails?> GetProductionPackageInternalAsync(IQueryable<ProductionPackage> query, bool forUpdate, CancellationToken ct)
     {
         var package = await query.FirstOrDefaultAsync(ct); if (package is null) return null;
-        var sceneQuery = dbContext.ProductionScenes.Where(x => x.ProductionPackageId == package.Id); var scenes = await (forUpdate ? sceneQuery : sceneQuery.AsNoTracking()).OrderBy(x=>x.Sequence).ToListAsync(ct); var sceneIds=scenes.Select(x=>x.Id).ToArray();
-        var mapQuery=dbContext.ProductionSceneScriptBlocks.Where(x=>x.ProductionPackageId==package.Id); var shotQuery=dbContext.ProductionShots.Where(x=>sceneIds.Contains(x.ProductionSceneId)); var textQuery=dbContext.ProductionOnScreenTexts.Where(x=>sceneIds.Contains(x.ProductionSceneId)); var assetQuery=dbContext.ProductionAssetRequirements.Where(x=>x.ProductionPackageId==package.Id);
-        var maps=await (forUpdate?mapQuery:mapQuery.AsNoTracking()).ToListAsync(ct); var shots=await (forUpdate?shotQuery:shotQuery.AsNoTracking()).ToListAsync(ct); var texts=await (forUpdate?textQuery:textQuery.AsNoTracking()).ToListAsync(ct); var assets=await (forUpdate?assetQuery:assetQuery.AsNoTracking()).ToListAsync(ct);
-        var shotIds=shots.Select(x=>x.Id).ToArray(); var textIds=texts.Select(x=>x.Id).ToArray(); var assetIds=assets.Select(x=>x.Id).ToArray();
-        var scq=dbContext.ProductionShotClaims.Where(x=>shotIds.Contains(x.ProductionShotId)); var tcq=dbContext.ProductionOnScreenTextClaims.Where(x=>textIds.Contains(x.ProductionOnScreenTextId)); var acq=dbContext.ProductionAssetClaims.Where(x=>assetIds.Contains(x.ProductionAssetRequirementId));
-        return new(package,scenes,maps,shots,await(forUpdate?scq:scq.AsNoTracking()).ToListAsync(ct),assets,await(forUpdate?acq:acq.AsNoTracking()).ToListAsync(ct),texts,await(forUpdate?tcq:tcq.AsNoTracking()).ToListAsync(ct));
+        var sceneQuery = dbContext.ProductionScenes.Where(x => x.ProductionPackageId == package.Id); var scenes = await (forUpdate ? sceneQuery : sceneQuery.AsNoTracking()).OrderBy(x => x.Sequence).ToListAsync(ct); var sceneIds = scenes.Select(x => x.Id).ToArray();
+        var mapQuery = dbContext.ProductionSceneScriptBlocks.Where(x => x.ProductionPackageId == package.Id); var shotQuery = dbContext.ProductionShots.Where(x => sceneIds.Contains(x.ProductionSceneId)); var textQuery = dbContext.ProductionOnScreenTexts.Where(x => sceneIds.Contains(x.ProductionSceneId)); var assetQuery = dbContext.ProductionAssetRequirements.Where(x => x.ProductionPackageId == package.Id);
+        var maps = await (forUpdate ? mapQuery : mapQuery.AsNoTracking()).ToListAsync(ct); var shots = await (forUpdate ? shotQuery : shotQuery.AsNoTracking()).ToListAsync(ct); var texts = await (forUpdate ? textQuery : textQuery.AsNoTracking()).ToListAsync(ct); var assets = await (forUpdate ? assetQuery : assetQuery.AsNoTracking()).ToListAsync(ct);
+        var shotIds = shots.Select(x => x.Id).ToArray(); var textIds = texts.Select(x => x.Id).ToArray(); var assetIds = assets.Select(x => x.Id).ToArray();
+        var scq = dbContext.ProductionShotClaims.Where(x => shotIds.Contains(x.ProductionShotId)); var tcq = dbContext.ProductionOnScreenTextClaims.Where(x => textIds.Contains(x.ProductionOnScreenTextId)); var acq = dbContext.ProductionAssetClaims.Where(x => assetIds.Contains(x.ProductionAssetRequirementId));
+        return new(package, scenes, maps, shots, await (forUpdate ? scq : scq.AsNoTracking()).ToListAsync(ct), assets, await (forUpdate ? acq : acq.AsNoTracking()).ToListAsync(ct), texts, await (forUpdate ? tcq : tcq.AsNoTracking()).ToListAsync(ct));
     }
 
     private async Task RotateStaleResearchRunAsync(Job job, DateTimeOffset now, CancellationToken cancellationToken)
