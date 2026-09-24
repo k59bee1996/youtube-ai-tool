@@ -120,6 +120,7 @@ public sealed class ProductionPackage
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
+    public byte[] RowVersion { get; private set; } = [];
 
     public void RecordEdit(
         string visualDirection,

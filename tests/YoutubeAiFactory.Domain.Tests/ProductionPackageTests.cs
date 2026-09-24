@@ -69,6 +69,24 @@ public sealed class ProductionPackageTests
             )
         );
 
+    [Fact]
+    public void Shot_rejects_notes_that_cannot_fit_the_database_column() =>
+        Assert.Throws<DomainException>(() =>
+            new ProductionShot(
+                Guid.NewGuid(),
+                1,
+                ProductionShotType.Illustration,
+                "Supported illustration",
+                "Wide",
+                "Static",
+                10,
+                1,
+                ProductionFactualityMode.GenericAtmosphere,
+                null,
+                new string('n', 4_001)
+            )
+        );
+
     private static ProductionPackage Create() =>
         new(
             Guid.NewGuid(),

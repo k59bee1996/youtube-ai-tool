@@ -116,6 +116,8 @@ builder.Services.AddScoped<UpdateProductionPackageHandler>();
 builder.Services.AddScoped<ValidateProductionPackageHandler>();
 builder.Services.AddScoped<ApproveProductionPackageHandler>();
 builder.Services.AddScoped<ExportProductionPackageHandler>();
+builder.Services.AddScoped<RequestProductionPackageLocalizationHandler>();
+builder.Services.AddScoped<GetProductionPackageLocalizationHandler>();
 builder.Services.AddScoped<ProductionPackageJobProcessor>();
 builder.Services
     .AddHealthChecks()

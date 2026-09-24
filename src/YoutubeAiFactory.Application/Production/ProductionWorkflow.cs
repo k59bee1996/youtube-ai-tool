@@ -1025,6 +1025,7 @@ public sealed class ProductionPackageJobProcessor(
                     shot.Composition,
                     shot.MotionSuggestion,
                     processed.Timing.ShotSeconds[(s.Sequence, shot.Sequence)],
+                    shot.RelativeDurationWeight,
                     shot.FactualityMode,
                     shot.AssetKey is null ? null : assets[shot.AssetKey].Id,
                     shot.Notes

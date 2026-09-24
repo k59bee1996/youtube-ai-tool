@@ -14,6 +14,7 @@ public sealed class ProductionShot
         string composition,
         string motionSuggestion,
         int estimatedDurationSeconds,
+        decimal relativeDurationWeight,
         ProductionFactualityMode factualityMode,
         Guid? assetRequirementId,
         string notes
@@ -21,11 +22,12 @@ public sealed class ProductionShot
     {
         Id = Guid.NewGuid();
         ProductionSceneId = Guard.NotEmpty(sceneId, nameof(sceneId));
-        if (sequence < 1 || estimatedDurationSeconds < 1)
-            throw new DomainException("Shot sequence and duration must be positive.");
+        if (sequence < 1 || estimatedDurationSeconds < 1 || relativeDurationWeight is <= 0 or > 1_000)
+            throw new DomainException("Shot sequence, duration, and relative weight must be valid and positive.");
         Sequence = sequence;
         ShotType = shotType;
         EstimatedDurationSeconds = estimatedDurationSeconds;
+        RelativeDurationWeight = relativeDurationWeight;
         FactualityMode = factualityMode;
         AssetRequirementId = assetRequirementId;
         Update(visualDescription, composition, motionSuggestion, notes);
@@ -39,6 +41,7 @@ public sealed class ProductionShot
     public string Composition { get; private set; } = string.Empty;
     public string MotionSuggestion { get; private set; } = string.Empty;
     public int EstimatedDurationSeconds { get; private set; }
+    public decimal RelativeDurationWeight { get; private set; }
     public ProductionFactualityMode FactualityMode { get; private set; }
     public Guid? AssetRequirementId { get; private set; }
     public string Notes { get; private set; } = string.Empty;
@@ -48,7 +51,9 @@ public sealed class ProductionShot
         VisualDescription = Guard.Required(visual, nameof(visual), 4_000);
         Composition = Guard.Required(composition, nameof(composition), 2_000);
         MotionSuggestion = Guard.Required(motion, nameof(motion), 2_000);
-        Notes = string.IsNullOrWhiteSpace(notes) ? string.Empty : notes.Trim();
+        Notes = string.IsNullOrWhiteSpace(notes)
+            ? string.Empty
+            : Guard.Required(notes, nameof(notes), 4_000);
     }
 }
 

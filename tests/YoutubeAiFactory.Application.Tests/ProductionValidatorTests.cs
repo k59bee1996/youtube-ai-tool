@@ -91,6 +91,50 @@ public sealed class ProductionValidatorTests
         );
     }
 
+    [Fact]
+    public void Rejects_shot_weight_above_supported_range()
+    {
+        var (context, result) = Fixture();
+        var scene = result.Scenes[0];
+        var changed = result with
+        {
+            Scenes =
+            [
+                scene with
+                {
+                    Shots = [scene.Shots[0] with { RelativeDurationWeight = 1_001 }],
+                },
+                result.Scenes[1],
+            ],
+        };
+
+        Assert.Throws<StructuredOutputException>(() =>
+            new ProductionValidator(new()).ValidateGenerated(changed, context)
+        );
+    }
+
+    [Fact]
+    public void Rejects_shot_notes_longer_than_persistence_contract()
+    {
+        var (context, result) = Fixture();
+        var scene = result.Scenes[0];
+        var changed = result with
+        {
+            Scenes =
+            [
+                scene with
+                {
+                    Shots = [scene.Shots[0] with { Notes = new string('n', 4_001) }],
+                },
+                result.Scenes[1],
+            ],
+        };
+
+        Assert.Throws<StructuredOutputException>(() =>
+            new ProductionValidator(new()).ValidateGenerated(changed, context)
+        );
+    }
+
     private static (ProductionGenerationContext, ProductionPackageResult) Fixture()
     {
         var claim = Guid.NewGuid();

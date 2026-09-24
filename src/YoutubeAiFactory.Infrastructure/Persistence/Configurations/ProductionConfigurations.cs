@@ -72,6 +72,7 @@ internal sealed class ProductionPackageConfiguration : IEntityTypeConfiguration<
         Col(b, x => x.CreatedAt, "created_at");
         Col(b, x => x.UpdatedAt, "updated_at");
         Col(b, x => x.ApprovedAt, "approved_at");
+        b.Property(x => x.RowVersion).HasColumnName("row_version").IsRowVersion();
         b.HasOne<Project>()
             .WithMany()
             .HasForeignKey(x => x.ProjectId)
@@ -273,6 +274,9 @@ internal sealed class ProductionShotConfiguration : IEntityTypeConfiguration<Pro
         b.Property(x => x.Composition).HasColumnName("composition").HasMaxLength(2000);
         b.Property(x => x.MotionSuggestion).HasColumnName("motion_suggestion").HasMaxLength(2000);
         b.Property(x => x.EstimatedDurationSeconds).HasColumnName("estimated_duration_seconds");
+        b.Property(x => x.RelativeDurationWeight)
+            .HasColumnName("relative_duration_weight")
+            .HasPrecision(10, 4);
         b.Property(x => x.FactualityMode)
             .HasColumnName("factuality_mode")
             .HasConversion<string>()

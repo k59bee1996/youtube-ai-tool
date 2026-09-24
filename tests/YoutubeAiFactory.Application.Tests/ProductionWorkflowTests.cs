@@ -57,6 +57,11 @@ public sealed class ProductionWorkflowTests
                 )
                 .Select(x => x.ScriptBlockId)
         );
+        var firstSceneShots = details
+            .Shots.Where(x => x.ProductionSceneId == details.Scenes.Single(x => x.Sequence == 1).Id)
+            .OrderBy(x => x.Sequence)
+            .ToArray();
+        Assert.Equal([1m, 4m], firstSceneShots.Select(x => x.RelativeDurationWeight));
         Assert.All(
             provider.Requests,
             request => Assert.Equal(AiModelProfile.Reasoning, request.ModelProfile)
@@ -668,6 +673,20 @@ public sealed class ProductionWorkflowTests
                     []
                 ))
                 .ToArray();
+            var firstShot = scenes[0].Shots[0];
+            scenes[0] = scenes[0] with
+            {
+                Shots =
+                [
+                    firstShot,
+                    firstShot with
+                    {
+                        Sequence = 2,
+                        VisualDescription = "Show a supporting detail from the same evidence.",
+                        RelativeDurationWeight = 4,
+                    },
+                ],
+            };
             return new(
                 "Evidence-safe documentary illustration",
                 "Measured",

@@ -41,10 +41,22 @@ public sealed class Phase11MigrationTests
                     """
                 )
                 .SingleAsync();
+            var concurrencyAndWeightColumns = await context
+                .Database.SqlQueryRaw<int>(
+                    """
+                    SELECT COUNT(*) AS [Value] FROM sys.columns AS c
+                    INNER JOIN sys.tables AS t ON t.object_id = c.object_id
+                    WHERE SCHEMA_NAME(t.schema_id) = 'yaf'
+                      AND ((t.name = 'production_packages' AND c.name = 'row_version')
+                        OR (t.name = 'production_shots' AND c.name = 'relative_duration_weight'))
+                    """
+                )
+                .SingleAsync();
 
             Assert.Equal(9, tables);
             Assert.Equal(1, mappingIndex);
             Assert.Equal(1, jobFence);
+            Assert.Equal(2, concurrencyAndWeightColumns);
         }
         finally
         {

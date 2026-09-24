@@ -280,7 +280,7 @@ internal static class ProductionDtoMapper
                         x.VisualDescription,
                         x.Composition,
                         x.MotionSuggestion,
-                        x.EstimatedDurationSeconds,
+                        x.RelativeDurationWeight,
                         x.FactualityMode,
                         x.AssetRequirementId is Guid id && assetsById.TryGetValue(id, out var a)
                             ? a.AssetKey

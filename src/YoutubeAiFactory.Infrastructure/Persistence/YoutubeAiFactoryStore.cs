@@ -943,7 +943,7 @@ internal sealed class YoutubeAiFactoryStore(YoutubeAiFactoryDbContext dbContext)
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new ResourceConflictException("The pilot was changed by another request. Refresh it and try again.");
+            throw new ResourceConflictException("The resource was changed by another request. Refresh it and try again.");
         }
         catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {

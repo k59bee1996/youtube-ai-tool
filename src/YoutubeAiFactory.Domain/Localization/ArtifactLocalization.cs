@@ -46,4 +46,5 @@ public static class LocalizableArtifactTypes
     public const string OpportunityReport = "opportunity-report";
     public const string ResearchReport = "research-report";
     public const string VideoOutline = "video-outline";
+    public const string ProductionPackage = "production-package";
 }

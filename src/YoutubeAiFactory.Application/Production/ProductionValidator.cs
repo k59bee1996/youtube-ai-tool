@@ -115,8 +115,8 @@ public sealed class ProductionValidator(ProductionOptions options)
             var seconds = sceneSeconds[scene.Sequence - 1];
             sceneTiming[scene.Sequence] = seconds;
             var weights = scene.Shots.Select(x => x.RelativeDurationWeight).ToArray();
-            if (weights.Any(x => x <= 0))
-                throw Invalid("Shot duration weights must be positive.");
+            if (weights.Any(x => x is <= 0 or > 1_000))
+                throw Invalid("Shot duration weights must be positive and no greater than 1000.");
             var allocatedShots = Allocate(
                 seconds,
                 weights.Select(x => (int)Math.Max(1, decimal.Round(x * 100))).ToArray()
@@ -127,6 +127,7 @@ public sealed class ProductionValidator(ProductionOptions options)
                 Required(shot.VisualDescription, "shot visual description", 4_000);
                 Required(shot.Composition, "shot composition", 2_000);
                 Required(shot.MotionSuggestion, "shot motion", 2_000);
+                Optional(shot.Notes, "shot notes", 4_000);
                 if (shot.AssetKey is not null && !assets.ContainsKey(shot.AssetKey))
                     throw Invalid("A shot references an unknown asset key.");
                 if (shot.AssetKey is not null)
@@ -290,6 +291,12 @@ public sealed class ProductionValidator(ProductionOptions options)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > max)
             throw Invalid($"Production {name} is required and must be at most {max} characters.");
+    }
+
+    private static void Optional(string? value, string name, int max)
+    {
+        if (value is not null && value.Length > max)
+            throw Invalid($"Production {name} must be at most {max} characters.");
     }
 
     private static int[] Allocate(int total, int[] weights)
