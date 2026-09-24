@@ -20,7 +20,8 @@ public sealed class ArtifactLocalizationOptions
 }
 
 public sealed record ArtifactLocalizationJobPayload(Guid ProjectId, Guid AnalysisId, int ArtifactVersion, string Locale,
-    Guid? OpportunityReportId = null, Guid? ResearchReportId = null, Guid? VideoOutlineId = null);
+    Guid? OpportunityReportId = null, Guid? ResearchReportId = null, Guid? VideoOutlineId = null,
+    Guid? ProductionPackageId = null);
 public sealed record ArtifactLocalizationStatusDto(LocalizedCompetitorAnalysisContent? Content, AnalysisJobDto? ActiveJob, AnalysisJobDto? LatestJob);
 public sealed record RequestArtifactLocalizationResult(Guid? JobId, string Status, bool Existing);
 
@@ -98,6 +99,11 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             if (job.ArtifactType == LocalizableArtifactTypes.VideoOutline)
             {
                 await ProcessVideoOutlineAsync(job, payload, cancellationToken);
+                return true;
+            }
+            if (job.ArtifactType == LocalizableArtifactTypes.ProductionPackage)
+            {
+                await ProcessProductionPackageAsync(job, payload, cancellationToken);
                 return true;
             }
             if (job.ArtifactType != LocalizableArtifactTypes.CompetitorAnalysis)
@@ -366,6 +372,91 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
                 exception is YoutubeAiFactoryException ? exception.Message : "Video outline translation could not be completed. Try again later.",
                 retryable, failedAt, retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null,
+                CancellationToken.None);
+            LogFailed(logger, job.Id, exception);
+        }
+    }
+
+    private async Task ProcessProductionPackageAsync(Job job, ArtifactLocalizationJobPayload payload,
+        CancellationToken cancellationToken)
+    {
+        AiRun? run = null;
+        try
+        {
+            if (payload.ProductionPackageId is not Guid packageId || packageId == Guid.Empty ||
+                job.VideoProjectId is not Guid videoProjectId)
+                throw new ApplicationValidationException("Production package localization job payload is invalid.");
+            var package = await store.GetProductionPackageAsync(payload.ProjectId, videoProjectId, packageId, false,
+                cancellationToken) ?? throw new ResourceNotFoundException(
+                "Production package for this localization job was not found.");
+            if (package.Package.Version != payload.ArtifactVersion)
+                throw new ApplicationValidationException("The requested production package version is unavailable.");
+            var cached = await store.GetArtifactLocalizationAsync(LocalizableArtifactTypes.ProductionPackage,
+                packageId, package.Package.Version, payload.Locale, cancellationToken);
+            if (cached is not null && LocalizedProductionPackageCache.IsValid(package, cached))
+            {
+                job.Complete(timeProvider.GetUtcNow());
+                await store.SaveChangesAsync(cancellationToken);
+                return;
+            }
+            if (cached is not null) await store.DeleteArtifactLocalizationAsync(cached.Id, cancellationToken);
+            var resolved = modelResolver.Resolve(ProductionPackageLocalizationPrompt.ModelProfile);
+            run = new AiRun("ArtifactLocalization", payload.ProjectId, resolved.Provider, resolved.Model,
+                ProductionPackageLocalizationPrompt.Key, ProductionPackageLocalizationPrompt.Version,
+                timeProvider.GetUtcNow(), resolved.Profile.ToString(), videoProjectId,
+                researchReportId: package.Package.ResearchReportId);
+            store.AddAiRun(run);
+            await store.SaveChangesAsync(cancellationToken);
+            LlmResult<LocalizedProductionPackageContent>? answer = null;
+            Exception? failure = null;
+            for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
+            {
+                try
+                {
+                    answer = await provider.GenerateStructuredAsync<LocalizedProductionPackageContent>(
+                        ProductionPackageLocalizationPrompt.Create(package, attempt > 0).WithResolvedModel(resolved),
+                        cancellationToken);
+                    LocalizedProductionPackageValidator.Validate(package, answer.Value);
+                    break;
+                }
+                catch (StructuredOutputException exception)
+                {
+                    answer = null;
+                    failure = exception;
+                    if (attempt >= options.MaxStructuredOutputRetries) break;
+                    run.RecordRetry();
+                    await store.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                    break;
+                }
+            }
+            if (answer is null)
+                throw failure ?? new StructuredOutputException(
+                    "The provider did not return localized production content.");
+            run.RecordProvider(answer.Provider, answer.Model);
+            store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.ProductionPackage,
+                packageId, package.Package.Version, payload.Locale,
+                JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions),
+                run.Id, ProductionPackageLocalizationPrompt.Key, ProductionPackageLocalizationPrompt.Version,
+                answer.Provider, answer.Model, timeProvider.GetUtcNow()));
+            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            job.Complete(timeProvider.GetUtcNow());
+            await store.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            var failedAt = timeProvider.GetUtcNow();
+            var retryable = exception is ExternalServiceException
+            { Failure: ExternalServiceFailure.QuotaExceeded or ExternalServiceFailure.Transient };
+            await store.FailArtifactLocalizationJobAsync(job.Id, run?.Id,
+                exception is YoutubeAiFactoryException ? exception.Message :
+                    "Production package translation could not be completed. Try again later.",
+                retryable, failedAt,
+                retryable ? failedAt.AddSeconds(Math.Pow(2, job.RetryCount + 1) * 5) : null,
                 CancellationToken.None);
             LogFailed(logger, job.Id, exception);
         }

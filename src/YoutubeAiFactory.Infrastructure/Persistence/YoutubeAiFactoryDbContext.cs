@@ -7,6 +7,7 @@ using YoutubeAiFactory.Domain.Localization;
 using YoutubeAiFactory.Domain.Opportunities;
 using YoutubeAiFactory.Domain.Outlines;
 using YoutubeAiFactory.Domain.Pilots;
+using YoutubeAiFactory.Domain.Production;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Scripts;
@@ -56,6 +57,15 @@ public sealed class YoutubeAiFactoryDbContext(DbContextOptions<YoutubeAiFactoryD
     public DbSet<VideoScriptBlock> VideoScriptBlocks => Set<VideoScriptBlock>();
     public DbSet<VideoScriptBlockClaim> VideoScriptBlockClaims => Set<VideoScriptBlockClaim>();
     public DbSet<VideoScriptBlockConflict> VideoScriptBlockConflicts => Set<VideoScriptBlockConflict>();
+    public DbSet<ProductionPackage> ProductionPackages => Set<ProductionPackage>();
+    public DbSet<ProductionScene> ProductionScenes => Set<ProductionScene>();
+    public DbSet<ProductionSceneScriptBlock> ProductionSceneScriptBlocks => Set<ProductionSceneScriptBlock>();
+    public DbSet<ProductionShot> ProductionShots => Set<ProductionShot>();
+    public DbSet<ProductionShotClaim> ProductionShotClaims => Set<ProductionShotClaim>();
+    public DbSet<ProductionAssetRequirement> ProductionAssetRequirements => Set<ProductionAssetRequirement>();
+    public DbSet<ProductionAssetClaim> ProductionAssetClaims => Set<ProductionAssetClaim>();
+    public DbSet<ProductionOnScreenText> ProductionOnScreenTexts => Set<ProductionOnScreenText>();
+    public DbSet<ProductionOnScreenTextClaim> ProductionOnScreenTextClaims => Set<ProductionOnScreenTextClaim>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

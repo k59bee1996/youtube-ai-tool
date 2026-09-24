@@ -4,7 +4,7 @@
 
 YouTube AI Factory converts market and competitor evidence into structured, reusable content intelligence. V1 will guide creators from market research through ideas, pilots, research, scripts, and production packages; it will not create or upload complete videos.
 
-## Current delivery: Phase 10
+## Current delivery: Phase 11
 
 The repository provides the foundation plus the first end-to-end business slice:
 
@@ -27,11 +27,16 @@ An approved PilotVideo can now be explicitly started as one idempotent Draft Vid
 - an Outline workspace that exposes version history, evidence inspection, conflict/gap warnings, Pilot alignment, immutable approval, staleness, and a lazy Vietnamese reading overlay that never changes canonical IDs, references, order, or workflow state.
 - a bounded, worker-backed Script Engine that requires the explicitly approved current Outline, sends only each Section's assigned claims/evidence/conflicts/gaps, uses Premium generation plus a separate Reasoning grounding audit, and persists ordered Script Sections/Blocks with exact Outline and ResearchReport lineage.
 - a Script workspace with immutable generation history, narration reading, Claim/Evidence/Source inspection, structured grounding issues, deterministic word/runtime metadata, block editing, grounding invalidation/revalidation, and explicit immutable approval.
+- a Production workspace that turns the current approved Script into versioned scenes, shots, reusable asset requirements, on-screen text, exact timing, evidence links, editable instructions, audit-only revalidation, approval, stable JSON export, and a lazy Vietnamese reading aid for explanatory fields only.
 
 ## Explicitly deferred
 
-Project update/delete, competitor deletion, background collection, production packages, authentication, and alternate LLM providers remain future phases. Full video generation, uploads, billing, teams, microservices, and distributed infrastructure remain outside V1.
+Project update/delete, competitor deletion, background collection, authentication, and alternate LLM providers remain future phases. Full video generation, uploads, billing, teams, microservices, and distributed infrastructure remain outside V1.
 
 ## Next product milestone
 
-Phase 11 can consume the one approved `VideoScript`, its ordered Sections/Blocks, narration, content language, Claim traceability, and runtime metadata. Production packaging must not regenerate Research or Script and remains out of scope for Phase 10.
+Phase 11 consumes the one approved, current, grounding-passed `VideoScript` and creates versioned `ProductionPackage` records. Each package contains global direction, ordered scenes, deterministic duration estimates, exact ScriptBlock mapping, shots, reusable asset requirements, on-screen text, transitions, motion, music/SFX/voice direction, factuality modes, rights-review flags, and ResearchClaim traceability. Users may edit instructions, asynchronously re-audit, approve the latest version, and export stable JSON.
+
+Phase 11 deliberately stops at planning data. It does not generate images or video, synthesize speech, render timelines, create files in asset storage, automate editing software, rewrite narration, generate thumbnails, or publish to YouTube. Phase 12 observability and cost dashboards remain next-phase work.
+
+Production instructions remain canonical in the project's content language. The Phase 11 `EN | VI` toggle translates only selected reader-facing explanations—warnings, grounding explanations, scene summaries/visual strategies, shot visual descriptions, and asset creative/source-search briefs—into a persisted overlay. Narration, generation prompts, on-screen copy, composition/motion instructions, IDs, claims, timings, classifications, lineage, and export remain canonical. Narration is never copied into editable package storage and is derived from the approved Script when read or exported.

@@ -106,3 +106,17 @@ Generation requires a current ResearchReport and `ResearchReady` or `OutlineRead
 - `POST .../scripts/{scriptId}:approve` approves only the latest Ready, current, structurally valid, grounding-passed version and transitions the VideoProject to `ScriptApproved`.
 
 Initial generation requires `OutlineApproved`; regeneration may create another immutable version while the project is `ScriptReady`. The source Approved Outline and its exact ResearchReport must still be current. Terminal generation failure restores the prior retryable state and preserves earlier Script versions. Approved Scripts are immutable. These routes never search/fetch, create or mutate Research, change WorkingTitle, or generate production scenes/assets/audio.
+
+## Phase 11 production package
+
+- `POST /api/projects/{projectId}/video-projects/{videoProjectId}/production-package:generate` returns `202` with an idempotent job identity. Allowed for a current approved Script while `ScriptApproved` or for regeneration while `Packaging`.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/production-package/latest` returns latest package, active/latest job, and generation eligibility.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/production-packages` lists immutable version history.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/production-packages/{packageId}` returns one project-scoped version with narration derived from ScriptBlock mappings and Claim source locators.
+- `PATCH /api/projects/{projectId}/video-projects/{videoProjectId}/production-packages/{packageId}` edits only creator-facing instruction text on the latest Ready version and changes grounding to Pending. Mapping, lineage, claims, timing, classifications, and approved packages are immutable.
+- `POST /api/projects/{projectId}/video-projects/{videoProjectId}/production-packages/{packageId}:validate` returns `202` and queues audit-only revalidation.
+- `POST /api/projects/{projectId}/video-projects/{videoProjectId}/production-packages/{packageId}:approve` approves only the latest, current, Passed version and atomically moves the VideoProject to `ProductionReady`.
+- `POST` / `GET /api/projects/{projectId}/video-projects/{videoProjectId}/production-packages/{packageId}/localizations/vi` lazily creates or reads a persisted Vietnamese overlay for selected reader-facing explanations. Canonical narration, prompts, production instructions, identities, timing, and export data are unchanged.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/production-package:export` returns approved-only JSON with `schemaVersion: production-package-export:v1`.
+
+All routes verify the parent Project/VideoProject scope. Generation, validation, and localization are asynchronous. Failed generation creates no package version. Existing versions remain readable after failed regeneration. Package rows use optimistic concurrency, so racing edit/approve requests return `409` rather than approving stale audited content.

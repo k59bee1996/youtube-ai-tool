@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    partial class YoutubeAiFactoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260918224909_AddProductionPackages")]
+    partial class AddProductionPackages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1895,13 +1898,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("int")
                         .HasColumnName("research_report_version");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion")
-                        .HasColumnName("row_version");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -2134,11 +2130,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ProductionSceneId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("production_scene_id");
-
-                    b.Property<decimal>("RelativeDurationWeight")
-                        .HasPrecision(10, 4)
-                        .HasColumnType("decimal(10,4)")
-                        .HasColumnName("relative_duration_weight");
 
                     b.Property<int>("Sequence")
                         .HasColumnType("int")

@@ -117,6 +117,18 @@ public sealed class VideoProjectTests
         Assert.Equal(VideoProjectStatus.Packaging, project.Status);
     }
 
+    [Fact]
+    public void Packaging_can_roll_back_after_initial_failure_or_complete_after_approval()
+    {
+        var project = Create(); var now = DateTimeOffset.UtcNow; MoveToResearchReady(project, now);
+        project.TransitionTo(VideoProjectStatus.OutlineGenerating, now); project.TransitionTo(VideoProjectStatus.OutlineReady, now);
+        project.TransitionTo(VideoProjectStatus.OutlineApproved, now); project.TransitionTo(VideoProjectStatus.ScriptGenerating, now);
+        project.TransitionTo(VideoProjectStatus.ScriptReady, now); project.TransitionTo(VideoProjectStatus.ScriptApproved, now);
+        project.TransitionTo(VideoProjectStatus.Packaging, now); project.TransitionTo(VideoProjectStatus.ScriptApproved, now);
+        project.TransitionTo(VideoProjectStatus.Packaging, now); project.TransitionTo(VideoProjectStatus.ProductionReady, now);
+        Assert.Equal(VideoProjectStatus.ProductionReady, project.Status);
+    }
+
     private static void MoveToResearchReady(VideoProject project, DateTimeOffset now)
     {
         project.TransitionTo(VideoProjectStatus.ResearchQueued, now);
