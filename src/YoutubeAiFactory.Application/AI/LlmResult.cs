@@ -6,4 +6,11 @@ public sealed record LlmResult<T>(
     string Model,
     int? InputTokens,
     int? OutputTokens,
-    string? RawOutput);
+    string? RawOutput,
+    int? CachedInputTokens = null,
+    int? ReasoningTokens = null,
+    decimal? ProviderReportedCost = null,
+    decimal? CalculatedEstimatedCost = null,
+    string? Currency = null,
+    string? PricingVersion = null,
+    DateTimeOffset? PricingEffectiveFrom = null);

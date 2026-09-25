@@ -86,7 +86,7 @@ public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store
             var analyses = await store.GetCurrentCompetitorAnalysesForProjectAsync(project.Id, cancellationToken);
             var context = contextBuilder.Build(project, analyses);
             var resolvedModel = modelResolver.Resolve(OpportunityAnalysisPrompt.ModelProfile);
-            run = new AiRun("OpportunityAnalysis", project.Id, resolvedModel.Provider, resolvedModel.Model, OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, now, resolvedModel.Profile.ToString());
+            run = new AiRun("OpportunityAnalysis", project.Id, resolvedModel.Provider, resolvedModel.Model, OpportunityAnalysisPrompt.Key, OpportunityAnalysisPrompt.Version, now, resolvedModel.Profile.ToString(), jobId: job.Id, workflowStage: "Generation");
             store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
             LlmResult<OpportunityAnalysisResult>? answer = null; Exception? failure = null; string? repairDiagnostic = null;
             for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
@@ -117,7 +117,7 @@ public sealed class OpportunityAnalysisJobProcessor(IYoutubeAiFactoryStore store
                     store.AddOpportunityEvidence(new OpportunityEvidence(candidate.Id, evidence.CompetitorId, evidence.CompetitorAnalysisId, evidence.VideoId, evidence.Id, evidence.Summary));
                 }
             }
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow()); job.Complete(timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow()); job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
             LogCompleted(logger, project.Id, report.Id, null);
         }

@@ -595,7 +595,7 @@ public sealed class ProductionPackageJobProcessor(
                     throw new ApplicationValidationException(
                         "Production package generation state is no longer runnable."
                     );
-                var generated = await GenerateAsync(context, execution.Token);
+                var generated = await GenerateAsync(context, job.Id, execution.Token);
                 last = generated.GroundingRun;
                 await PersistAsync(payload, context, generated, execution.Token);
             }
@@ -614,7 +614,7 @@ public sealed class ProductionPackageJobProcessor(
                     ?? throw new ResourceNotFoundException("Production package no longer exists.");
                 var result = ProductionDtoMapper.ToResult(package);
                 ProductionPersistenceValidator.Validate(package, context, validator);
-                var audit = await AuditAsync(context, result, execution.Token);
+                var audit = await AuditAsync(context, job.Id, result, execution.Token);
                 last = audit.Run;
                 package.Package.RecordGroundingResult(
                     audit.Result.Status,
@@ -688,24 +688,25 @@ public sealed class ProductionPackageJobProcessor(
 
     private async Task<Processed> GenerateAsync(
         ProductionGenerationContext context,
+        Guid jobId,
         CancellationToken ct
     )
     {
-        var generated = await GenerateCandidateAsync(context, ct);
+        var generated = await GenerateCandidateAsync(context, jobId, ct);
         var result = generated.Result;
         var timing = validator.ValidateGenerated(result, context);
-        var audit = await AuditAsync(context, result, ct);
+        var audit = await AuditAsync(context, jobId, result, ct);
         var corrections = 0;
         while (
             audit.Result.Status == ProductionGroundingStatus.Failed
             && corrections < options.MaxGroundingCorrectionAttempts
         )
         {
-            var corrected = await CorrectAsync(context, result, audit.Result.Issues, ct);
+            var corrected = await CorrectAsync(context, jobId, result, audit.Result.Issues, ct);
             result = corrected.Result;
             generated = corrected;
             timing = validator.ValidateGenerated(result, context);
-            audit = await AuditAsync(context, result, ct);
+            audit = await AuditAsync(context, jobId, result, ct);
             corrections++;
         }
         if (audit.Result.Status != ProductionGroundingStatus.Passed)
@@ -725,6 +726,7 @@ public sealed class ProductionPackageJobProcessor(
 
     private async Task<Generated> GenerateCandidateAsync(
         ProductionGenerationContext context,
+        Guid jobId,
         CancellationToken ct
     )
     {
@@ -732,6 +734,7 @@ public sealed class ProductionPackageJobProcessor(
         var run = Start(
             "ProductionPackageGeneration",
             context,
+            jobId,
             resolved,
             ProductionPrompt.GenerationKey,
             ProductionPrompt.GenerationVersion
@@ -762,7 +765,7 @@ public sealed class ProductionPackageJobProcessor(
                     when (ex.RawOutput is not null && repairs < options.MaxStructuredRepairAttempts)
                 {
                     repairs++;
-                    var repaired = await RepairAsync(context, ex.RawOutput, ex.Message, ct);
+                    var repaired = await RepairAsync(context, jobId, ex.RawOutput, ex.Message, ct);
                     run.Complete(null, null, null, timeProvider.GetUtcNow());
                     return repaired;
                 }
@@ -789,6 +792,7 @@ public sealed class ProductionPackageJobProcessor(
 
     private async Task<Generated> CorrectAsync(
         ProductionGenerationContext context,
+        Guid jobId,
         ProductionPackageResult package,
         IReadOnlyList<ProductionGroundingIssueResult> issues,
         CancellationToken ct
@@ -798,6 +802,7 @@ public sealed class ProductionPackageJobProcessor(
         var run = Start(
             "ProductionPackageCorrection",
             context,
+            jobId,
             m,
             ProductionPrompt.CorrectionKey,
             ProductionPrompt.CorrectionVersion
@@ -823,6 +828,7 @@ public sealed class ProductionPackageJobProcessor(
 
     private async Task<Audited> AuditAsync(
         ProductionGenerationContext context,
+        Guid jobId,
         ProductionPackageResult package,
         CancellationToken ct
     )
@@ -831,6 +837,7 @@ public sealed class ProductionPackageJobProcessor(
         var run = Start(
             "ProductionGroundingAudit",
             context,
+            jobId,
             m,
             ProductionPrompt.AuditKey,
             ProductionPrompt.AuditVersion
@@ -856,6 +863,7 @@ public sealed class ProductionPackageJobProcessor(
 
     private async Task<Generated> RepairAsync(
         ProductionGenerationContext context,
+        Guid jobId,
         string raw,
         string diagnostic,
         CancellationToken ct
@@ -865,6 +873,7 @@ public sealed class ProductionPackageJobProcessor(
         var run = Start(
             "StructuredOutputRepair",
             context,
+            jobId,
             m,
             ProductionPrompt.RepairKey,
             ProductionPrompt.RepairVersion
@@ -891,6 +900,7 @@ public sealed class ProductionPackageJobProcessor(
     private AiRun Start(
         string workflow,
         ProductionGenerationContext c,
+        Guid jobId,
         ResolvedAiModel m,
         string key,
         int version
@@ -906,7 +916,9 @@ public sealed class ProductionPackageJobProcessor(
             timeProvider.GetUtcNow(),
             m.Profile.ToString(),
             c.VideoProjectId,
-            researchReportId: c.ResearchReportId
+            researchReportId: c.ResearchReportId,
+            jobId: jobId,
+            workflowStage: workflow
         );
         store.AddAiRun(run);
         return run;
@@ -915,7 +927,7 @@ public sealed class ProductionPackageJobProcessor(
     private void Complete<T>(AiRun run, LlmResult<T> result)
     {
         run.RecordProvider(result.Provider, result.Model);
-        run.Complete(result.InputTokens, result.OutputTokens, null, timeProvider.GetUtcNow());
+        run.CompleteFrom(result, timeProvider.GetUtcNow());
     }
 
     private async Task FailRun(AiRun run, Exception ex, string fallback)

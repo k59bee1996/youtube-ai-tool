@@ -78,6 +78,8 @@ For Phase 3–6 analysis, Phase 8 research, and Phase 9 outline generation, run 
 
 `AI:Models:Fast`, `AI:Models:Reasoning`, and `AI:Models:Premium` each require `Provider`, `Model`, `TimeoutSeconds`, and `MaxOutputTokens`. Environment variables such as `AI__Models__Premium__Model` may map profiles differently by environment, or intentionally map all profiles to one local-development model. Missing profiles fail clearly; routing never silently downgrades a Premium workload.
 
+Phase 12 cost estimates are opt-in. Configure verified, effective-dated prices only when desired; do not put provider credentials or unverified prices in tracked files. An environment-specific configuration can provide `AI:Pricing:0:Provider`, `Model`, `Currency`, `InputPricePerMillionTokens`, `OutputPricePerMillionTokens`, `CachedInputPricePerMillionTokens`, `EffectiveFrom`, and `PriceVersion`. Without a matching price entry, token usage remains recorded but monetary cost is `Unavailable`. Historical AiRuns retain the pricing version used at execution time.
+
 `Script` configuration bounds generation/repair retries, independent length and grounding correction attempts, block/narration size, WPM, fallback target duration, length ratios, and the worker lease. Defaults use 150 WPM and a 0.8-1.2 target-word tolerance.
 
 ## Validate

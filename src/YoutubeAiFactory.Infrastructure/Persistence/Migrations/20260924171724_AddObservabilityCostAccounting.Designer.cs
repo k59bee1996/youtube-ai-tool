@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using YoutubeAiFactory.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using YoutubeAiFactory.Infrastructure.Persistence;
 namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(YoutubeAiFactoryDbContext))]
-    partial class YoutubeAiFactoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924171724_AddObservabilityCostAccounting")]
+    partial class AddObservabilityCostAccounting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -729,10 +732,6 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("ExecutionStartedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("execution_started_at");
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)

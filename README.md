@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 11 converts one explicitly approved, evidence-grounded Script into a versioned production package of scenes, shots, reusable asset requirements, on-screen text, motion, transitions, and audio direction. It validates complete ScriptBlock coverage, audits visual factuality, and exports only an explicitly approved package.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 12 adds read-only operational observability and cost accounting over the Phase 0–11 workflows: production pipeline state, durable Job history, AiRun usage, known/estimated cost, unknown-cost coverage, and workflow health. It does not generate media, publish videos, or implement billing.
 
 ## Repository layout
 

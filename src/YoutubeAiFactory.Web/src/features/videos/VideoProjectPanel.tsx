@@ -1,12 +1,12 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
-import { api, type ResearchJob, type ResearchLocalizationStatus, type ResearchReport, type ResearchStatus, type VideoProject, type VideoProjectListItem } from "../../services/api"
+import { api, type ResearchJob, type ResearchLocalizationStatus, type ResearchReport, type ResearchStatus, type VideoProject, type VideoProjectListItem, type VideoProjectObservability } from "../../services/api"
 import { messageFrom } from "../../lib/errors"
 import { AnalysisLanguageToggle, type AnalysisLocale } from "../localization/AnalysisLanguageToggle"
 import { OutlineWorkspace } from "./OutlineWorkspace"
 import { ScriptWorkspace } from "./ScriptWorkspace"
 import { ProductionWorkspace } from "./ProductionWorkspace"
 
-type WorkspaceTab = "Overview" | "Research" | "Outline" | "Script" | "Production"
+type WorkspaceTab = "Overview" | "Research" | "Outline" | "Script" | "Production" | "Observability"
 
 export function VideoProjectPanel({ projectId, onOpen }: { projectId: string; onOpen: (videoProject: VideoProject) => void }) {
   const [items, setItems] = useState<VideoProjectListItem[]>([])
@@ -37,6 +37,8 @@ export function VideoProjectWorkspace({ project, onBack }: { project: VideoProje
   const [research, setResearch] = useState<ResearchStatus | null>(null)
   const [researchError, setResearchError] = useState<string | null>(null)
   const [researchBusy, setResearchBusy] = useState(false)
+  const [observability, setObservability] = useState<VideoProjectObservability | null>(null)
+  const [observabilityError, setObservabilityError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => initialTab(project.status))
   const updateWorkflowStatus = useCallback((status: string) => setCurrent(value => value.status === status ? value : { ...value, status }), [])
   const loadResearch = useCallback(async () => {
@@ -49,6 +51,11 @@ export function VideoProjectWorkspace({ project, onBack }: { project: VideoProje
     const timer = window.setTimeout(() => void loadResearch(), 2000)
     return () => window.clearTimeout(timer)
   }, [loadResearch, research?.activeJob])
+  const loadObservability = useCallback(async () => {
+    try { setObservability(await api.getVideoProjectObservability(project.projectId, project.id)); setObservabilityError(null) }
+    catch (requestError) { setObservabilityError(messageFrom(requestError)) }
+  }, [project.id, project.projectId])
+  useEffect(() => { if (activeTab === "Observability") void Promise.resolve().then(loadObservability) }, [activeTab, loadObservability])
   async function save() {
     setBusy(true)
     try { setCurrent(await api.updateVideoProject(current.projectId, current.id, workingTitle, notes || null)); setError(null) }
@@ -68,7 +75,7 @@ export function VideoProjectWorkspace({ project, onBack }: { project: VideoProje
     {current.sourceRequiresReview ? <p className="stale-note">Source strategy has changed since this Video Project was created. Its execution history remains intact.</p> : null}
     {current.sourceWarnings.map((warning) => <p className="stale-note" key={warning}>{warning}</p>)}
     <div className="confidence-grid"><div><span>Planning</span><strong>Complete</strong></div><div><span>Research</span><strong>{research?.activeJob ? research.activeJob.status : refreshFailure ? "Refresh failed" : research?.latestReport ? "Complete" : "Not started"}</strong></div><div><span>Outline</span><strong>{current.status.startsWith("Outline") ? current.status.replace("Outline", "") || "Generating" : current.status.startsWith("Script") || current.status === "Packaging" || current.status === "ProductionReady" ? "Approved" : "Locked"}</strong></div><div><span>Script</span><strong>{current.status.startsWith("Script") ? current.status.replace("Script", "") || "Generating" : current.status === "Packaging" || current.status === "ProductionReady" ? "Approved" : "Locked"}</strong></div><div><span>Production</span><strong>{current.status === "ProductionReady" ? "Ready" : current.status === "Packaging" ? "Packaging" : "Locked"}</strong></div></div>
-    <nav className="workspace-tabs" role="tablist" aria-label="Video Project workflow">{(["Overview", "Research", "Outline", "Script", "Production"] as WorkspaceTab[]).map(tab => <button className={activeTab === tab ? "workspace-tab active" : "workspace-tab"} type="button" role="tab" aria-selected={activeTab === tab} key={tab} onClick={() => setActiveTab(tab)}>{tab}</button>)}</nav>
+    <nav className="workspace-tabs" role="tablist" aria-label="Video Project workflow">{(["Overview", "Research", "Outline", "Script", "Production", "Observability"] as WorkspaceTab[]).map(tab => <button className={activeTab === tab ? "workspace-tab active" : "workspace-tab"} type="button" role="tab" aria-selected={activeTab === tab} key={tab} onClick={() => setActiveTab(tab)}>{tab}</button>)}</nav>
     {activeTab === "Overview" ? <><section className="analysis-block"><h3>Source context</h3><p><strong>Opportunity:</strong> {current.opportunityName}</p><p><strong>Idea score:</strong> {current.ideaScore}</p><p><strong>Pilot:</strong> Version {current.pilotVersion}, slot {current.pilotSequence} · {current.experimentType}</p><p><strong>Hypothesis:</strong> {current.pilotHypothesis}</p><p><strong>Variable:</strong> {current.variableBeingTested}</p><p><strong>Primary metric:</strong> {current.primaryMetric}</p><p><strong>Success signal:</strong> {current.successSignal}</p></section>
     <section className="analysis-block"><h3>Execution brief</h3><p><strong>Topic:</strong> {current.topic}</p><p><strong>Angle:</strong> {current.angle}</p><p><strong>Format:</strong> {current.contentFormat}</p><p><strong>Audience:</strong> {current.targetAudience}</p><p><strong>Viewer promise:</strong> {current.viewerPromise}</p><p><strong>Hook:</strong> {current.hookConcept}</p><p><strong>Thumbnail concept:</strong> {current.thumbnailConcept}</p></section>
     <section className="analysis-block"><h3>Working details</h3><label>Working title<input value={workingTitle} maxLength={300} onChange={(event) => setWorkingTitle(event.target.value)} /></label><label>Execution notes<textarea value={notes} maxLength={10000} onChange={(event) => setNotes(event.target.value)} /></label><button className="primary-button" type="button" disabled={busy} onClick={() => void save()}>{busy ? "Saving..." : "Save working details"}</button></section></> : null}
@@ -76,7 +83,15 @@ export function VideoProjectWorkspace({ project, onBack }: { project: VideoProje
     {activeTab === "Outline" ? <OutlineWorkspace projectId={current.projectId} videoProjectId={current.id} revisionKey={`${current.updatedAt}:${research?.latestReport?.id ?? ""}:${research?.activeJob?.id ?? ""}`} onWorkflowStatusChange={updateWorkflowStatus} /> : null}
     {activeTab === "Script" ? <ScriptWorkspace projectId={current.projectId} videoProjectId={current.id} revisionKey={`${current.status}:${current.updatedAt}`} onWorkflowStatusChange={updateWorkflowStatus} /> : null}
     {activeTab === "Production" ? <ProductionWorkspace projectId={current.projectId} videoProjectId={current.id} revisionKey={`${current.status}:${current.updatedAt}`} onWorkflowStatusChange={updateWorkflowStatus} /> : null}
+    {activeTab === "Observability" ? <VideoProjectObservabilityPanel data={observability} error={observabilityError} onRefresh={() => void loadObservability()} /> : null}
   </section>
+}
+
+function VideoProjectObservabilityPanel({ data, error, onRefresh }: { data: VideoProjectObservability | null; error: string | null; onRefresh: () => void }) {
+  if (error) return <section className="analysis-block"><p className="error-copy" role="alert">{error}</p><button className="quiet-button" type="button" onClick={onRefresh}>Retry</button></section>
+  if (!data) return <section className="analysis-block"><p className="empty-state">Loading execution history...</p></section>
+  const costText = data.directAiCost.knownOrEstimatedCost.length === 0 ? "No cost recorded" : data.directAiCost.knownOrEstimatedCost.map(item => `${item.currency} ${item.amount.toFixed(6)}`).join(" · ")
+  return <section className="analysis-block"><div className="section-heading"><div><h3>Execution observability</h3><p className="section-copy">Direct VideoProject AI cost only. Shared project strategy spending is reported on the Project dashboard.</p></div><button className="quiet-button" type="button" onClick={onRefresh}>Refresh</button></div><div className="confidence-grid"><div><span>Production state</span><strong>{data.currentStatus}</strong></div><div><span>Direct AI cost</span><strong>{costText}</strong></div><div><span>AI requests</span><strong>{data.directAiCost.aiRequestCount}</strong></div><div><span>Unknown-cost requests</span><strong>{data.directAiCost.unknownCostRequestCount}</strong></div><div><span>Completed jobs</span><strong>{data.completedJobCount}</strong></div><div><span>Failed jobs</span><strong>{data.failedJobCount}</strong></div></div>{data.workflows.map(item => <article className="pilot-card" key={item.workflow}><div className="section-heading"><strong>{item.workflow}</strong><span>{item.knownOrEstimatedCost.length ? item.knownOrEstimatedCost.map(cost => `${cost.currency} ${cost.amount.toFixed(6)}`).join(" · ") : "Unknown cost"}</span></div><p className="section-copy">{item.jobCount} jobs · {item.aiRequestCount} AI requests · {item.unknownCostRequestCount} unknown cost{item.latestFailure ? ` · Latest failure: ${item.latestFailure}` : ""}</p></article>)}</section>
 }
 
 function initialTab(status: string): WorkspaceTab {

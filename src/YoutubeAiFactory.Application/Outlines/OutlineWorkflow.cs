@@ -268,7 +268,7 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
             if (!string.Equals(context.OutlineInputFingerprint, payload.InputFingerprint, StringComparison.Ordinal))
                 throw new ApplicationValidationException("Outline inputs changed after the job was queued. Queue a new outline from the current inputs.");
 
-            var generated = await GenerateAsync(context, executionToken);
+            var generated = await GenerateAsync(context, job.Id, executionToken);
             aiRun = generated.AiRun;
             var warnings = validator.ValidateGenerated(generated.Result, context);
             executionToken.ThrowIfCancellationRequested();
@@ -385,12 +385,12 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
         }
     }
 
-    private async Task<GeneratedOutline> GenerateAsync(OutlineGenerationContext context, CancellationToken cancellationToken)
+    private async Task<GeneratedOutline> GenerateAsync(OutlineGenerationContext context, Guid jobId, CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.OutlineGeneration);
         var run = new AiRun("OutlineGeneration", context.ProjectId, resolved.Provider, resolved.Model,
             OutlinePrompt.Key, OutlinePrompt.Version, timeProvider.GetUtcNow(), resolved.Profile.ToString(),
-            context.VideoProjectId, researchReportId: context.ResearchReportId);
+            context.VideoProjectId, researchReportId: context.ResearchReportId, jobId: jobId, workflowStage: "Generation");
         store.AddAiRun(run);
         await store.SaveChangesAsync(cancellationToken);
         string? diagnostic = null;
@@ -408,7 +408,7 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                     var warnings = validator.ValidateGenerated(answer.Value, context);
                     _ = warnings;
                     run.RecordProvider(answer.Provider, answer.Model);
-                    run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+                    run.CompleteFrom(answer, timeProvider.GetUtcNow());
                     await store.SaveChangesAsync(cancellationToken);
                     return new(answer.Value, run, answer.Provider, answer.Model);
                 }
@@ -418,7 +418,7 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                     structuredRepairAttempts++;
                     try
                     {
-                        var repaired = await RepairAsync(context, exception.RawOutput!, exception.Message, cancellationToken);
+                        var repaired = await RepairAsync(context, jobId, exception.RawOutput!, exception.Message, cancellationToken);
                         validator.ValidateGenerated(repaired.Value, context);
                         run.RecordProvider(resolved.Provider, resolved.Model);
                         run.Complete(null, null, null, timeProvider.GetUtcNow());
@@ -452,13 +452,13 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
         }
     }
 
-    private async Task<LlmResult<OutlineGenerationResult>> RepairAsync(OutlineGenerationContext context,
+    private async Task<LlmResult<OutlineGenerationResult>> RepairAsync(OutlineGenerationContext context, Guid jobId,
         string malformedOutput, string diagnostic, CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.StructuredOutputRepair);
         var run = new AiRun("StructuredOutputRepair", context.ProjectId, resolved.Provider, resolved.Model,
             OutlinePrompt.RepairKey, OutlinePrompt.RepairVersion, timeProvider.GetUtcNow(), resolved.Profile.ToString(),
-            context.VideoProjectId, researchReportId: context.ResearchReportId);
+            context.VideoProjectId, researchReportId: context.ResearchReportId, jobId: jobId, workflowStage: "StructuredOutputRepair");
         store.AddAiRun(run);
         await store.SaveChangesAsync(cancellationToken);
         try
@@ -467,7 +467,7 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                 OutlinePrompt.CreateRepair(malformedOutput, diagnostic).WithResolvedModel(resolved), cancellationToken);
             validator.ValidateGenerated(answer.Value, context);
             run.RecordProvider(answer.Provider, answer.Model);
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
             return answer;
         }

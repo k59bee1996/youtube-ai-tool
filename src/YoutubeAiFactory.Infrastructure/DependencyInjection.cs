@@ -4,11 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using YoutubeAiFactory.Application.AI;
 using YoutubeAiFactory.Application.Competitors;
 using YoutubeAiFactory.Application.Persistence;
+using YoutubeAiFactory.Application.Observability;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Infrastructure.AI;
 using YoutubeAiFactory.Infrastructure.Persistence;
 using YoutubeAiFactory.Infrastructure.Research;
 using YoutubeAiFactory.Infrastructure.YouTube;
+using YoutubeAiFactory.Infrastructure.Observability;
 
 namespace YoutubeAiFactory.Infrastructure;
 
@@ -29,6 +31,7 @@ public static class DependencyInjection
             }));
 
         services.AddScoped<IYoutubeAiFactoryStore, YoutubeAiFactoryStore>();
+        services.AddScoped<IObservabilityQueries, SqlServerObservabilityQueries>();
         services.AddSingleton<IVideoResearchJobLeaseRenewer, VideoResearchJobLeaseRenewer>();
         services.AddSingleton<IVideoOutlineJobLeaseRenewer, VideoOutlineJobLeaseRenewer>();
         services.AddSingleton<IVideoScriptJobLeaseRenewer, VideoScriptJobLeaseRenewer>();
