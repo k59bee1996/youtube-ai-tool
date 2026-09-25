@@ -3,14 +3,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using YoutubeAiFactory.Application.AI;
 using YoutubeAiFactory.Application.Competitors;
-using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Observability;
+using YoutubeAiFactory.Application.Persistence;
 using YoutubeAiFactory.Application.Research;
 using YoutubeAiFactory.Infrastructure.AI;
+using YoutubeAiFactory.Infrastructure.Observability;
 using YoutubeAiFactory.Infrastructure.Persistence;
 using YoutubeAiFactory.Infrastructure.Research;
 using YoutubeAiFactory.Infrastructure.YouTube;
-using YoutubeAiFactory.Infrastructure.Observability;
 
 namespace YoutubeAiFactory.Infrastructure;
 

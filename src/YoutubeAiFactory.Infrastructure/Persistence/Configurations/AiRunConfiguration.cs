@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using YoutubeAiFactory.Domain.AI;
+using YoutubeAiFactory.Domain.Jobs;
 using YoutubeAiFactory.Domain.Projects;
 using YoutubeAiFactory.Domain.Research;
 using YoutubeAiFactory.Domain.Videos;
-using YoutubeAiFactory.Domain.Jobs;
 
 namespace YoutubeAiFactory.Infrastructure.Persistence.Configurations;
 
