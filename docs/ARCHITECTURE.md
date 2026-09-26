@@ -16,6 +16,12 @@ Web -> API -> Application -> Domain
 
 `Domain` has no framework or integration dependencies. `Application` defines use cases and external contracts. `Infrastructure` owns EF Core, SQL Server, provider adapters, and migrations. `Api` maps HTTP contracts to application use cases. `Worker` executes database-backed long-running workflows.
 
+## Phase 12 observability
+
+Phase 12 reuses `Job` as the logical workflow record and `AiRun` as the provider-request telemetry record. Each provider request may carry a `JobId`, VideoProject, workflow stage, model profile, resolved provider/model, token categories, cost source, pricing version, and sanitized failure metadata. `IObservabilityQueries` is a read-only Application contract implemented by SQL Server projections in Infrastructure; dashboard requests never invoke `ILlmProvider`, enqueue jobs, or mutate VideoProject state.
+
+Cost accounting keeps shared project strategy work (competitor, opportunity, idea, and pilot workflows) separate from direct VideoProject work (research, outline, script, and production). Provider-reported cost and price-calculated estimates are distinct, and missing cost remains unavailable. Configured prices are optional and effective-dated; no provider prices are shipped by default. Cost totals are grouped by currency and never silently mixed.
+
 ## AI model routing
 
 AI workflows request an application-level capability, never a concrete vendor model:

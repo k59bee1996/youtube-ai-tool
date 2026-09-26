@@ -46,6 +46,7 @@ public sealed class JobTests
         job.RenewLease(leaseId, renewedAt);
 
         Assert.Equal(renewedAt, job.StartedAt);
+        Assert.Equal(startedAt, job.ExecutionStartedAt);
         Assert.Throws<DomainException>(() => job.RenewLease(Guid.NewGuid(), renewedAt.AddMinutes(1)));
     }
 

@@ -125,7 +125,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             var canonical = JsonSerializer.Deserialize<CompetitorAnalysisResult>(analysis.ResultJson, RequestCompetitorAnalysisHandlerJson)
                 ?? throw new InvalidOperationException("Stored competitor analysis is unreadable.");
             var resolvedModel = modelResolver.Resolve(CompetitorAnalysisLocalizationPrompt.ModelProfile);
-            run = new AiRun("ArtifactLocalization", payload.ProjectId, analysis.CompetitorChannelId, resolvedModel.Provider, resolvedModel.Model, CompetitorAnalysisLocalizationPrompt.Key, CompetitorAnalysisLocalizationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString());
+            run = new AiRun("ArtifactLocalization", payload.ProjectId, analysis.CompetitorChannelId, resolvedModel.Provider, resolvedModel.Model, CompetitorAnalysisLocalizationPrompt.Key, CompetitorAnalysisLocalizationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), jobId: job.Id, workflowStage: "Localization");
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedCompetitorAnalysisContent>? answer = null;
@@ -153,7 +153,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.CompetitorAnalysis, analysis.Id, analysis.Version, payload.Locale,
                 JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id, CompetitorAnalysisLocalizationPrompt.Key,
                 CompetitorAnalysisLocalizationPrompt.Version, answer.Provider, answer.Model, timeProvider.GetUtcNow()));
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
         }
@@ -193,7 +193,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
 
             var resolvedModel = modelResolver.Resolve(OpportunityReportLocalizationPrompt.ModelProfile);
             run = new AiRun("ArtifactLocalization", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, OpportunityReportLocalizationPrompt.Key,
-                OpportunityReportLocalizationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString());
+                OpportunityReportLocalizationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), jobId: job.Id, workflowStage: "Localization");
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedOpportunityReportContent>? answer = null;
@@ -225,7 +225,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.OpportunityReport, report.Report.Id, report.Report.Version, payload.Locale,
                 JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id, OpportunityReportLocalizationPrompt.Key,
                 OpportunityReportLocalizationPrompt.Version, answer.Provider, answer.Model, timeProvider.GetUtcNow()));
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
         }
@@ -263,7 +263,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             var resolvedModel = modelResolver.Resolve(ResearchReportLocalizationPrompt.ModelProfile);
             run = new AiRun("ArtifactLocalization", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model,
                 ResearchReportLocalizationPrompt.Key, ResearchReportLocalizationPrompt.Version, timeProvider.GetUtcNow(),
-                resolvedModel.Profile.ToString(), report.Report.VideoProjectId, report.Report.ResearchRunId);
+                resolvedModel.Profile.ToString(), report.Report.VideoProjectId, report.Report.ResearchRunId, jobId: job.Id, workflowStage: "Localization");
             store.AddAiRun(run); await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedResearchReportContent>? answer = null;
             Exception? failure = null;
@@ -288,7 +288,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             store.AddArtifactLocalization(new ArtifactLocalization(LocalizableArtifactTypes.ResearchReport, report.Report.Id, report.Report.Version,
                 payload.Locale, JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id,
                 ResearchReportLocalizationPrompt.Key, ResearchReportLocalizationPrompt.Version, answer.Provider, answer.Model, timeProvider.GetUtcNow()));
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow()); job.Complete(timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow()); job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -327,7 +327,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             var resolved = modelResolver.Resolve(VideoOutlineLocalizationPrompt.ModelProfile);
             run = new AiRun("ArtifactLocalization", payload.ProjectId, resolved.Provider, resolved.Model,
                 VideoOutlineLocalizationPrompt.Key, VideoOutlineLocalizationPrompt.Version, timeProvider.GetUtcNow(),
-                resolved.Profile.ToString(), videoProjectId, researchReportId: outline.Outline.ResearchReportId);
+                resolved.Profile.ToString(), videoProjectId, researchReportId: outline.Outline.ResearchReportId, jobId: job.Id, workflowStage: "Localization");
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedVideoOutlineContent>? answer = null;
@@ -359,7 +359,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
                 JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions), run.Id,
                 VideoOutlineLocalizationPrompt.Key, VideoOutlineLocalizationPrompt.Version, answer.Provider, answer.Model,
                 timeProvider.GetUtcNow()));
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
         }
@@ -404,7 +404,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
             run = new AiRun("ArtifactLocalization", payload.ProjectId, resolved.Provider, resolved.Model,
                 ProductionPackageLocalizationPrompt.Key, ProductionPackageLocalizationPrompt.Version,
                 timeProvider.GetUtcNow(), resolved.Profile.ToString(), videoProjectId,
-                researchReportId: package.Package.ResearchReportId);
+                researchReportId: package.Package.ResearchReportId, jobId: job.Id, workflowStage: "Localization");
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<LocalizedProductionPackageContent>? answer = null;
@@ -442,7 +442,7 @@ public sealed class ArtifactLocalizationJobProcessor(IYoutubeAiFactoryStore stor
                 JsonSerializer.Serialize(answer.Value, RequestCompetitorAnalysisLocalizationHandler.JsonOptions),
                 run.Id, ProductionPackageLocalizationPrompt.Key, ProductionPackageLocalizationPrompt.Version,
                 answer.Provider, answer.Model, timeProvider.GetUtcNow()));
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
         }

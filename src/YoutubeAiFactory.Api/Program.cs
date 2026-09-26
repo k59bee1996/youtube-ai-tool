@@ -152,6 +152,7 @@ app.MapOpportunityEndpoints();
 app.MapIdeaEndpoints();
 app.MapPilotEndpoints();
 app.MapVideoProjectEndpoints();
+app.MapObservabilityEndpoints();
 
 app.Run();
 
