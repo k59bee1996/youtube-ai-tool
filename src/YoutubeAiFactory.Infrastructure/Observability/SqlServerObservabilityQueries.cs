@@ -12,6 +12,9 @@ namespace YoutubeAiFactory.Infrastructure.Observability;
 /// </summary>
 internal sealed class SqlServerObservabilityQueries(IDbContextFactory<YoutubeAiFactoryDbContext> contextFactory) : IObservabilityQueries
 {
+    // EstimatedCost predates explicit currency tracking and was always calculated in USD.
+    private const string LegacyEstimatedCostCurrency = "USD";
+
     public async Task<ProjectObservabilityOverviewDto> GetProjectOverviewAsync(Guid projectId, ObservabilityFilter filter, CancellationToken cancellationToken)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -180,9 +183,10 @@ internal sealed class SqlServerObservabilityQueries(IDbContextFactory<YoutubeAiF
 
     private static (string Currency, decimal Amount)? GetKnownCost(AiRun run)
     {
-        var amount = run.ProviderReportedCost ?? run.CalculatedEstimatedCost;
-        return amount is not null && !string.IsNullOrWhiteSpace(run.Currency)
-            ? (run.Currency, amount.Value)
+        var amount = run.ProviderReportedCost ?? run.CalculatedEstimatedCost ?? run.EstimatedCost;
+        var currency = run.Currency ?? (run.EstimatedCost is not null ? LegacyEstimatedCostCurrency : null);
+        return amount is not null && !string.IsNullOrWhiteSpace(currency)
+            ? (currency, amount.Value)
             : null;
     }
 

@@ -82,6 +82,7 @@ public sealed class IdeaGenerationJobProcessor(IYoutubeAiFactoryStore store, ILl
                 LlmResult<IdeaGenerationResult>? answer = null; Exception? failure = null;
                 for (var attempt = 0; attempt <= options.MaxStructuredOutputRetries; attempt++)
                 {
+                    answer = null;
                     var requestRun = new AiRun("IdeaGeneration", payload.ProjectId, resolvedModel.Provider, resolvedModel.Model,
                         IdeaGenerationPrompt.Key, IdeaGenerationPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(),
                         jobId: job.Id, workflowStage: "Generation");
