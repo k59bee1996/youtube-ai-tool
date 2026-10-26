@@ -64,7 +64,9 @@ public sealed class OutlineWorkflowTests
 
         Assert.Single(workflow.Store.Outlines);
         Assert.Equal([AiModelProfile.Reasoning, AiModelProfile.Reasoning], provider.Requests.Select(item => item.ModelProfile).ToArray());
-        Assert.Equal(1, workflow.Store.AiRuns.Single().RetryCount);
+        Assert.Equal(2, workflow.Store.AiRuns.Count(run => run.Workflow == "OutlineGeneration"));
+        Assert.All(workflow.Store.AiRuns.Where(run => run.Workflow == "OutlineGeneration"), run => Assert.Equal(0, run.RetryCount));
+        Assert.Contains(workflow.Store.AiRuns, run => run.Workflow == "OutlineGeneration" && run.Status == AiRunStatus.Failed);
     }
 
     [Fact]

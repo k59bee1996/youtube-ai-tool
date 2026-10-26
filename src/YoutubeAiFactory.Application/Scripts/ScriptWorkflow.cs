@@ -311,7 +311,7 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
             {
                 if (videoProject.Status != VideoProjectStatus.ScriptGenerating)
                     throw new ApplicationValidationException("Script generation job state is no longer runnable.");
-                processed = await GenerateAndGroundAsync(context, executionCancellation.Token);
+                processed = await GenerateAndGroundAsync(context, job.Id, executionCancellation.Token);
                 lastAiRun = processed.GroundingRun;
                 persisted = await PersistGeneratedAsync(payload, videoProject, context, processed,
                     executionCancellation.Token);
@@ -328,7 +328,7 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
                     throw new ApplicationValidationException("The Script selected for grounding validation is no longer current.");
                 var result = ToResult(persisted);
                 validator.ValidateGenerated(result, context);
-                var audit = await AuditAsync(context, result, executionCancellation.Token);
+                var audit = await AuditAsync(context, job.Id, result, executionCancellation.Token);
                 lastAiRun = audit.Run;
                 persisted.Script.RecordGroundingResult(audit.Result.Status, audit.Run.Id,
                     JsonSerializer.Serialize(audit.Result.Issues, ScriptPrompt.SerializerOptions), timeProvider.GetUtcNow());
@@ -396,10 +396,10 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
         return true;
     }
 
-    private async Task<ProcessedScript> GenerateAndGroundAsync(ScriptGenerationContext context,
+    private async Task<ProcessedScript> GenerateAndGroundAsync(ScriptGenerationContext context, Guid jobId,
         CancellationToken cancellationToken)
     {
-        var generated = await GenerateAsync(context, cancellationToken);
+        var generated = await GenerateAsync(context, jobId, cancellationToken);
         var result = generated.Result;
         var contentRun = generated.Run;
         var contentProvider = generated.Provider;
@@ -410,7 +410,7 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
         {
             if (lengthCorrectionAttempts >= options.MaxLengthCorrectionAttempts)
                 throw new StructuredOutputException("Script length is outside the configured target range.");
-            var corrected = await CorrectAsync(context, result, [], string.Join(" ", metrics.Warnings),
+            var corrected = await CorrectAsync(context, jobId, result, [], string.Join(" ", metrics.Warnings),
                 cancellationToken);
             result = corrected.Result;
             contentRun = corrected.Run;
@@ -422,12 +422,12 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
                 throw new StructuredOutputException("Script remained outside the configured target range after bounded correction.");
         }
 
-        var audit = await AuditAsync(context, result, cancellationToken);
+        var audit = await AuditAsync(context, jobId, result, cancellationToken);
         var groundingCorrectionAttempts = 0;
         while (audit.Result.Status == ScriptGroundingStatus.Failed &&
                groundingCorrectionAttempts < options.MaxGroundingCorrectionAttempts)
         {
-            var corrected = await CorrectAsync(context, result, audit.Result.Issues, null, cancellationToken);
+            var corrected = await CorrectAsync(context, jobId, result, audit.Result.Issues, null, cancellationToken);
             result = corrected.Result;
             contentRun = corrected.Run;
             contentProvider = corrected.Provider;
@@ -436,7 +436,7 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
             metrics = validator.ValidateGenerated(result, context);
             if (metrics.Warnings.Count > 0)
                 throw new StructuredOutputException("Grounding correction moved the Script outside the configured length range.");
-            audit = await AuditAsync(context, result, cancellationToken);
+            audit = await AuditAsync(context, jobId, result, cancellationToken);
         }
         if (audit.Result.Status != ScriptGroundingStatus.Passed)
             throw new StructuredOutputException("Script grounding failed after the configured bounded correction attempts.");
@@ -445,11 +445,11 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
             contentProvider, contentModel);
     }
 
-    private async Task<GeneratedScript> GenerateAsync(ScriptGenerationContext context,
+    private async Task<GeneratedScript> GenerateAsync(ScriptGenerationContext context, Guid jobId,
         CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.ScriptGeneration);
-        var run = StartRun("ScriptGeneration", context, resolved, ScriptPrompt.GenerationKey,
+        var run = StartRun("ScriptGeneration", context, jobId, resolved, ScriptPrompt.GenerationKey,
             ScriptPrompt.GenerationVersion);
         await store.SaveChangesAsync(cancellationToken);
         string? diagnostic = null;
@@ -476,7 +476,7 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
                     repairAttempts++;
                     try
                     {
-                        var repaired = await RepairAsync(context, exception.RawOutput!, exception.Message,
+                        var repaired = await RepairAsync(context, jobId, exception.RawOutput!, exception.Message,
                             cancellationToken);
                         validator.ValidateGenerated(repaired.Result, context);
                         run.RecordProvider(resolved.Provider, resolved.Model);
@@ -507,12 +507,12 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
         }
     }
 
-    private async Task<GeneratedScript> CorrectAsync(ScriptGenerationContext context, VideoScriptResult script,
+    private async Task<GeneratedScript> CorrectAsync(ScriptGenerationContext context, Guid jobId, VideoScriptResult script,
         IReadOnlyList<ScriptGroundingIssueResult> issues, string? lengthDiagnostic,
         CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.ScriptGroundingCorrection);
-        var run = StartRun("ScriptGroundingCorrection", context, resolved, ScriptPrompt.CorrectionKey,
+        var run = StartRun("ScriptGroundingCorrection", context, jobId, resolved, ScriptPrompt.CorrectionKey,
             ScriptPrompt.CorrectionVersion);
         await store.SaveChangesAsync(cancellationToken);
         try
@@ -532,11 +532,11 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
         }
     }
 
-    private async Task<AuditedScript> AuditAsync(ScriptGenerationContext context, VideoScriptResult script,
+    private async Task<AuditedScript> AuditAsync(ScriptGenerationContext context, Guid jobId, VideoScriptResult script,
         CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.ScriptGroundingAudit);
-        var run = StartRun("ScriptGroundingAudit", context, resolved, ScriptPrompt.AuditKey,
+        var run = StartRun("ScriptGroundingAudit", context, jobId, resolved, ScriptPrompt.AuditKey,
             ScriptPrompt.AuditVersion);
         await store.SaveChangesAsync(cancellationToken);
         try
@@ -555,11 +555,11 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
         }
     }
 
-    private async Task<GeneratedScript> RepairAsync(ScriptGenerationContext context,
+    private async Task<GeneratedScript> RepairAsync(ScriptGenerationContext context, Guid jobId,
         string malformedOutput, string diagnostic, CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.StructuredOutputRepair);
-        var run = StartRun("StructuredOutputRepair", context, resolved, ScriptPrompt.RepairKey,
+        var run = StartRun("StructuredOutputRepair", context, jobId, resolved, ScriptPrompt.RepairKey,
             ScriptPrompt.RepairVersion);
         await store.SaveChangesAsync(cancellationToken);
         try
@@ -578,12 +578,12 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
         }
     }
 
-    private AiRun StartRun(string workflow, ScriptGenerationContext context, ResolvedAiModel resolved,
+    private AiRun StartRun(string workflow, ScriptGenerationContext context, Guid jobId, ResolvedAiModel resolved,
         string promptKey, int promptVersion)
     {
         var run = new AiRun(workflow, context.ProjectId, resolved.Provider, resolved.Model, promptKey,
             promptVersion, timeProvider.GetUtcNow(), resolved.Profile.ToString(), context.VideoProjectId,
-            researchReportId: context.ResearchReportId);
+            researchReportId: context.ResearchReportId, jobId: jobId, workflowStage: workflow);
         store.AddAiRun(run);
         return run;
     }
@@ -591,7 +591,7 @@ public sealed partial class VideoScriptJobProcessor(IYoutubeAiFactoryStore store
     private void CompleteRun<T>(AiRun run, LlmResult<T> answer)
     {
         run.RecordProvider(answer.Provider, answer.Model);
-        run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+        run.CompleteFrom(answer, timeProvider.GetUtcNow());
     }
 
     private async Task FailRunAsync(AiRun run, Exception exception, string fallback)

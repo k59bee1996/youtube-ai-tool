@@ -28,11 +28,14 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(job => job.AvailableAt).HasColumnName("available_at").IsRequired();
         builder.Property(job => job.StartedAt).HasColumnName("started_at");
+        builder.Property(job => job.ExecutionStartedAt).HasColumnName("execution_started_at");
         builder.Property(job => job.LeaseId).HasColumnName("lease_id");
         builder.Property(job => job.CompletedAt).HasColumnName("completed_at");
         builder.Property(job => job.FailureReason).HasColumnName("failure_reason").HasMaxLength(2_000);
 
         builder.HasIndex(job => new { job.Status, job.AvailableAt });
+        builder.HasIndex(job => new { job.ProjectId, job.CreatedAt });
+        builder.HasIndex(job => new { job.VideoProjectId, job.CreatedAt });
         builder.HasIndex(job => job.CompetitorChannelId)
             .HasDatabaseName("ux_jobs_active_competitor_analysis")
             .IsUnique()

@@ -75,8 +75,13 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
             var usage = root.TryGetProperty("usage", out var usageElement) ? usageElement : default;
             int? inputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("prompt_tokens", out var input) ? input.GetInt32() : null;
             int? outputTokens = usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty("completion_tokens", out var outputToken) ? outputToken.GetInt32() : null;
+            int? cachedInputTokens = ReadNestedUsageTokenCount(usage, "prompt_tokens_details", "cached_tokens");
+            int? reasoningTokens = ReadNestedUsageTokenCount(usage, "completion_tokens_details", "reasoning_tokens");
             var responseModelName = root.TryGetProperty("model", out var responseModel) ? responseModel.GetString() ?? model.Model : model.Model;
-            return new LlmResult<T>(value, model.Provider, responseModelName, inputTokens, outputTokens, structuredOutput);
+            var price = ResolvePrice(settings.Pricing, model.Provider, responseModelName, request.RequestedAt);
+            var estimatedCost = CalculateCost(inputTokens, outputTokens, cachedInputTokens, price);
+            return new LlmResult<T>(value, model.Provider, responseModelName, inputTokens, outputTokens, structuredOutput,
+                cachedInputTokens, reasoningTokens, null, estimatedCost, price?.Currency, price?.PriceVersion, price?.EffectiveFrom);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -134,6 +139,59 @@ internal sealed class OpenAiLlmProvider(HttpClient client, IOptions<AiOptions> o
 
     private static string? ResponseHeader(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault() : null;
+
+    private static int? ReadNestedUsageTokenCount(JsonElement usage, string detailsName, string tokenName)
+    {
+        if (usage.ValueKind != JsonValueKind.Object ||
+            !usage.TryGetProperty(detailsName, out var details) ||
+            details.ValueKind != JsonValueKind.Object ||
+            !details.TryGetProperty(tokenName, out var tokens) ||
+            tokens.ValueKind != JsonValueKind.Number)
+        {
+            return null;
+        }
+
+        return tokens.TryGetInt32(out var value) ? value : null;
+    }
+
+    private static AiModelPricingOptions? ResolvePrice(
+        IEnumerable<AiModelPricingOptions> prices,
+        string provider,
+        string model,
+        DateTimeOffset executedAt) => prices
+        .Where(price => string.Equals(price.Provider, provider, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(price.Model, model, StringComparison.OrdinalIgnoreCase) &&
+                        price.EffectiveFrom <= executedAt &&
+                        (price.EffectiveUntil is null || price.EffectiveUntil > executedAt) &&
+                        HasUsablePrices(price))
+        .OrderByDescending(price => price.EffectiveFrom)
+        .FirstOrDefault();
+
+    private static bool HasUsablePrices(AiModelPricingOptions price) =>
+        price.InputPricePerMillionTokens is not null && price.OutputPricePerMillionTokens is not null &&
+        !string.IsNullOrWhiteSpace(price.Currency) && !string.IsNullOrWhiteSpace(price.PriceVersion);
+
+    private static decimal? CalculateCost(
+        int? inputTokens,
+        int? outputTokens,
+        int? cachedInputTokens,
+        AiModelPricingOptions? price)
+    {
+        if (price is null || inputTokens is null || outputTokens is null)
+        {
+            return null;
+        }
+
+        // Cached tokens are part of prompt_tokens. Price only the non-cached portion at input price.
+        var cached = Math.Min(cachedInputTokens ?? 0, inputTokens.Value);
+        var regularInput = inputTokens.Value - cached;
+        var inputPrice = price.InputPricePerMillionTokens ?? throw new InvalidOperationException("A price entry must define input pricing.");
+        var outputPrice = price.OutputPricePerMillionTokens ?? throw new InvalidOperationException("A price entry must define output pricing.");
+        var cachedPrice = price.CachedInputPricePerMillionTokens ?? inputPrice;
+        return regularInput * inputPrice / 1_000_000m +
+            cached * cachedPrice / 1_000_000m +
+            outputTokens.Value * outputPrice / 1_000_000m;
+    }
 
     private static void AddResponseValue(JsonElement source, string propertyName, string label, List<string> details)
     {

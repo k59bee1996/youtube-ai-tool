@@ -7,6 +7,7 @@ import { PilotPanel } from "../../pilots/PilotPanel"
 import { VideoProjectPanel, VideoProjectWorkspace } from "../../videos/VideoProjectPanel"
 import type { VideoProject } from "../../../services/api"
 import type { Project } from "../../../services/api"
+import { ObservabilityDashboard } from "../../observability/ObservabilityDashboard"
 
 type ProjectWorkspaceProps = {
   project: Project
@@ -22,6 +23,7 @@ export function ProjectWorkspace({ project, competitors, competitor, loading, co
   const [opportunitiesOpen, setOpportunitiesOpen] = useState(false)
   const [pilotOpen, setPilotOpen] = useState(false)
   const [videosOpen, setVideosOpen] = useState(false)
+  const [observabilityOpen, setObservabilityOpen] = useState(false)
   const [videoProject, setVideoProject] = useState<VideoProject | null>(null)
   if (videoProject) return <VideoProjectWorkspace project={videoProject} onBack={() => setVideoProject(null)} />
   return <>
@@ -47,6 +49,8 @@ export function ProjectWorkspace({ project, competitors, competitor, loading, co
     {pilotOpen && <PilotPanel projectId={project.id} onVideoProjectCreated={setVideoProject} />}
     <section className="panel competitor-panel"><PanelToggle eyebrow="Execution" title="Videos" toggleLabel="videos" copy="Move an approved pilot experiment into a durable production workflow." open={videosOpen} onToggle={() => setVideosOpen((open) => !open)} /></section>
     {videosOpen && <VideoProjectPanel projectId={project.id} onOpen={setVideoProject} />}
+    <section className="panel competitor-panel"><PanelToggle eyebrow="Operations" title="Observability" toggleLabel="dashboard" copy="Inspect production progress, AI usage, cost coverage, and workflow health." open={observabilityOpen} onToggle={() => setObservabilityOpen((open) => !open)} /></section>
+    {observabilityOpen && <ObservabilityDashboard projectId={project.id} />}
   </>
 }
 

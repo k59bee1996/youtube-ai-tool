@@ -268,7 +268,7 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
             if (!string.Equals(context.OutlineInputFingerprint, payload.InputFingerprint, StringComparison.Ordinal))
                 throw new ApplicationValidationException("Outline inputs changed after the job was queued. Queue a new outline from the current inputs.");
 
-            var generated = await GenerateAsync(context, executionToken);
+            var generated = await GenerateAsync(context, job.Id, executionToken);
             aiRun = generated.AiRun;
             var warnings = validator.ValidateGenerated(generated.Result, context);
             executionToken.ThrowIfCancellationRequested();
@@ -385,14 +385,10 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
         }
     }
 
-    private async Task<GeneratedOutline> GenerateAsync(OutlineGenerationContext context, CancellationToken cancellationToken)
+    private async Task<GeneratedOutline> GenerateAsync(OutlineGenerationContext context, Guid jobId, CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.OutlineGeneration);
-        var run = new AiRun("OutlineGeneration", context.ProjectId, resolved.Provider, resolved.Model,
-            OutlinePrompt.Key, OutlinePrompt.Version, timeProvider.GetUtcNow(), resolved.Profile.ToString(),
-            context.VideoProjectId, researchReportId: context.ResearchReportId);
-        store.AddAiRun(run);
-        await store.SaveChangesAsync(cancellationToken);
+        AiRun? activeRun = null;
         string? diagnostic = null;
         OutlineGenerationResult? previous = null;
         var structuredRepairAttempts = 0;
@@ -400,6 +396,12 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
         {
             for (var attempt = 0; attempt <= options.MaxGenerationRetries; attempt++)
             {
+                var run = new AiRun("OutlineGeneration", context.ProjectId, resolved.Provider, resolved.Model,
+                    OutlinePrompt.Key, OutlinePrompt.Version, timeProvider.GetUtcNow(), resolved.Profile.ToString(),
+                    context.VideoProjectId, researchReportId: context.ResearchReportId, jobId: jobId, workflowStage: "Generation");
+                activeRun = run;
+                store.AddAiRun(run);
+                await store.SaveChangesAsync(cancellationToken);
                 try
                 {
                     var answer = await provider.GenerateStructuredAsync<OutlineGenerationResult>(
@@ -408,22 +410,21 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                     var warnings = validator.ValidateGenerated(answer.Value, context);
                     _ = warnings;
                     run.RecordProvider(answer.Provider, answer.Model);
-                    run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+                    run.CompleteFrom(answer, timeProvider.GetUtcNow());
                     await store.SaveChangesAsync(cancellationToken);
                     return new(answer.Value, run, answer.Provider, answer.Model);
                 }
                 catch (StructuredOutputException exception) when (!string.IsNullOrWhiteSpace(exception.RawOutput) &&
                     structuredRepairAttempts < options.MaxStructuredRepairAttempts)
                 {
+                    run.Fail(exception.Message, timeProvider.GetUtcNow(), "InvalidStructuredOutput");
+                    await store.SaveChangesAsync(cancellationToken);
                     structuredRepairAttempts++;
                     try
                     {
-                        var repaired = await RepairAsync(context, exception.RawOutput!, exception.Message, cancellationToken);
-                        validator.ValidateGenerated(repaired.Value, context);
-                        run.RecordProvider(resolved.Provider, resolved.Model);
-                        run.Complete(null, null, null, timeProvider.GetUtcNow());
-                        await store.SaveChangesAsync(cancellationToken);
-                        return new(repaired.Value, run, resolved.Provider, resolved.Model);
+                        var repaired = await RepairAsync(context, jobId, exception.RawOutput!, exception.Message, cancellationToken);
+                        validator.ValidateGenerated(repaired.Result.Value, context);
+                        return new(repaired.Result.Value, repaired.AiRun, repaired.Result.Provider, repaired.Result.Model);
                     }
                     catch (Exception repairFailure) when (repairFailure is StructuredOutputException or ApplicationValidationException)
                     {
@@ -432,33 +433,33 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                 }
                 catch (Exception exception) when (exception is StructuredOutputException or ApplicationValidationException)
                 {
+                    run.Fail(exception.Message, timeProvider.GetUtcNow(), "InvalidStructuredOutput");
+                    await store.SaveChangesAsync(cancellationToken);
                     diagnostic = exception.Message;
                 }
                 if (attempt == options.MaxGenerationRetries)
                     throw new StructuredOutputException(diagnostic ?? "Outline output did not satisfy the evidence and experiment constraints.");
-                run.RecordRetry();
-                await store.SaveChangesAsync(cancellationToken);
             }
             throw new StructuredOutputException("Outline output did not satisfy the required contract.");
         }
         catch (Exception exception)
         {
-            if (run.Status == AiRunStatus.Running)
+            if (activeRun?.Status == AiRunStatus.Running)
             {
-                run.Fail(exception is YoutubeAiFactoryException ? exception.Message : "Outline AI stage failed.", timeProvider.GetUtcNow());
+                activeRun.Fail(exception is YoutubeAiFactoryException ? exception.Message : "Outline AI stage failed.", timeProvider.GetUtcNow());
                 await store.SaveChangesAsync(CancellationToken.None);
             }
             throw;
         }
     }
 
-    private async Task<LlmResult<OutlineGenerationResult>> RepairAsync(OutlineGenerationContext context,
+    private async Task<RepairedOutline> RepairAsync(OutlineGenerationContext context, Guid jobId,
         string malformedOutput, string diagnostic, CancellationToken cancellationToken)
     {
         var resolved = modelResolver.Resolve(AiWorkflowProfiles.StructuredOutputRepair);
         var run = new AiRun("StructuredOutputRepair", context.ProjectId, resolved.Provider, resolved.Model,
             OutlinePrompt.RepairKey, OutlinePrompt.RepairVersion, timeProvider.GetUtcNow(), resolved.Profile.ToString(),
-            context.VideoProjectId, researchReportId: context.ResearchReportId);
+            context.VideoProjectId, researchReportId: context.ResearchReportId, jobId: jobId, workflowStage: "StructuredOutputRepair");
         store.AddAiRun(run);
         await store.SaveChangesAsync(cancellationToken);
         try
@@ -467,9 +468,9 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
                 OutlinePrompt.CreateRepair(malformedOutput, diagnostic).WithResolvedModel(resolved), cancellationToken);
             validator.ValidateGenerated(answer.Value, context);
             run.RecordProvider(answer.Provider, answer.Model);
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
-            return answer;
+            return new(answer, run);
         }
         catch (Exception exception)
         {
@@ -482,6 +483,8 @@ public sealed partial class VideoOutlineJobProcessor(IYoutubeAiFactoryStore stor
             throw;
         }
     }
+
+    private sealed record RepairedOutline(LlmResult<OutlineGenerationResult> Result, AiRun AiRun);
 
     private sealed record GeneratedOutline(OutlineGenerationResult Result, AiRun AiRun, string Provider, string Model);
 }

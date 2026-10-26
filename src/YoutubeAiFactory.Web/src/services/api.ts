@@ -240,4 +240,34 @@ export const api = {
   getProductionPackageLocalization: (projectId: string, videoProjectId: string, packageId: string, locale: 'vi') => request<ProductionLocalizationStatus>(`/api/projects/${projectId}/video-projects/${videoProjectId}/production-packages/${packageId}/localizations/${locale}`),
   requestProductionPackageLocalization: (projectId: string, videoProjectId: string, packageId: string, locale: 'vi') => request<AnalysisRun>(`/api/projects/${projectId}/video-projects/${videoProjectId}/production-packages/${packageId}/localizations/${locale}`, { method: 'POST' }),
   exportProductionPackage: (projectId: string, videoProjectId: string) => request<ProductionExport>(`/api/projects/${projectId}/video-projects/${videoProjectId}/production-package:export`),
+  getObservabilityOverview: (projectId: string, signal?: AbortSignal) => request<ProjectObservabilityOverview>(`/api/projects/${projectId}/observability/overview`, { signal }),
+  getObservabilityCosts: (projectId: string, params?: { from?: string; to?: string; workflow?: string; modelProfile?: string }, signal?: AbortSignal) => request<AiCostBreakdown>(`/api/projects/${projectId}/observability/costs${query(params)}`, { signal }),
+  getObservabilityWorkflows: (projectId: string, signal?: AbortSignal) => request<WorkflowHealth[]>(`/api/projects/${projectId}/observability/workflows`, { signal }),
+  getVideoProjectObservability: (projectId: string, videoProjectId: string, signal?: AbortSignal) => request<VideoProjectObservability>(`/api/projects/${projectId}/video-projects/${videoProjectId}/observability`, { signal }),
+  getObservabilityJobs: (projectId: string, videoProjectId?: string, page = 1, pageSize = 25, signal?: AbortSignal) => request<PagedResult<JobExecution>>(`/api/projects/${projectId}/observability/jobs${query({ videoProjectId, page, pageSize })}`, { signal }),
+  getObservabilityAiRuns: (projectId: string, videoProjectId?: string, page = 1, pageSize = 25, signal?: AbortSignal) => request<PagedResult<AiRunExecution>>(`/api/projects/${projectId}/observability/ai-runs${query({ videoProjectId, page, pageSize })}`, { signal }),
 }
+
+function query(values?: Record<string, string | number | undefined>) {
+  if (!values) return ''
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(values)) if (value !== undefined) search.set(key, String(value))
+  const text = search.toString()
+  return text ? `?${text}` : ''
+}
+
+export type CostAmount = { currency: string; amount: number }
+export type AiCostCategory = { aiRequestCount: number; requestsWithCost: number; unknownCostRequestCount: number; knownOrEstimatedCost: CostAmount[] }
+export type CostGroup = { key: string; aiRequestCount: number; unknownCostRequestCount: number; knownOrEstimatedCost: CostAmount[] }
+export type DailyCost = { date: string; unknownCostRequestCount: number; knownOrEstimatedCost: CostAmount[] }
+export type AiCostBreakdown = { sharedProject: AiCostCategory; videoProjectDirect: AiCostCategory; total: AiCostCategory; byWorkflow: CostGroup[]; byModelProfile: CostGroup[]; byModel: CostGroup[]; dailyTrend: DailyCost[] }
+export type PipelineStageCount = { stage: string; count: number }
+export type ProjectJobSummary = { activeJobCount: number; failedJobCount: number; completedJobCount: number; retryingJobCount: number }
+export type RecentExecution = { kind: string; id: string; workflow: string; status: string; occurredAt: string; failureReason: string | null; videoProjectId: string | null }
+export type ProjectObservabilityOverview = { totalVideoProjects: number; pipeline: PipelineStageCount[]; aiCost: AiCostCategory; jobs: ProjectJobSummary; recentActivity: RecentExecution[] }
+export type WorkflowHealth = { workflow: string; completedJobs: number; failedJobs: number; activeJobs: number; retryingJobs: number; aiRequestCount: number; retriedJobCount: number; failureRate: number | null; retryRate: number | null; averageExecutionMilliseconds: number | null }
+export type WorkflowExecutionSummary = { workflow: string; jobCount: number; aiRequestCount: number; unknownCostRequestCount: number; knownOrEstimatedCost: CostAmount[]; averageExecutionMilliseconds: number | null; latestFailure: string | null }
+export type VideoProjectObservability = { videoProjectId: string; currentStatus: string; directAiCost: AiCostCategory; completedJobCount: number; failedJobCount: number; workflows: WorkflowExecutionSummary[]; recentActivity: RecentExecution[] }
+export type JobExecution = { id: string; type: string; status: string; videoProjectId: string | null; createdAt: string; startedAt: string | null; completedAt: string | null; queueWaitMilliseconds: number | null; executionMilliseconds: number | null; endToEndMilliseconds: number | null; attemptCount: number; retryCount: number; failureReason: string | null }
+export type AiRunExecution = { id: string; jobId: string | null; videoProjectId: string | null; workflow: string; workflowStage: string | null; status: string; modelProfile: string; provider: string; model: string; promptKey: string; promptVersion: number; startedAt: string; completedAt: string | null; durationMilliseconds: number | null; inputTokens: number | null; outputTokens: number | null; cachedInputTokens: number | null; reasoningTokens: number | null; cost: number | null; currency: string | null; costSource: string; retryCount: number; errorCategory: string | null; failureReason: string | null }
+export type PagedResult<T> = { items: T[]; page: number; pageSize: number; totalCount: number }

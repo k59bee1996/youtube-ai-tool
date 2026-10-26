@@ -68,6 +68,38 @@ public sealed class OpenAiLlmProviderTests
     }
 
     [Fact]
+    public async Task GenerateStructuredAsync_records_optional_usage_and_uses_historical_configured_pricing()
+    {
+        var handler = new QueueHttpMessageHandler(ResponseWithUsage());
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var provider = new OpenAiLlmProvider(client, Options.Create(new AiOptions
+        {
+            ApiKey = "test-key",
+            Pricing =
+            [
+                new AiModelPricingOptions
+                {
+                    Provider = "OpenAI", Model = "test-model", Currency = "USD", PriceVersion = "fixture-v1",
+                    InputPricePerMillionTokens = 2m, CachedInputPricePerMillionTokens = 1m,
+                    OutputPricePerMillionTokens = 4m, EffectiveFrom = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                },
+            ],
+        }));
+        var request = new LlmRequest("test-prompt", 1, "system", "user")
+            .WithResolvedModel(new ResolvedAiModel(AiModelProfile.Reasoning, "OpenAI", "test-model", 60, 5_000));
+
+        var result = await provider.GenerateStructuredAsync<JsonElement>(request, CancellationToken.None);
+
+        Assert.Equal(1_000, result.InputTokens);
+        Assert.Equal(2_000, result.OutputTokens);
+        Assert.Equal(200, result.CachedInputTokens);
+        Assert.Equal(20, result.ReasoningTokens);
+        Assert.Equal(0.0098m, result.CalculatedEstimatedCost);
+        Assert.Equal("USD", result.Currency);
+        Assert.Equal("fixture-v1", result.PricingVersion);
+    }
+
+    [Fact]
     public async Task GenerateStructuredAsync_includes_safe_openai_error_details_and_a_context_diagnostic_without_returning_the_error_message()
     {
         var handler = new QueueHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.BadRequest)
@@ -148,6 +180,14 @@ public sealed class OpenAiLlmProviderTests
                 model = "test-model",
                 usage = new { prompt_tokens = 1, completion_tokens = 1 },
             }),
+            Encoding.UTF8,
+            "application/json"),
+    };
+
+    private static HttpResponseMessage ResponseWithUsage() => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(
+            """{"choices":[{"message":{"content":"{\"value\":\"priced\"}"}}],"model":"test-model","usage":{"prompt_tokens":1000,"completion_tokens":2000,"prompt_tokens_details":{"cached_tokens":200},"completion_tokens_details":{"reasoning_tokens":20}}}""",
             Encoding.UTF8,
             "application/json"),
     };

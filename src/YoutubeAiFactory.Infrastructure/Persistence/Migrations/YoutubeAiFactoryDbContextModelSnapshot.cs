@@ -30,6 +30,15 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
+                    b.Property<int?>("CachedInputTokens")
+                        .HasColumnType("int")
+                        .HasColumnName("cached_input_tokens");
+
+                    b.Property<decimal?>("CalculatedEstimatedCost")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("decimal(19,8)")
+                        .HasColumnName("calculated_estimated_cost");
+
                     b.Property<Guid?>("CompetitorId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("competitor_channel_id");
@@ -37,6 +46,22 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("completed_at");
+
+                    b.Property<string>("CostSource")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("cost_source");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("ErrorCategory")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("error_category");
 
                     b.Property<decimal?>("EstimatedCost")
                         .HasPrecision(18, 6)
@@ -51,6 +76,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.Property<int?>("InputTokens")
                         .HasColumnType("int")
                         .HasColumnName("input_tokens");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("job_id");
 
                     b.Property<long?>("LatencyMilliseconds")
                         .HasColumnType("bigint")
@@ -72,6 +101,15 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("int")
                         .HasColumnName("output_tokens");
 
+                    b.Property<DateTimeOffset?>("PricingEffectiveFrom")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("pricing_effective_from");
+
+                    b.Property<string>("PricingVersion")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("pricing_version");
+
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
@@ -91,6 +129,15 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("provider");
+
+                    b.Property<decimal?>("ProviderReportedCost")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("decimal(19,8)")
+                        .HasColumnName("provider_reported_cost");
+
+                    b.Property<int?>("ReasoningTokens")
+                        .HasColumnType("int")
+                        .HasColumnName("reasoning_tokens");
 
                     b.Property<Guid?>("ResearchReportId")
                         .HasColumnType("uniqueidentifier")
@@ -124,9 +171,16 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("workflow");
 
+                    b.Property<string>("WorkflowStage")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("workflow_stage");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CompetitorId", "StartedAt");
+
+                    b.HasIndex("JobId", "StartedAt");
 
                     b.HasIndex("ProjectId", "StartedAt");
 
@@ -135,6 +189,8 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                     b.HasIndex("ResearchRunId", "StartedAt");
 
                     b.HasIndex("VideoProjectId", "StartedAt");
+
+                    b.HasIndex("ProjectId", "Workflow", "StartedAt");
 
                     b.ToTable("ai_runs", "yaf");
                 });
@@ -674,6 +730,10 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("ExecutionStartedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("execution_started_at");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)")
@@ -741,12 +801,16 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_jobs_active_idea_generation")
                         .HasFilter("type = 'idea-generation' AND status IN ('Queued', 'Running', 'Retrying')");
 
+                    b.HasIndex("ProjectId", "CreatedAt");
+
                     b.HasIndex("ProjectId", "Type")
                         .IsUnique()
                         .HasDatabaseName("ux_jobs_active_project_analysis")
                         .HasFilter("type IN ('opportunity-analysis', 'pilot-generation') AND status IN ('Queued', 'Running', 'Retrying')");
 
                     b.HasIndex("Status", "AvailableAt");
+
+                    b.HasIndex("VideoProjectId", "CreatedAt");
 
                     b.HasIndex("VideoProjectId", "Type")
                         .IsUnique()
@@ -3066,6 +3130,11 @@ namespace YoutubeAiFactory.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("YoutubeAiFactory.Domain.AI.AiRun", b =>
                 {
+                    b.HasOne("YoutubeAiFactory.Domain.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("YoutubeAiFactory.Domain.Projects.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")

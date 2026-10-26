@@ -30,6 +30,16 @@ Phase 2 is intentionally single-user and has no authentication or workspace auth
 - `GET /health/live` confirms the process can answer requests.
 - `GET /health/ready` checks SQL Server connectivity and YouTube API-key configuration.
 
+## Observability
+
+- `GET /api/projects/{projectId}/observability/overview` returns the current VideoProject pipeline, active/completed/failed Job counts, project AI cost coverage, and recent Job/AiRun activity.
+- `GET /api/projects/{projectId}/observability/costs` returns shared-project and VideoProject-direct AI cost separately, with optional `from`, `to`, `workflow`, and `modelProfile` filters. Costs are grouped by currency; unknown cost is reported as a count and never coerced to zero.
+- `GET /api/projects/{projectId}/observability/workflows` returns deterministic completed/failed/active/retrying Job counts, terminal failure/retry rates, AI request counts, and recorded execution durations. Failure rate is `Failed / (Completed + Failed)`; cancelled and active Jobs are excluded from the denominator.
+- `GET /api/projects/{projectId}/video-projects/{videoProjectId}/observability` returns direct VideoProject cost, cost coverage, workflow summaries, and recent activity. Shared strategy costs remain on the Project dashboard.
+- `GET /api/projects/{projectId}/observability/jobs?page=1&pageSize=25` and `GET /api/projects/{projectId}/observability/ai-runs?page=1&pageSize=25` expose bounded, project-scoped execution history. Both accept an optional `videoProjectId` filter.
+
+These endpoints are read-only and do not invoke AI, enqueue work, or change VideoProject state. In the current single-user V1, project IDs provide scope against accidental cross-project reads; authentication/workspace authorization remains a prerequisite before exposing the API to untrusted users. Dashboard amounts distinguish provider-reported cost, price-calculated estimates, and unavailable cost. Optional effective-dated prices are configured under `AI:Pricing`; no provider prices are assumed.
+
 ## AI analysis behavior
 
 Competitor IDs are always scoped to their route project. A competitor without collected videos returns a validation problem instead of consuming an AI call. Repeated run commands while a matching job is queued/running return the existing job. A failed job preserves a safe failure message and may be retried by submitting a new run command. Start `YoutubeAiFactory.Worker` to execute queued jobs.

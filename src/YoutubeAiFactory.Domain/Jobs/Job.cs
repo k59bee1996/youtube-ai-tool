@@ -77,6 +77,9 @@ public sealed class Job
 
     public DateTimeOffset? StartedAt { get; private set; }
 
+    /// <summary>Immutable start of the current attempt; StartedAt remains a lease-heartbeat timestamp for recovery.</summary>
+    public DateTimeOffset? ExecutionStartedAt { get; private set; }
+
     public Guid? LeaseId { get; private set; }
 
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -102,6 +105,7 @@ public sealed class Job
 
         Status = JobStatus.Running;
         StartedAt = startedAt;
+        ExecutionStartedAt = startedAt;
         LeaseId = leaseId ?? Guid.NewGuid();
         FailureReason = null;
     }
@@ -136,6 +140,7 @@ public sealed class Job
         Status = JobStatus.Queued;
         AvailableAt = availableAt;
         StartedAt = null;
+        ExecutionStartedAt = null;
         LeaseId = null;
         FailureReason = "Recovered after worker interruption.";
     }

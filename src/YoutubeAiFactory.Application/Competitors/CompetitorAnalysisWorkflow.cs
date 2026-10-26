@@ -83,7 +83,7 @@ public sealed class CompetitorAnalysisJobProcessor(
                 ?? throw new ResourceNotFoundException("The competitor for this analysis job no longer exists.");
             var context = contextBuilder.Build(competitor);
             var resolvedModel = modelResolver.Resolve(CompetitorAnalysisPrompt.ModelProfile);
-            run = new AiRun("CompetitorAnalysis", payload.ProjectId, payload.CompetitorId, resolvedModel.Provider, resolvedModel.Model, CompetitorAnalysisPrompt.Key, CompetitorAnalysisPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString());
+            run = new AiRun("CompetitorAnalysis", payload.ProjectId, payload.CompetitorId, resolvedModel.Provider, resolvedModel.Model, CompetitorAnalysisPrompt.Key, CompetitorAnalysisPrompt.Version, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), jobId: job.Id, workflowStage: "Generation");
             store.AddAiRun(run);
             await store.SaveChangesAsync(cancellationToken);
             LlmResult<CompetitorAnalysisResult>? answer = null;
@@ -118,7 +118,7 @@ public sealed class CompetitorAnalysisJobProcessor(
                 answer.Provider, answer.Model, context.SourceDataAsOf, context.AnalyzedVideoCount,
                 JsonSerializer.Serialize(answer.Value, CompetitorAnalysisPrompt.SerializerOptions), timeProvider.GetUtcNow());
             store.AddCompetitorAnalysis(persisted);
-            run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+            run.CompleteFrom(answer, timeProvider.GetUtcNow());
             job.Complete(timeProvider.GetUtcNow());
             await store.SaveChangesAsync(cancellationToken);
             LogCompleted(logger, competitor.Id, version, context.AnalyzedVideoCount, run.RetryCount, null);

@@ -1,6 +1,6 @@
 # YouTube AI Factory
 
-YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 11 converts one explicitly approved, evidence-grounded Script into a versioned production package of scenes, shots, reusable asset requirements, on-screen text, motion, transitions, and audio direction. It validates complete ScriptBlock coverage, audits visual factuality, and exports only an explicitly approved package.
+YouTube AI Factory turns YouTube market information into structured content intelligence. Phase 12 adds read-only operational observability and cost accounting over the Phase 0–11 workflows: production pipeline state, durable Job history, AiRun usage, known/estimated cost, unknown-cost coverage, and workflow health. It does not generate media, publish videos, or implement billing.
 
 ## Repository layout
 
@@ -45,6 +45,8 @@ GitHub Actions runs for pull requests targeting `main` and pushes to `main`. It 
 
 Run the same checks locally using the commands in [Local Development](docs/LOCAL_DEVELOPMENT.md#validate), including the optional disposable SQL Server integration database.
 
-## Phase boundary
+## V1 boundary
 
-Start the Worker as well as the API to process competitor, opportunity, idea-generation, pilot-generation, localization, research, outline, Script, and production-package jobs. A `ScriptApproved` VideoProject can queue Reasoning-class production planning. The worker preserves exact Script/Outline/Research lineage, maps every ScriptBlock once in order, calculates timing deterministically, runs a separate visual-grounding audit, and persists only a passed version. Editing instructions changes grounding to `Pending`; revalidation is audit-only, and optimistic concurrency prevents stale approval after a racing edit. Approval moves the project to `ProductionReady`, after which `production-package-export:v1` JSON is available. The Production workspace offers a lazy Vietnamese reading aid for selected explanations without changing narration, prompts, instructions, or export. Phase 11 does not call image, video, TTS, storage, or rendering providers.
+Start the Worker as well as the API to process competitor, opportunity, idea-generation, pilot-generation, localization, research, outline, Script, and production-package jobs. A `ScriptApproved` VideoProject can queue Reasoning-class production planning. The worker preserves exact Script/Outline/Research lineage, maps every ScriptBlock once in order, calculates timing deterministically, runs a separate visual-grounding audit, and persists only a passed version. Editing instructions changes grounding to `Pending`; revalidation is audit-only, and optimistic concurrency prevents stale approval after a racing edit. Approval moves the project to `ProductionReady`, after which `production-package-export:v1` JSON is available. The Production workspace offers a lazy Vietnamese reading aid for selected explanations without changing narration, prompts, instructions, or export.
+
+Phase 12 adds read-only project and VideoProject observability over persisted workflow records. Dashboard reads do not invoke AI, enqueue jobs, translate artifacts, or change workflow state. V1 stops at structured production planning and operational reporting; it does not call image, video, TTS, storage, rendering, publishing, or billing providers.

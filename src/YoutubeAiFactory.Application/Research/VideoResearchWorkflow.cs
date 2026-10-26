@@ -160,7 +160,7 @@ public sealed class VideoResearchJobProcessor(
                 throw new ApplicationValidationException("Video project research inputs changed after this run was queued. Start a new research run from the current brief.");
 
             var planAnswer = await GenerateAsync<ResearchQueryPlanResult>("ResearchQueryPlanning", diagnostic => ResearchPrompts.QueryPlan(brief, diagnostic),
-                value => ValidatePlan(value), payload, executionToken);
+                value => ValidatePlan(value), payload, job.Id, executionToken);
             activeAiRun = planAnswer.AiRun;
             var plan = new ResearchPlan(planAnswer.Result.Objective, planAnswer.Result.Questions, planAnswer.Result.Queries,
                 planAnswer.Result.PriorityFactAreas, planAnswer.Result.KnownRisks);
@@ -176,7 +176,7 @@ public sealed class VideoResearchJobProcessor(
             {
                 var relevance = await GenerateAsync<ResearchSourceRelevanceResult>("ResearchSourceRelevance",
                     diagnostic => ResearchPrompts.Relevance(brief, plan, item.Source.Title ?? item.Source.Domain, item.Source.CanonicalUrl, item.Text, diagnostic),
-                    ValidateRelevance, payload, executionToken);
+                    ValidateRelevance, payload, job.Id, executionToken);
                 activeAiRun = relevance.AiRun;
                 if (relevance.Result.Relevance is ResearchSourceRelevance.Relevant or ResearchSourceRelevance.PossiblyRelevant)
                 {
@@ -193,7 +193,7 @@ public sealed class VideoResearchJobProcessor(
                 if (evidence.Count >= options.MaxTotalEvidenceItems) break;
                 var extracted = await GenerateAsync<ResearchEvidenceExtractionResult>("ResearchEvidenceExtraction",
                     diagnostic => ResearchPrompts.Evidence(brief, plan, item.Source.Id, item.Source.Title ?? item.Source.Domain, item.Source.CanonicalUrl, item.Text, diagnostic),
-                    value => ValidateEvidenceExtraction(value, item.Text), payload, executionToken);
+                    value => ValidateEvidenceExtraction(value, item.Text), payload, job.Id, executionToken);
                 activeAiRun = extracted.AiRun;
                 foreach (var candidate in extracted.Result.Evidence.Take(options.MaxEvidenceItemsPerSource))
                 {
@@ -223,7 +223,7 @@ public sealed class VideoResearchJobProcessor(
             {
                 var contradictionAnswer = await GenerateAsync<ResearchContradictionAnalysisResult>("ResearchContradictionAnalysis",
                     diagnostic => ResearchPrompts.Contradictions(brief, ToPromptClaims(claims, claimEvidence), ToPromptEvidence(evidence, sourceById), diagnostic),
-                    value => ValidateConflicts(value, claims.Select(item => item.Claim.Id), evidence.Select(item => item.Id), claimEvidence), payload, executionToken);
+                    value => ValidateConflicts(value, claims.Select(item => item.Claim.Id), evidence.Select(item => item.Id), claimEvidence), payload, job.Id, executionToken);
                 activeAiRun = contradictionAnswer.AiRun;
                 foreach (var conflict in contradictionAnswer.Result.Conflicts.DistinctBy(item => (item.ClaimId, item.SupportingEvidenceId, item.ContradictingEvidenceId)))
                 {
@@ -240,7 +240,7 @@ public sealed class VideoResearchJobProcessor(
             var synthesisAnswer = await GenerateAsync<ResearchSynthesisResult>("ResearchSynthesis",
                 diagnostic => ResearchPrompts.Synthesis(brief, plan, ToPromptClaims(claims, claimEvidence), ToPromptEvidence(evidence, sourceById),
                     conflicts.Select(item => new ConflictForPrompt(item.ResearchClaimId, item.SupportingEvidenceId, item.ContradictingEvidenceId, item.Explanation, item.IsResolved)).ToArray(), deterministicGaps, diagnostic),
-                value => ValidateSynthesis(value, claims.Select(item => item.Claim), claimEvidence, evidenceById), payload, executionToken);
+                value => ValidateSynthesis(value, claims.Select(item => item.Claim), claimEvidence, evidenceById), payload, job.Id, executionToken);
             activeAiRun = synthesisAnswer.AiRun;
             var mergedSynthesis = synthesisAnswer.Result with
             {
@@ -295,12 +295,12 @@ public sealed class VideoResearchJobProcessor(
     }
 
     private async Task<(T Result, AiRun AiRun)> GenerateAsync<T>(string workflow, Func<string?, LlmRequest> requestFactory, Action<T> validate,
-        ResearchJobPayload payload, CancellationToken cancellationToken)
+        ResearchJobPayload payload, Guid jobId, CancellationToken cancellationToken)
     {
         var initialRequest = requestFactory(null);
         var resolvedModel = modelResolver.Resolve(initialRequest.ModelProfile);
         var run = new AiRun(workflow, payload.ProjectId, resolvedModel.Provider, resolvedModel.Model, initialRequest.PromptKey,
-            initialRequest.PromptVersion, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), payload.VideoProjectId, payload.ResearchRunId);
+            initialRequest.PromptVersion, timeProvider.GetUtcNow(), resolvedModel.Profile.ToString(), payload.VideoProjectId, payload.ResearchRunId, jobId: jobId, workflowStage: workflow);
         store.AddAiRun(run);
         await store.SaveChangesAsync(cancellationToken);
         string? diagnostic = null;
@@ -314,7 +314,7 @@ public sealed class VideoResearchJobProcessor(
                     cancellationToken.ThrowIfCancellationRequested();
                     validate(answer.Value);
                     run.RecordProvider(answer.Provider, answer.Model);
-                    run.Complete(answer.InputTokens, answer.OutputTokens, null, timeProvider.GetUtcNow());
+                    run.CompleteFrom(answer, timeProvider.GetUtcNow());
                     await store.SaveChangesAsync(cancellationToken);
                     return (answer.Value, run);
                 }

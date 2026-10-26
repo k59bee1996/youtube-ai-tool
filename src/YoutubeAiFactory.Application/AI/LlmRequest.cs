@@ -42,6 +42,7 @@ public sealed record LlmRequest
         OutputSchema = outputSchema?.DeepClone();
         ModelProfile = modelProfile;
         ResolvedModel = resolvedModel;
+        RequestedAt = DateTimeOffset.UtcNow;
     }
 
     public string PromptKey { get; }
@@ -63,12 +64,19 @@ public sealed record LlmRequest
     /// <summary>Provider execution settings selected by infrastructure for this request.</summary>
     public ResolvedAiModel? ResolvedModel { get; }
 
+    /// <summary>Time at which this provider request contract was created, used for effective-dated pricing.</summary>
+    public DateTimeOffset RequestedAt { get; private init; }
+
     public LlmRequest WithResolvedModel(ResolvedAiModel model)
     {
         ArgumentNullException.ThrowIfNull(model);
         if (model.Profile != ModelProfile)
             throw new ArgumentException("Resolved model profile must match the request profile.", nameof(model));
 
-        return new LlmRequest(PromptKey, PromptVersion, SystemInstructions, UserContent, ModelConfiguration, OutputSchema, ModelProfile, model);
+        var resolved = new LlmRequest(PromptKey, PromptVersion, SystemInstructions, UserContent, ModelConfiguration, OutputSchema, ModelProfile, model)
+        {
+            RequestedAt = RequestedAt,
+        };
+        return resolved;
     }
 }
