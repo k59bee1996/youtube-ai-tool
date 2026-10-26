@@ -2428,49 +2428,33 @@ always choose the complete workflow.
 
 The current immediate objective is:
 
-**## MILESTONE 1**
+**## V1 RELEASE HARDENING**
 
-Build a working vertical slice:
+Complete and release the Phase 0–12 modular-monolith V1:
 
 \`\`\`text
 
-Create Project
+Verify Phase 12 observability and cost accounting
 
  ↓
 
-Submit YouTube competitor URL
+Resolve review findings and merge the Phase 12 pull request
 
  ↓
 
-Resolve channel
+Run backend, frontend, formatting, and SQL Server integration validation
 
  ↓
 
-Collect channel/video metadata
+Run one credentialed end-to-end smoke test
 
  ↓
 
-Persist to SQL Server
-
- ↓
-
-Display competitor information
-
- ↓
-
-Run structured competitor AI analysis
-
- ↓
-
-Persist analysis
-
- ↓
-
-Display Winning Patterns
+Document known limitations and tag the V1 release
 
 \`\`\`
 
-Do not proceed to Niche Finder, Idea Engine, Script Engine or Production Package until this milestone is reliable.
+Do not add post-V1 capabilities such as media generation, publishing, billing, teams, or distributed infrastructure until this release-hardening milestone is complete. Preserve the existing Phase 0–12 behavior while fixing release blockers.
 
 **---**
 

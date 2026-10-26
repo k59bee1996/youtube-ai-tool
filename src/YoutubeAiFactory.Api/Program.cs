@@ -131,7 +131,7 @@ app.UseExceptionHandler();
 app.MapGet("/", () => Results.Ok(new
 {
     service = "YouTube AI Factory API",
-    phase = "phase-11",
+    phase = "phase-12",
 }));
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
